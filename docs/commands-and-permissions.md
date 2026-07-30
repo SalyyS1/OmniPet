@@ -1,78 +1,33 @@
 # Commands and permissions
 
-OmniPet registers `/pets` and `/pet` through Paper's modern command lifecycle. Both names use the same command tree and can be used with selectors, `/execute`, command blocks, and functions where Paper permits them.
+Phase 1 registers one minimal Paper command. The old menu, item, egg, inspection, and admin command tree is not part of the authoritative runtime yet.
 
-## Player commands
+## Foundation command
 
-| Command | Permission | Description |
+| Command | Alias | Permission | Current behavior |
+| --- | --- | --- | --- |
+| `/pet` | `/pets` | `omnipet.general` | Returns the foundation status message. |
+
+The implementation is intentionally small while the Studio and player command phases are built. It does not open a GUI, mutate player data, hatch eggs, give items, or summon pets.
+
+## Descriptor defaults
+
+These nodes are declared in `omnipet-paper/src/main/resources/paper-plugin.yml`:
+
+| Node | Default | Phase 1 meaning |
 | --- | --- | --- |
-| `/pets` | `omnipet.general` | Open page 1 of the pet menu. |
-| `/pets <page>` | `omnipet.general` | Open a one-based pet menu page. |
-| `/pet` | `omnipet.general` | Stable alias for `/pets`. |
+| `omnipet.*` | `op` | Grants `omnipet.general` and the declared admin tree. |
+| `omnipet.general` | `true` | Allows `/pet` and `/pets`. |
+| `omnipet.admin.*` | `false` | Reserved for later admin commands. |
+| `omnipet.admin.reload` | `false` | Reserved; no reload command is registered yet. |
+| `omnipet.admin.inspect` | `false` | Reserved; no inspect command is registered yet. |
+| `omnipet.admin.explore` | `false` | Reserved; no explore command is registered yet. |
+| `omnipet.admin.managepet` | `false` | Reserved; no pet-management command is registered yet. |
+| `omnipet.admin.manageegg` | `false` | Reserved; no egg-management command is registered yet. |
+| `omnipet.admin.item` | `false` | Reserved; no item command is registered yet. |
 
-Example:
+`omnipet.general` is the only permission currently checked by the foundation command. Granting a reserved admin node does not enable a hidden command.
 
-```text
-/execute as @a[tag=pet-preview] run pets
-```
+## Migration note
 
-## Administrative commands
-
-Every admin command also passes through the root `omnipet.general` check. Grant both the admin node and general access if your permissions plugin overrides defaults.
-
-| Command | Permission | Description |
-| --- | --- | --- |
-| `/pets reload` | `omnipet.admin.reload` | Reload configs and online player runtime state. Test changes on staging first. |
-| `/pets inspect <players>` | `omnipet.admin.inspect` | Show egg and pet summaries for one or more profiles. |
-| `/pets explore <player> [path]` | `omnipet.admin.explore` | Explore codec-backed player data for diagnostics. Treat output as sensitive. |
-| `/pets pet give <pet> [players]` | `omnipet.admin.managepet` | Add a default instance of a configured pet type. |
-| `/pets pet take <slot> [player]` | `omnipet.admin.managepet` | Remove the zero-based pet-list slot. |
-| `/pets egg set <egg> [players]` | `omnipet.admin.manageegg` | Start the configured egg duration. |
-| `/pets egg set <egg> <players> <duration>` | `omnipet.admin.manageegg` | Start an egg with an explicit duration such as `10m` or `2h30m`. |
-| `/pets egg clear [players]` | `omnipet.admin.manageegg` | Clear the current hatch job. |
-| `/pets item food <food> [players]` | `omnipet.admin.item` | Give a standalone food from `items.yml`. |
-| `/pets item hatcher <hatcher> [players]` | `omnipet.admin.item` | Give a hatch-time reduction item. |
-| `/pets item evolver [players]` | `omnipet.admin.item` | Give the configured evolver. |
-| `/pets item egg <egg> [players]` | `omnipet.admin.item` | Give a configured egg item. |
-
-When `[players]` is omitted, the executor must be a player and becomes the target. Console automation should always supply an explicit selector or player.
-
-## Permission tree
-
-| Node | Default | Children/purpose |
-| --- | --- | --- |
-| `omnipet.*` | op | `omnipet.general`, `omnipet.admin.*` |
-| `omnipet.general` | true | Player command root |
-| `omnipet.admin.*` | false | All admin nodes |
-| `omnipet.admin.reload` | false | Reload |
-| `omnipet.admin.inspect` | false | Summary inspection |
-| `omnipet.admin.explore` | false | Codec explorer |
-| `omnipet.admin.managepet` | false | Pet add/remove |
-| `omnipet.admin.manageegg` | false | Egg set/clear |
-| `omnipet.admin.item` | false | Give plugin items |
-
-## Storage permissions
-
-Storage uses the `slotPermission` template from `config.yml`, not the `omnipet.*` tree. The default is:
-
-```yaml
-slotPermission: petstorage.slot.%s
-```
-
-`%s` becomes `1`, `2`, and so on. Permissions must be consecutive: having slot 5 without slots 1-4 does not create five usable slots.
-
-## Migration notes
-
-The legacy `passivepet.*` nodes are accepted as fallback command checks, but are not the primary OmniPet names. During migration:
-
-1. Add equivalent `omnipet.*` grants to groups, command blocks, menus, and automation.
-2. Keep old grants temporarily, then remove them after all command users migrate.
-3. Preserve `petstorage.slot.%s` unless you deliberately migrate every slot grant.
-4. Audit console scripts for the stable `/pet` and `/pets` aliases; no command rename is required.
-
-## Safety
-
-- Back up before bulk `pet take`, `egg clear`, or reload operations.
-- Avoid exposing `/pets explore` output publicly; player data can include UUIDs and progression state.
-- Use selectors narrowly. `@a` item or pet grants can create a large number of mutations in one command.
-- Test command syntax after changing Paper builds because the command API is version-sensitive.
+Before cutover, export old permission groups and add the `omnipet.*` names deliberately. Do not assume the Phase 1 foundation command accepts legacy `passivepet.*` grants. Preserve `petstorage.slot.%s` and other old grants for later gameplay phases rather than deleting them during the build foundation migration.

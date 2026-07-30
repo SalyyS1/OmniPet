@@ -1,112 +1,66 @@
 # Getting started
 
-This guide covers a clean OmniPet install on a Paper server. If the server has ever used PassivePet, stop and follow [Migration](migration.md) first.
+This guide covers the verified Phase 1 foundation. The JAR boots, loads versioned pet definitions, establishes persistence/migration seams, and registers a minimal command. Studio, hatching, slots, renderers, integrations, economy, and progression are later phases.
 
-## 1. Choose the runtime
+## Requirements
 
-| Paper line | Required Java | OmniPet position |
-| --- | ---: | --- |
-| 1.21.x | 21 | Primary line; test the exact Paper build you deploy. |
-| 26.1.1 | 25 | Preview pin: `26.1.1.build.29-alpha` passed the core compile probe. |
-| 26.1.2+ / 26.2 | 25 | Experimental; `26.1.2.build.74-stable` passed the core compile probe. |
-
-The default Gradle build compiles against Paper API `1.21-R0.1-SNAPSHOT`; the CI compatibility lane also probes `1.21.11-R0.1-SNAPSHOT`. `api-version: 1.21` is a descriptor contract, not proof that every 1.21 patch is binary-compatible.
-
-## 2. Install the plugin
-
-1. Stop the server.
-2. Put `OmniPet-<version>.jar` in `plugins/`.
-3. Install optional dependencies only if you use their features:
-   - MythicLib for `mythiclibBuffs` and `mythiclib.cast(...)`.
-   - MMOItems for OmniPet item stats and the `mmoitems(...)` expression provider.
-4. Start the server once.
-5. Confirm the log reports `OmniPet` enabled and only initializes hooks for installed plugins.
-
-OmniPet creates:
-
-```text
-plugins/OmniPet/
-  MANUAL.md
-  config.yml
-  eggs.yml
-  gui.yml
-  items.yml
-  lang.yml
-  pets/
-    example_pet.yml
-    nahara.yml
-  data/
-    players/
-```
-
-Generated files are copied only when the install is new. Keep them in source control or a backup system appropriate for your server; never store player files in a public repository.
-
-## 3. Review the starter pack
-
-At minimum, check:
-
-- `config.yml`: global storage cap and slot permission template.
-- `eggs.yml`: positive hatch durations and valid pet IDs.
-- `pets/*.yml`: pet components, MiniMessage, expressions, and optional integration use.
-- `gui.yml`: menu size, item materials, component lore placeholders.
-- `items.yml`: standalone food, evolver, egg, and hatcher templates.
-- `lang.yml`: player-facing messages and progress-bar lore.
-
-Run `/pets reload` after an intentional configuration change. Prefer a staging server: reload errors can leave a live server with partial configuration and are not a substitute for startup validation.
-
-## 4. Grant storage slots
-
-The default slot template is `petstorage.slot.%s`; `%s` becomes the 1-based slot number. A player needs every slot permission in sequence.
-
-Example with LuckPerms:
-
-```text
-/lp group default permission set petstorage.slot.1 true
-/lp group vip permission set petstorage.slot.2 true
-/lp group vip permission set petstorage.slot.3 true
-```
-
-All player commands require `omnipet.general`, which defaults to true. Admin subcommands require the matching `omnipet.admin.*` permission as well.
-
-## 5. Test the first hatch
-
-```text
-/pets item egg common <player>
-```
-
-The player right-clicks the egg to begin hatching. Use a hatcher item to reduce the remaining time:
-
-```text
-/pets item hatcher elixir <player>
-```
-
-For a faster staging test, an administrator can directly set an egg and duration:
-
-```text
-/pets egg set common <player> 10s
-```
-
-After hatching, open `/pets`, left-click the pet to summon it, and interact with its display to test food, evolver, or trigger behavior.
-
-## 6. Production checklist
-
-- Back up the plugin data folder before each upgrade.
-- Pin the exact Paper, Java, MythicLib, and MMOItems versions used for release testing.
-- Confirm clean boot with no optional plugins and with each enabled integration.
-- Validate summon, recall, hatch, quit/rejoin, reload, and disable behavior.
-- Keep user-authored expressions bounded and review any item-granting trigger.
-- Never use lore or display names as security identifiers; OmniPet items use persistent data.
+- JDK 21 for the normal build and release target.
+- The checked-in Gradle Wrapper; no system Gradle or Maven workflow is required.
+- Paper API compatibility should be judged by exact compile probes and live smoke tests, not a version range.
 
 ## Build from source
 
-From the OmniPet project directory:
+Run from the OmniPet directory:
 
-```bash
+```text
 # Windows
-gradlew.bat clean test jar
+gradlew.bat clean build
 
 # Linux/macOS
-./gradlew clean test jar
+./gradlew clean build
 ```
 
-The release JAR is written under `build/libs/`, with a copy under `build/release/` after a full build. Use Gradle commands in automation and documentation; Maven metadata in historical files is not the release workflow.
+`clean build` runs module tests and the branding, module-boundary, Gradle-only, compatibility-compile, and distribution checks. Do not substitute Maven commands or add a parallel Maven artifact path.
+
+## Find the artifact
+
+The root build copies one installable JAR to:
+
+```text
+build/release/OmniPet-3.0.0-SNAPSHOT.jar
+```
+
+The producing module also writes `omnipet-paper/build/libs/OmniPet-3.0.0-SNAPSHOT.jar`. The descriptor author is `SalyVn`.
+
+## Foundation server check
+
+1. Stop the test server.
+2. Back up any existing `plugins/PassivePet/` and `plugins/OmniPet/` directories.
+3. Put the release JAR in `plugins/`.
+4. Start Paper with the Java runtime required by that exact server build.
+5. Confirm the log contains `OmniPet foundation enabled` or a clear fail-closed initialization error.
+6. Run `/pet` and `/pets`. Both currently return the foundation status message; they do not open a menu.
+
+The command requires `omnipet.general`, which defaults to `true`. Declared admin permissions are reserved for later command branches.
+
+## Data used by Phase 1
+
+The bootstrap initializes these paths under `plugins/OmniPet/`:
+
+```text
+pets/                         # versioned pet definition YAML
+data/players/                 # versioned player state repository
+migration/legacy-eggs-v1.yml  # created only when legacy eggs.yml is present
+```
+
+Phase 1 does not copy the old PassivePet folder, install gameplay starter configs, or expose a complete player lifecycle. Migrate only on a staging copy and follow [Migration](migration.md).
+
+## Compatibility scope
+
+The build probes Paper APIs `1.21-R0.1-SNAPSHOT`, `1.21.11-R0.1-SNAPSHOT`, `26.1.1.build.29-alpha`, `26.1.2.build.74-stable`, and `26.2.build.87-stable`. The 26.x jobs use a Java 25 compiler while still producing Java 21 bytecode. These are compile checks only; no live Paper smoke test is part of Phase 1 evidence.
+
+## Next reading
+
+- [Developer guide](developer-guide.md) for module and repository contracts.
+- [Compatibility](compatibility.md) before testing a Paper build.
+- [Roadmap](roadmap.md) for features not yet shipped.

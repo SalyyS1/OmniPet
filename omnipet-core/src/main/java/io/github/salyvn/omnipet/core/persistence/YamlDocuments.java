@@ -1,0 +1,48 @@
+package io.github.salyvn.omnipet.core.persistence;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+
+import io.github.salyvn.omnipet.core.domain.RawNodeValues;
+
+public final class YamlDocuments {
+    private static final Yaml READER = reader();
+    private static final Yaml WRITER = writer();
+
+    private YamlDocuments() {}
+
+    public static Map<String, Object> readMap(String yaml) {
+        Object value = READER.load(yaml == null ? "" : yaml);
+        if (value == null) return new LinkedHashMap<>();
+        if (!(value instanceof Map<?, ?> map)) throw new IllegalArgumentException("YAML document must be a map");
+        LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+        map.forEach((key, nested) -> result.put(String.valueOf(key), RawNodeValues.mutableCopy(nested)));
+        RawNodeValues.rejectNonFinite(result, "document");
+        return result;
+    }
+
+    public static String writeMap(Map<String, Object> value) {
+        return WRITER.dump(RawNodeValues.mutableCopy(value));
+    }
+
+    private static Yaml reader() {
+        LoaderOptions options = new LoaderOptions();
+        options.setAllowDuplicateKeys(false);
+        options.setMaxAliasesForCollections(50);
+        return new Yaml(new SafeConstructor(options));
+    }
+
+    private static Yaml writer() {
+        DumperOptions options = new DumperOptions();
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        options.setPrettyFlow(true);
+        options.setIndent(2);
+        options.setWidth(120);
+        return new Yaml(options);
+    }
+}

@@ -1,86 +1,57 @@
 # OmniPet
 
-OmniPet is a configurable Paper plugin for collectible pets, egg hatching, pet storage, leveling, stamina, triggers, and optional Mythic ecosystem integrations. It is maintained by SalyVn and keeps the original YAML component model while the runtime is being modernized.
+OmniPet is a Paper plugin rewrite. This checkout is the verified Phase 1 foundation: a Gradle-only build, a two-module boundary, versioned YAML/domain contracts, legacy migration seams, and a minimal Paper bootstrap. It is not a complete pet-gameplay release.
 
-> This repository is a development snapshot. Read the compatibility table before choosing a server build.
+## Phase 1 shipped
 
-## What is available now
+- Gradle Wrapper 9.1.0 is the only supported build authority. The clean verification command is `gradlew.bat clean build` on Windows or `./gradlew clean build` on Linux/macOS.
+- `omnipet-core` contains dependency-neutral domain, YAML codecs, migration readers, atomic storage, path checks, and repository/registry seams. `omnipet-paper` contains the Paper bootstrap and produces the installable distribution JAR.
+- Java 21 is the source and release baseline. Resources and Java compilation use UTF-8.
+- The descriptor is branded `OmniPet`, authored by `SalyVn`, and loads `io.github.salyvn.omnipet.paper.OmniPetPlugin`.
+- Paper registers `/pet` with `/pets` as its alias. Both names currently execute the foundation command and report that pet features are being built in a later phase.
+- `omnipet.general` defaults to `true`; `omnipet.*` defaults to `op`; declared `omnipet.admin.*` nodes default to `false`. Admin command branches are descriptor contracts only and are not shipped gameplay commands yet.
+- Player and pet definition envelopes use schema version 2. The core preserves raw unknown nodes, stable IDs, legacy state hints, and recoverable orphan data instead of silently replacing a profile.
+- Atomic writes create `.bak` snapshots when replacing an existing file. Invalid player files are quarantined; a quarantined profile fails closed until an operator performs explicit recovery.
+- Legacy egg definitions are validated and written to `migration/legacy-eggs-v1.yml` with a semantic SHA-256 journal. The source `eggs.yml` is never overwritten by that journal.
 
-- Paper-native `/pets` and `/pet` menus with paginated storage.
-- YAML pet definitions with `general`, `display`, `hatching`, `leveling`, `stamina`, and `trigger` components.
-- Egg definitions with duration, rarity, and pet pools.
-- Standalone food, evolver, egg, and hatcher items.
-- Optional MythicLib stat/skill expressions and MMOItems item identifiers.
-- Adventure MiniMessage text and the TinyExpr expression language.
-- A rebranded API under `io.github.salyvn.omnipet`.
+## Deferred roadmap
 
-ModelEngine rendering is deliberately a roadmap item. The current built-in renderer uses Paper display entities; do not add a `ModelEngine` dependency to a production server expecting it to be used automatically.
+The following are not claims about the current JAR: Studio GUI, incubation/hatching gameplay, multi-pet slots and vault/economy, live renderers, MythicMobs skills, ModelEngine, economy providers, and GitHub Pages publication/maintenance. See [the roadmap](docs/roadmap.md) for phase ownership and release gates.
 
 ## Compatibility
 
-| Server track | Java | Status | Notes |
-| --- | ---: | --- | --- |
-| Paper 1.21.x | 21 | Primary baseline | Core compile probes pass for `1.21-R0.1-SNAPSHOT` and `1.21.11-R0.1-SNAPSHOT`; still smoke-test the exact build you deploy. |
-| Paper 26.1.1 | 25 | Preview/alpha caveat | Core compile probe passes for `26.1.1.build.29-alpha`; this is an alpha pin, not a blanket `26.1.1+` certification. |
-| Paper 26.1.2 and later 26.x | 25 | Experimental | Core compile probe passes for `26.1.2.build.74-stable`; optional vendor plugins have no published 26.x guarantee in this project. |
+Compatibility jobs are compile probes, not live-server certification:
 
-MythicLib and MMOItems are optional. OmniPet must start without either plugin; their APIs are vendor-version contracts and should be pinned and smoke-tested with the server build you publish.
+| Paper API probe | Java toolchain | Position |
+| --- | ---: | --- |
+| `1.21-R0.1-SNAPSHOT`, `1.21.11-R0.1-SNAPSHOT` | 21 | Primary baseline probes |
+| `26.1.1.build.29-alpha` | 25 | Preview/alpha probe |
+| `26.1.2.build.74-stable`, `26.2.build.87-stable` | 25 | Experimental/forward probes |
 
-See [the full compatibility matrix](docs/compatibility.md).
+Use the exact build matrix in [compatibility](docs/compatibility.md). Passing a probe does not certify Paper runtime behavior, vendor plugins, or future 26.x versions.
 
-## Install and build
+## Build and artifact
 
-1. Install a supported Paper server and the matching Java runtime.
-2. Download the `OmniPet-<version>.jar` artifact into `plugins/`.
-3. Start the server once. OmniPet copies starter files into `plugins/OmniPet/`.
-4. Review `config.yml`, `eggs.yml`, `gui.yml`, `items.yml`, `lang.yml`, and `pets/*.yml` before inviting players.
-
-Build from this directory with Gradle:
-
-```bash
-# Linux/macOS
-./gradlew clean test jar
-
-# Windows PowerShell or cmd
-gradlew.bat clean test jar
-```
-
-The Java 21 toolchain and UTF-8 resource encoding are configured by `build.gradle.kts`. Maven commands and the old `passivepet2` artifact name are not part of the supported workflow.
-
-## First commands
+From this directory:
 
 ```text
-/pets
-/pets 1
-/pets item food petSteak
-/pets item egg common
-/pets item hatcher elixir
-/pets item evolver
+gradlew.bat clean build
 ```
 
-`/pet` is a stable alias for `/pets`. Administrators can use `/pets reload`, `/pets inspect <player>`, `/pets explore <player> [path]`, `/pets pet ...`, and `/pets egg ...`; details are in [Commands and permissions](docs/commands-and-permissions.md).
+The single release artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (copied from `omnipet-paper/build/libs/`). Maven commands, `pom.xml`, Maven wrappers, and the old `passivepet2` artifact name are not part of the supported workflow.
+
+## Migration warning
+
+Before any rebrand or data-folder move, stop the server and make a complete backup. Preserve player, pet, egg, component, and user-defined IDs. Do not run the old plugin and OmniPet against the same data at the same time. Read [Migration from PassivePet](docs/migration.md) for the legacy warnings, journal behavior, `.bak` handling, quarantine rules, and rollback procedure.
 
 ## Documentation
 
 - [Getting started](docs/getting-started.md)
-- [Configuration reference](docs/configuration.md)
 - [Commands and permissions](docs/commands-and-permissions.md)
-- [Integrations](docs/integrations.md)
-- [Migration from PassivePet](docs/migration.md)
-- [Developer guide and API](docs/developer-guide.md)
-- [Copy-safe examples](docs/examples.md)
-- [Troubleshooting](docs/troubleshooting.md)
+- [Compatibility](docs/compatibility.md)
+- [Configuration and schema (future/non-authoritative)](docs/configuration.md)
+- [Developer guide](docs/developer-guide.md)
+- [Migration](docs/migration.md)
 - [Roadmap](docs/roadmap.md)
-- [Bundled examples](src/main/resources/example/)
 
-The same Markdown files are suitable for a GitHub wiki. A no-secret GitHub Pages workflow publishes `docs/` as a static site.
-
-## Migration summary
-
-Keep a complete backup before changing the plugin folder name. Preserve pet, egg, item, component, expression, and command IDs. OmniPet writes the `omnipet` PDC namespace and reads legacy `passivepet:*` item keys; MMOItems adapters read both `OMNIPET_*` and legacy `PASSIVEPET_*` stat IDs. New permissions should use `omnipet.*`; matching legacy command grants remain accepted during migration.
-
-The migration guide includes a rollback procedure and a list of fields that must not be renamed casually.
-
-## Support expectations
-
-When reporting an issue, include the OmniPet version, exact Paper build, Java version, optional plugin versions, startup log around hook detection, and a minimal redacted YAML file. Never attach player data, tokens, or private server logs containing personal information.
+The remaining configuration, example, integration, and troubleshooting pages retain useful future syntax/design notes. Treat them as non-authoritative until their owning phases ship.

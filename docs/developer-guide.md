@@ -1,126 +1,83 @@
 # Developer guide
 
-OmniPet is a Java 21 Paper plugin built with Gradle Kotlin DSL. The current code exposes an API interface, component codecs, item identifiers, and expression providers. Treat the 3.0 development API as evolving until a versioned API artifact is published.
+OmniPet Phase 1 is a Java 21, Gradle Kotlin DSL, multi-project foundation. The authoritative implementation lives in `omnipet-core` and `omnipet-paper`; the older root `src/` tree remains migration and behavior reference, not the shipped gameplay authority.
 
-## Build
+## Build contract
 
-```bash
+```text
 # Windows
-gradlew.bat clean test jar
+gradlew.bat clean build
 
 # Linux/macOS
-./gradlew clean test jar
+./gradlew clean build
 ```
 
-The build uses:
+- Gradle Wrapper 9.1.0 is pinned with a distribution SHA-256.
+- Group: `io.github.salyvn`.
+- Version: `3.0.0-SNAPSHOT` unless `pluginVersion` is overridden.
+- Java toolchain and `--release`: 21.
+- Encoding: UTF-8.
+- Maven metadata, wrappers, and `target` workflow directories are rejected by the build.
 
-- group `io.github.salyvn`;
-- Java 21 toolchain and `--release 21`;
-- UTF-8 Java/resource processing;
-- compile-only Paper, MythicLib, MMOItems, and DataFixerUpper APIs;
-- TinyExpr bundled into the plugin JAR;
-- artifact base name `OmniPet`.
+## Module boundary
 
-Do not shade Paper or optional server plugins. Reproducible public releases should pin/verify snapshot and JitPack inputs.
-
-## Addon dependency
-
-Until a repository coordinate is published, an addon can compile against a local OmniPet JAR:
-
-```kotlin
-dependencies {
-    compileOnly(files("libs/OmniPet-3.0.0-SNAPSHOT.jar"))
-}
+```text
+omnipet-core  ->  omnipet-paper  ->  OmniPet-<version>.jar
+domain/schema     Paper bootstrap    installable distribution
+persistence
+migration
 ```
 
-Declare OmniPet in the addon's Paper descriptor:
+`omnipet-paper` depends on `omnipet-core`. The core module depends on SnakeYAML only and the build rejects Bukkit, Paper, MythicLib, MMOItems, MythicMobs, and ModelEngine imports from core. The Paper module owns the descriptor, lifecycle command registration, compatibility compile task, and distribution JAR.
 
-```yaml
-dependencies:
-  server:
-    OmniPet:
-      load: BEFORE
-      required: true
-      join-classpath: true
+Do not add vendor modules until an owning phase proves a real API/classloader boundary.
+
+## Current core contracts
+
+- Schema 2 envelopes: `PlayerStateEnvelope` and `PetDefinitionEnvelope`.
+- Stable identities: player UUID, per-instance pet UUID, stable definition ID, and optimistic revision.
+- Definition model: tier `D/C/B/A/S`, mandatory head icon, display provider contract, raw YAML node, and finite statistic bounds.
+- Repositories: player state locking/revision checks, YAML pet definition read/save/archive/reference scan, and immutable registry snapshots.
+- Migration: schema 1 player/pet readers, deterministic pet-instance UUID assignment, legacy egg journal, and legacy `passivepet` item-key constants.
+- Storage safety: canonical containment, Windows-safe IDs, case-fold collision checks, no symbolic links, atomic replace, `.bak`, archive, and quarantine.
+
+Unknown top-level fields, pet-instance fields, component maps, current egg data, and definition raw nodes are copied into immutable raw maps and written back. This preservation is intentional: later phases may understand data that Phase 1 does not.
+
+## Paper bootstrap
+
+`io.github.salyvn.omnipet.paper.OmniPetPlugin` performs only foundation wiring:
+
+1. Reject a symbolic-link data folder.
+2. Create the data root.
+3. Journal legacy `eggs.yml` if present.
+4. Construct pet/player repositories and load a registry snapshot.
+5. Register `/pet` with `/pets` as alias.
+6. Disable the plugin on initialization failure.
+
+The command returns a foundation status message. No Studio, hatching, player menu, admin mutation tree, renderer, vendor adapter, or economy service is wired yet.
+
+## Compatibility probes
+
+Run the normal baseline with Java 21:
+
+```text
+gradlew.bat clean build
 ```
 
-## Obtain the API
+The Paper boundary can be compiled against an exact API coordinate:
 
-Avoid depending on the implementation class when the plugin interface is enough:
-
-```java
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-import org.bukkit.plugin.Plugin;
-
-import io.github.salyvn.omnipet.api.OmniPet;
-import io.github.salyvn.omnipet.api.PetPlayer;
-
-Plugin candidate = Bukkit.getPluginManager().getPlugin("OmniPet");
-if (!(candidate instanceof OmniPet omniPet) || !candidate.isEnabled()) {
-    return;
-}
-
-PetPlayer profile = omniPet.player(player);
-if (profile != null) {
-    int owned = profile.pets().size();
-}
+```text
+gradlew.bat compileCompatibilityJava -PcompatibilityPaperApiVersion=1.21.11-R0.1-SNAPSHOT -PcompatibilityJavaVersion=21
 ```
 
-Resolve the plugin during your enable lifecycle, not from a static initializer. Player profiles can be absent before OmniPet has loaded the player.
+For 26.x, supply a Java 25 toolchain and an exact alpha/stable coordinate. A successful compile does not prove plugin boot, command behavior, scheduler safety, entity behavior, or vendor compatibility.
 
-## Public surfaces
+## Verification evidence
 
-`OmniPet` currently exposes:
+The final Phase 1 validation passed `gradlew.bat clean build --no-daemon` on JDK 21 with 37/37 tests: 33 core and 4 Paper. The single artifact was `build/release/OmniPet-3.0.0-SNAPSHOT.jar`, authored by `SalyVn`, with no bundled Paper/vendor packages or `META-INF/maven` entries.
 
-- component codec registry: `components()` and `registerComponent(...)`;
-- pet and egg registries: `pets()` and `eggs()`;
-- item identification: `identifyItem(...)` and `registerItemIdentifier(...)`;
-- expression scope registration: `registerProvider(...)`;
-- player lookup/load/save methods;
-- reload entry point.
+There is no live Paper server smoke-test evidence yet. Treat runtime certification and every optional integration as later release gates.
 
-Several API types expose Mojang Codec, Guava BiMap, Paper/Bukkit, and TinyExpr classes. Addons must treat those libraries as part of the current compile contract. A future dependency-neutral API may change this surface.
+## Deferred extension surfaces
 
-## Safe read example
-
-```java
-var eggType = omniPet.eggs().get("common");
-var petType = omniPet.pets().get("example_pet");
-
-if (eggType == null || petType == null) {
-    getLogger().warning("OmniPet starter IDs are unavailable");
-}
-```
-
-Do not cache registry objects across `/pets reload` unless your addon listens for and handles replacement. Prefer stable string IDs at your boundary.
-
-## Extension guidance
-
-- Keep third-party classes in adapter packages loaded only after plugin-presence checks.
-- Never call Bukkit entity, inventory, MythicLib, MMOItems, or future ModelEngine APIs asynchronously.
-- Register components/providers during plugin load before pet definitions decode.
-- Validate IDs and numeric expression results before runtime use.
-- Make cleanup idempotent across recall, logout, reload, and disable.
-- Do not normalize user-defined pet, egg, food, or hatcher IDs.
-- Do not write to player YAML while OmniPet is active without a coordinated repository API.
-
-## ModelEngine adapter contract
-
-There is no current ModelEngine implementation. A future adapter should implement a renderer port owned by the runtime layer, not expose ModelEngine types from the public API/core. It must support capability detection, main-thread creation/removal, lifecycle cleanup, and fallback to Paper display entities.
-
-## Testing
-
-Pure tests should cover duration parsing, pagination, codec round trips, component defaults, expressions, state bounds, and legacy/new item identifiers. Integration tests should cover clean boot, optional-plugin permutations, commands, GUI, persistence failure, migration, and the exact Paper matrix.
-
-For release validation, inspect the JAR:
-
-- contains `paper-plugin.yml` and all example resources;
-- contains TinyExpr runtime classes;
-- excludes Paper, MythicLib, MMOItems, MythicMobs, and ModelEngine classes;
-- reports OmniPet/SalyVn branding and the Gradle project version.
-
-## Reporting API issues
-
-Include a minimal addon, compile dependency declaration, OmniPet commit/version, exact Paper build, Java version, and stack trace. Do not attach production player files or private server artifacts.
-
+Studio Save and `/pets reload` must consume the tested `RegistrySnapshotTransaction` seam when implemented. Incubation, multi-pet/vault slots, renderers, MythicMobs skills, ModelEngine, economy adapters, and a published addon API remain phase-owned roadmap work.

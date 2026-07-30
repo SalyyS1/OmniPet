@@ -19,3 +19,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "OmniPet"
+
+include("omnipet-core", "omnipet-paper")

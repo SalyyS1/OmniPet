@@ -1,0 +1,34 @@
+name: OmniPet
+version: ${version}
+api-version: '1.21'
+authors: [SalyVn]
+description: "OmniPet greenfield foundation."
+website: https://github.com/SalyyS1/OmniPet
+main: io.github.salyvn.omnipet.paper.OmniPetPlugin
+
+permissions:
+  omnipet.*:
+    description: Wildcard permission for OmniPet administrators
+    default: op
+    children:
+      omnipet.general: true
+      omnipet.admin.*: true
+  omnipet.general:
+    description: Default permission for using OmniPet
+    default: true
+  omnipet.admin.*:
+    description: Wildcard permission for OmniPet administration
+    default: false
+    children:
+      omnipet.admin.reload: true
+      omnipet.admin.inspect: true
+      omnipet.admin.explore: true
+      omnipet.admin.managepet: true
+      omnipet.admin.manageegg: true
+      omnipet.admin.item: true
+  omnipet.admin.reload: { description: "Allow reloading OmniPet", default: false }
+  omnipet.admin.inspect: { description: "Allow viewing player pet information", default: false }
+  omnipet.admin.explore: { description: "Allow exploring player data", default: false }
+  omnipet.admin.managepet: { description: "Allow managing pet definitions and storage", default: false }
+  omnipet.admin.manageegg: { description: "Allow managing player eggs", default: false }
+  omnipet.admin.item: { description: "Allow giving OmniPet items", default: false }
