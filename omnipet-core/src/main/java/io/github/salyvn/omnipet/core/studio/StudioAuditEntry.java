@@ -11,7 +11,7 @@ public record StudioAuditEntry(
         long registryGeneration,
         boolean success,
         String message) {
-    public enum Operation { SAVE, ARCHIVE, RELOAD }
+    public enum Operation { SAVE, ARCHIVE, HARD_DELETE, RELOAD }
 
     public StudioAuditEntry {
         timestamp = timestamp == null ? Instant.now() : timestamp;

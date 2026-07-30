@@ -20,6 +20,9 @@ import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrat
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrator;
 import io.github.salyvn.omnipet.paper.command.FoundationCommandContract;
 import io.github.salyvn.omnipet.paper.command.OmniPetCommand;
+import io.github.salyvn.omnipet.paper.catalog.PaperStatCatalogContext;
+import io.github.salyvn.omnipet.paper.catalog.ReflectiveMythicLibStatCatalogSource;
+import io.github.salyvn.omnipet.paper.catalog.StatCatalogLifecycleListener;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioListener;
 
@@ -27,6 +30,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PlayerStateRepository playerStates;
     private RegistrySnapshotRepository registry;
     private PetStudioController studio;
+    private PaperStatCatalogContext statCatalog;
 
     @Override
     public void onEnable() {
@@ -41,10 +45,13 @@ public final class OmniPetPlugin extends JavaPlugin {
             playerStates = new FilePlayerStateRepository(dataRoot.resolve("data/players"));
             registry = new InMemoryRegistrySnapshotRepository();
             var snapshot = new FoundationRegistryLoader().load(definitions, registry);
+            statCatalog = new PaperStatCatalogContext(new ReflectiveMythicLibStatCatalogSource(
+                    getServer().getPluginManager()));
             studio = new PetStudioController(this, definitions, registry, java.util.List.of(
                     playerStates::referenceScan,
-                    PetReferenceScanner.yamlFiles(java.util.List.of(dataRoot.resolve("eggs.yml")))));
+                    PetReferenceScanner.yamlFiles(java.util.List.of(dataRoot.resolve("eggs.yml")))), statCatalog);
             getServer().getPluginManager().registerEvents(new PetStudioListener(studio), this);
+            getServer().getPluginManager().registerEvents(new StatCatalogLifecycleListener(statCatalog), this);
             registerCommands();
             getLogger().info("OmniPet enabled with Pet Studio and " + snapshot.definitions().size() + " definitions.");
         } catch (IOException | RuntimeException failure) {

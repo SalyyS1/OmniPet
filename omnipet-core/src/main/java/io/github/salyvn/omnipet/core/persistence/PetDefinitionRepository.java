@@ -20,5 +20,7 @@ public interface PetDefinitionRepository {
 
     PetDefinitionArchiveReceipt archiveWithRollback(String id) throws IOException;
 
+    PetDefinitionDeleteReceipt deleteWithRollback(String id) throws IOException;
+
     Set<String> referenceScan(String id) throws IOException;
 }

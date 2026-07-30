@@ -3,9 +3,11 @@ package io.github.salyvn.omnipet.paper.studio.session;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -85,6 +87,19 @@ public final class PetStudioSessionManager {
         assertMainThread();
         MutableSession session = findCurrent(token);
         return session == null ? Optional.empty() : Optional.of(session.snapshot());
+    }
+
+    public Set<String> references(String definitionId) {
+        assertMainThread();
+        Objects.requireNonNull(definitionId, "definitionId");
+        Set<String> references = new LinkedHashSet<>();
+        for (MutableSession session : sessions.values().toArray(MutableSession[]::new)) {
+            if (expireIfDue(session)) continue;
+            if (session.definitionId.equalsIgnoreCase(definitionId)) {
+                references.add("studio-session:" + session.sessionId);
+            }
+        }
+        return Set.copyOf(references);
     }
 
     public StudioViewToken nextView(StudioViewToken token) {

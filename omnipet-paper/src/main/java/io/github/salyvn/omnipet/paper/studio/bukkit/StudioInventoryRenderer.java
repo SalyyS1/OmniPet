@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.bukkit.Bukkit;
@@ -17,9 +18,12 @@ import org.bukkit.inventory.meta.ItemMeta;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
+import io.github.salyvn.omnipet.core.catalog.CatalogHealth;
+import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
 import io.github.salyvn.omnipet.core.domain.PetDefinition;
 import io.github.salyvn.omnipet.core.domain.PetTier;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshot;
+import io.github.salyvn.omnipet.core.studio.StatLogicalIdentity;
 import io.github.salyvn.omnipet.core.studio.StudioPetDraft;
 import io.github.salyvn.omnipet.paper.studio.session.StudioViewToken;
 
@@ -97,6 +101,7 @@ final class StudioInventoryRenderer {
         actions.put(16, new StudioAction(StudioActionType.EDIT_SKILLS, ""));
         actions.put(19, new StudioAction(StudioActionType.EDIT_BEHAVIOR, ""));
         actions.put(20, new StudioAction(StudioActionType.EDIT_RELEASE, ""));
+        if (draft.mode() == StudioPetDraft.Mode.EDIT) actions.put(44, new StudioAction(StudioActionType.CLONE, ""));
         actions.put(45, new StudioAction(StudioActionType.BACK, ""));
         actions.put(49, new StudioAction(StudioActionType.SAVE, ""));
         actions.put(53, new StudioAction(StudioActionType.CANCEL, ""));
@@ -106,7 +111,7 @@ final class StudioInventoryRenderer {
         inventory.setItem(12, item(Material.ARMOR_STAND, "Renderer: " + draft.display().provider(), NamedTextColor.AQUA,
                 draft.display().model() == null ? "Built-in head" : "Model: " + draft.display().model(), "Click to edit"));
         inventory.setItem(13, item(Material.REDSTONE, "MythicLib stats: " + draft.stats().size(), NamedTextColor.LIGHT_PURPLE,
-                "Format: id MODIFIER min max;...", "Click to edit"));
+                statCatalogLine(state), "Click to choose or enter manual IDs"));
         inventory.setItem(14, item(Material.NETHER_STAR, "Rarity bands: " + draft.rarityBands().size(), NamedTextColor.LIGHT_PURPLE,
                 "Format: id min max weight hatchMultiplier;...", "Click to edit"));
         inventory.setItem(15, item(Material.EXPERIENCE_BOTTLE, "Progression", NamedTextColor.GREEN,
@@ -118,9 +123,71 @@ final class StudioInventoryRenderer {
                 "Format: key=value;...", "Click to edit"));
         inventory.setItem(20, item(Material.ENDER_CHEST, "Release policy", NamedTextColor.GREEN,
                 draft.releasePolicy() == null ? "Not configured" : draft.releasePolicy().mode(), "Click to edit"));
+        inventory.setItem(44, item(draft.mode() == StudioPetDraft.Mode.EDIT ? Material.CARTOGRAPHY_TABLE : Material.GRAY_DYE,
+                draft.mode() == StudioPetDraft.Mode.EDIT ? "Clone definition" : "Clone unavailable", NamedTextColor.AQUA,
+                draft.mode() == StudioPetDraft.Mode.EDIT ? "Create a new stable ID from this draft" : "Save this new definition before cloning",
+                "Source definition remains unchanged"));
         inventory.setItem(45, item(Material.ARROW, "Back", NamedTextColor.YELLOW, "Discard navigation only"));
         inventory.setItem(49, item(Material.EMERALD_BLOCK, "Save", NamedTextColor.GREEN, "Validate and atomically publish"));
         inventory.setItem(53, item(Material.BARRIER, "Cancel", NamedTextColor.RED, "Discard draft"));
+        return inventory;
+    }
+
+    Inventory stats(Player player, StudioState state) {
+        Map<Integer, StudioAction> actions = new HashMap<>();
+        StudioInventoryHolder holder = holder(state, StudioInventoryHolder.Screen.STAT_PICKER, actions);
+        Inventory inventory = create(holder, 54, "OmniPet Studio | Stats");
+        fill(inventory);
+
+        List<StatCatalogEntry> entries = state.statSnapshot == null ? List.of() : state.statSnapshot.entries().stream()
+                .filter(entry -> state.statFilter.isBlank()
+                        || entry.id().toLowerCase(Locale.ROOT).contains(state.statFilter)
+                        || entry.displayName().toLowerCase(Locale.ROOT).contains(state.statFilter))
+                .sorted(Comparator.comparing(StatCatalogEntry::displayName).thenComparing(StatCatalogEntry::id))
+                .toList();
+        int pages = Math.max(1, (entries.size() + 44) / 45);
+        state.statPage = Math.max(0, Math.min(state.statPage, pages - 1));
+        int start = state.statPage * 45;
+        for (int index = start; index < Math.min(start + 45, entries.size()); index++) {
+            StatCatalogEntry entry = entries.get(index);
+            String logicalKey = StatLogicalIdentity.key(entry.id(), entry.extensions());
+            boolean selected = state.draft.stats().stream()
+                    .anyMatch(stat -> StatLogicalIdentity.key(stat).equals(logicalKey));
+            int slot = index - start;
+            actions.put(slot, new StudioAction(StudioActionType.STAT, entry.id()));
+            inventory.setItem(slot, item(selected ? Material.LIME_DYE : Material.PAPER,
+                    entry.displayName(), selected ? NamedTextColor.GREEN : NamedTextColor.AQUA,
+                    entry.id(), "Provider: " + entry.provider(),
+                    "Modifiers: " + entry.supportedModifierTypes(),
+                    selected ? "Selected - click to replace" : "Click to configure"));
+        }
+
+        if (state.statSnapshot == null || state.statSnapshot.health() != CatalogHealth.AVAILABLE) {
+            String detail = state.statSnapshot == null ? "Catalog snapshot is unavailable" : state.statSnapshot.detail();
+            inventory.setItem(22, item(Material.RED_STAINED_GLASS_PANE, "Dynamic catalog unavailable",
+                    NamedTextColor.RED, detail, "Manual stat IDs remain supported"));
+        } else if (entries.isEmpty()) {
+            inventory.setItem(22, item(Material.GRAY_DYE, "No matching stats", NamedTextColor.YELLOW,
+                    state.statFilter.isBlank() ? "MythicLib returned no registered stats" : "Change or clear search"));
+        }
+
+        actions.put(45, new StudioAction(StudioActionType.PREVIOUS, ""));
+        actions.put(46, new StudioAction(StudioActionType.STAT_MANUAL, ""));
+        actions.put(47, new StudioAction(StudioActionType.STAT_REFRESH, ""));
+        actions.put(49, new StudioAction(StudioActionType.BACK, ""));
+        actions.put(50, new StudioAction(StudioActionType.STAT_SEARCH, ""));
+        actions.put(53, new StudioAction(StudioActionType.NEXT, ""));
+        inventory.setItem(45, item(Material.ARROW, "Previous", NamedTextColor.YELLOW,
+                "Page " + (state.statPage + 1) + "/" + pages));
+        inventory.setItem(46, item(Material.WRITABLE_BOOK, "Manual stat list", NamedTextColor.GOLD,
+                "Supports legacy/bare IDs", "Format: id MODIFIER min max;..."));
+        inventory.setItem(47, item(Material.CLOCK, "Refresh provider catalog", NamedTextColor.YELLOW,
+                "Use after MythicLib or MMOItems reloads"));
+        inventory.setItem(49, item(Material.ARROW, "Back to editor", NamedTextColor.YELLOW));
+        inventory.setItem(50, item(Material.COMPASS, "Search stats", NamedTextColor.AQUA,
+                state.statFilter.isBlank() ? "No filter" : "Filter: " + state.statFilter));
+        inventory.setItem(53, item(Material.ARROW, "Next", NamedTextColor.YELLOW,
+                "Page " + (state.statPage + 1) + "/" + pages));
         return inventory;
     }
 
@@ -130,9 +197,12 @@ final class StudioInventoryRenderer {
         Inventory inventory = create(holder, 27, "OmniPet Studio | Archive");
         fill(inventory);
         actions.put(11, new StudioAction(StudioActionType.CONFIRM_ARCHIVE, state.archiveTarget));
+        actions.put(13, new StudioAction(StudioActionType.HARD_DELETE, state.archiveTarget));
         actions.put(15, new StudioAction(StudioActionType.CANCEL_ARCHIVE, ""));
         inventory.setItem(11, item(Material.LIME_DYE, "Confirm archive", NamedTextColor.GREEN,
                 state.archiveTarget, "References are checked before commit"));
+        inventory.setItem(13, item(Material.LAVA_BUCKET, "Hard delete", NamedTextColor.RED,
+                "Permanent removal of YAML and backup", "Requires typing the exact definition ID"));
         inventory.setItem(15, item(Material.BARRIER, "Cancel", NamedTextColor.RED));
         return inventory;
     }
@@ -165,6 +235,16 @@ final class StudioInventoryRenderer {
         meta.lore(lines);
         stack.setItemMeta(meta);
         return stack;
+    }
+
+    private static String statCatalogLine(StudioState state) {
+        if (state.statSnapshot == null) return "Catalog has not been queried";
+        return switch (state.statSnapshot.health()) {
+            case AVAILABLE -> "Catalog available: " + state.statSnapshot.entries().size() + " registered stats";
+            case UNAVAILABLE -> "Catalog unavailable: " + state.statSnapshot.detail();
+            case DISABLED -> "Catalog disabled: " + state.statSnapshot.detail();
+            case INCOMPATIBLE -> "Catalog incompatible: " + state.statSnapshot.detail();
+        };
     }
 
     private static String abbreviate(String value) { return value.length() <= 32 ? value : value.substring(0, 29) + "..."; }

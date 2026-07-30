@@ -19,6 +19,9 @@ class PaperPluginDescriptorTest {
             assertTrue(descriptor.contains("main: io.github.salyvn.omnipet.paper.OmniPetPlugin"));
             assertTrue(descriptor.contains("omnipet.general:"));
             assertTrue(descriptor.contains("default: true"));
+            assertTrue(descriptor.contains("MythicLib:"));
+            assertTrue(descriptor.contains("MMOItems:"));
+            assertTrue(descriptor.contains("join-classpath: false"));
         }
     }
 }

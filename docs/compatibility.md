@@ -22,13 +22,13 @@ Do not convert these rows into `1.21.x supported`, `26.1.1+ supported`, or `late
 
 ## Phase 1 runtime scope
 
-The current Paper code loads repositories, journals legacy eggs, builds a definition snapshot, and registers the foundation `/pet` command with `/pets` alias. It does not exercise menus, hatching, inventories, entities, schedulers, skills, economy, or progression. Those systems therefore have no compatibility claim.
+The current Paper code loads repositories, journals legacy eggs, builds a definition snapshot, registers the `/pet` command with `/pets` alias, and exercises the Admin Pet Studio inventories, tokenized chat sessions, scheduler expiry, and reflection-safe stat picker. These Studio paths have compile/unit evidence but no live-server smoke certification. Hatching, player inventories, entities, renderers, skills, economy, and progression remain deferred and have no compatibility claim.
 
 ## Optional integrations
 
 | Integration | Phase 1 state | Compatibility position |
 | --- | --- | --- |
-| MythicLib/MMOItems | No concrete adapter in authoritative modules | Deferred; no version claim. |
+| MythicLib/MMOItems | Reflection-safe MythicLib Studio catalog; MMOItems affects provider fingerprint but item stats stay separate | GUI/catalog compile-tested only; live vendor smoke and runtime buff application remain deferred. |
 | MythicMobs skills | Not implemented | Deferred to the skill phase. |
 | ModelEngine | Domain provider value exists; no renderer adapter | Deferred; no runtime or 26.x claim. |
 | Vault/PlayerPoints/economy | Not implemented | Deferred to slot/economy phase. |

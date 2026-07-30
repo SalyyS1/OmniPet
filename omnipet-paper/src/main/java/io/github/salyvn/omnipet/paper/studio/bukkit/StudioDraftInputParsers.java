@@ -7,12 +7,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
 import io.github.salyvn.omnipet.core.domain.DisplayDefinition;
 import io.github.salyvn.omnipet.core.domain.HeadIcon;
 import io.github.salyvn.omnipet.core.studio.ProgressionFields;
 import io.github.salyvn.omnipet.core.studio.RarityBand;
 import io.github.salyvn.omnipet.core.studio.ReleasePolicy;
 import io.github.salyvn.omnipet.core.studio.SkillReference;
+import io.github.salyvn.omnipet.core.studio.StatLogicalIdentity;
 import io.github.salyvn.omnipet.core.studio.StatModifierType;
 import io.github.salyvn.omnipet.core.studio.StatRange;
 import io.github.salyvn.omnipet.core.studio.StudioStat;
@@ -58,6 +60,30 @@ final class StudioDraftInputParsers {
             result.add(new StudioStat(parts[0], modifier,
                     StudioInputParsers.parseRange(parts[2] + " " + parts[3]), Map.of()));
         }
+        return List.copyOf(result);
+    }
+
+    static StudioStat catalogStat(String input, StatCatalogEntry entry) {
+        String[] parts = required(input).split("\\s+");
+        if (parts.length != 3) throw new IllegalArgumentException("expected: <modifier> <min> <max>");
+        StatModifierType modifier;
+        try {
+            modifier = StatModifierType.valueOf(parts[0].toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("unknown modifier: " + parts[0], error);
+        }
+        if (!entry.supportedModifierTypes().contains(modifier)) {
+            throw new IllegalArgumentException("modifier is not supported by " + entry.displayName());
+        }
+        return new StudioStat(entry.id(), modifier,
+                StudioInputParsers.parseRange(parts[1] + " " + parts[2]), entry.extensions());
+    }
+
+    static List<StudioStat> upsertStat(List<StudioStat> current, StudioStat replacement) {
+        List<StudioStat> result = new ArrayList<>(current);
+        String replacementKey = StatLogicalIdentity.key(replacement);
+        result.removeIf(stat -> StatLogicalIdentity.key(stat).equals(replacementKey));
+        result.add(replacement);
         return List.copyOf(result);
     }
 
@@ -137,6 +163,13 @@ final class StudioDraftInputParsers {
         String value = required(input);
         if (value.chars().anyMatch(Character::isWhitespace)) throw new IllegalArgumentException("release mode must be one token");
         return new ReleasePolicy(value.toUpperCase(Locale.ROOT), Map.of());
+    }
+
+    static String exactDefinitionId(String input, String expected) {
+        if (input == null || !input.equals(expected)) {
+            throw new IllegalArgumentException("type the exact definition ID: " + expected);
+        }
+        return input;
     }
 
     private static String required(String input) {

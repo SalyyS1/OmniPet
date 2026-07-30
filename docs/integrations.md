@@ -6,14 +6,16 @@ OmniPet's core gameplay does not require another plugin. Integrations are option
 
 | Capability | Plugin | Current status | Missing-plugin behavior |
 | --- | --- | --- | --- |
-| Stat modifiers on the owner | MythicLib | Implemented through `mythiclibBuffs` | Do not put the component in a pet that must load without MythicLib. |
-| Skill expression | MythicLib | Implemented through `mythiclib.cast(player, skillId)` | Expression provider is unavailable. Avoid calling it in shared/default configs. |
-| Pet food/evolver/egg/hatcher item stats | MMOItems | Implemented | Standalone `items.yml` remains available. |
-| MMOItems expression factory | MMOItems | Implemented through `mmoitems(type, id)` | Provider is unavailable. |
+| Studio stat catalog | MythicLib | Implemented as a reflection-safe picker with manual fallback; runtime owner buffs are deferred | The picker is unavailable and manual IDs remain supported. |
+| Owner stat application | MythicLib | Deferred to the gameplay skill/buff phase | Do not advertise a live buff until that phase ships. |
+| Pet food/evolver/egg/hatcher item stats | MMOItems | Deferred to the hatching/economy phases | No item integration is active in the current runtime. |
+| MMOItems expression factory | MMOItems | Deferred | No expression provider is active in the current runtime. |
 | Direct MythicMobs casting | MythicMobs | Not implemented as a direct adapter | No change to core. |
 | 3D model rendering | ModelEngine | Roadmap adapter boundary only | Built-in Paper display renderer remains active. |
 
-The Paper descriptor declares MythicLib and MMOItems as optional server dependencies. OmniPet initializes each hook only when the corresponding plugin is present.
+The Paper descriptor declares MythicLib and MMOItems as optional server dependencies for the catalog boundary. Live buffs, items, expressions, and gameplay hooks remain phase-gated.
+
+> The examples below are future design/reference syntax, not current configuration contracts.
 
 ## MythicLib
 
@@ -110,4 +112,3 @@ At minimum, boot and exercise OmniPet with:
 3. MythicLib and MMOItems.
 4. Every exact vendor version advertised by the release.
 5. Missing/invalid stat IDs, skill IDs, MMOItems IDs, and legacy IDs.
-

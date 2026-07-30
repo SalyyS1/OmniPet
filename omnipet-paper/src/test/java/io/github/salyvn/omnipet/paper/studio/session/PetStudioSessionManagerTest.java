@@ -125,6 +125,27 @@ class PetStudioSessionManagerTest {
         assertEquals(List.of(SessionCloseReason.TIMEOUT), fixture.reasons());
     }
 
+    @Test
+    void exposesActiveDefinitionSessionsAsRemovalReferences() {
+        Fixture fixture = new Fixture();
+        PetStudioSession session = fixture.manager.open(UUID.randomUUID(), "wolf", 1, "hash", 2);
+        fixture.manager.open(UUID.randomUUID(), "", 0, "", 2);
+
+        assertEquals(java.util.Set.of("studio-session:" + session.sessionId()),
+                fixture.manager.references("wolf"));
+        assertTrue(fixture.manager.references("fox").isEmpty());
+    }
+
+    @Test
+    void expiredStudioSessionsDoNotBlockRemoval() {
+        Fixture fixture = new Fixture();
+        fixture.manager.open(UUID.randomUUID(), "wolf", 1, "hash", 2);
+        fixture.clock.advance(TIMEOUT);
+
+        assertTrue(fixture.manager.references("wolf").isEmpty());
+        assertEquals(List.of(SessionCloseReason.TIMEOUT), fixture.reasons());
+    }
+
     private static final class Fixture {
         private final MutableClock clock = new MutableClock();
         private final TestScheduler scheduler = new TestScheduler();

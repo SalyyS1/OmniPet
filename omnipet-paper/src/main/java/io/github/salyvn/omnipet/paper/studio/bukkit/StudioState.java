@@ -4,6 +4,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 import io.github.salyvn.omnipet.core.domain.PetTier;
+import io.github.salyvn.omnipet.core.catalog.CatalogSnapshot;
+import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
 import io.github.salyvn.omnipet.core.studio.StudioPetDraft;
 import io.github.salyvn.omnipet.paper.studio.session.PetStudioSession;
 import io.github.salyvn.omnipet.paper.studio.session.StudioViewToken;
@@ -15,6 +17,9 @@ final class StudioState {
     PetTier tier = PetTier.D;
     int page;
     String filter = "";
+    String statFilter = "";
+    int statPage;
+    CatalogSnapshot<StatCatalogEntry> statSnapshot;
     boolean archiveMode;
     String archiveTarget;
     long archiveRevision;
@@ -23,6 +28,7 @@ final class StudioState {
     StudioPetDraft draft;
     UUID saveKey = UUID.randomUUID();
     UUID archiveKey = UUID.randomUUID();
+    UUID hardDeleteKey = UUID.randomUUID();
 
     StudioState(UUID viewerId, PetStudioSession session) {
         this.viewerId = Objects.requireNonNull(viewerId, "viewerId");

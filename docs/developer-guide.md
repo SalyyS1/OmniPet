@@ -51,11 +51,11 @@ Unknown top-level fields, pet-instance fields, component maps, current egg data,
 2. Create the data root.
 3. Journal legacy `eggs.yml` if present.
 4. Construct pet/player repositories and load a registry snapshot.
-5. Create the shared Studio save/reload transaction and session manager.
-6. Register the guarded Studio listener and `/pet` with `/pets` as alias.
+5. Create the shared Studio save/reload transaction, session manager, and cached reflection-safe MythicLib stat catalog.
+6. Register guarded Studio/vendor lifecycle listeners and `/pet` with `/pets` as alias.
 7. Disable the plugin on initialization failure.
 
-`/pet admin browse` opens the tokenized Studio tier/list/editor flow. Save/archive and `/pet admin reload` use the same staged registry generation boundary. Hatching, player menus, renderers, vendor adapters, and economy services remain later phases.
+`/pet admin browse` opens the tokenized Studio tier/list/editor flow. The stat picker reads MythicLib through its own plugin class loader, caches by registry generation, vendor fingerprint, and refresh epoch, and fails closed to manual IDs when the provider is absent, disabled, or incompatible. Save/archive, exact-ID hard delete, clone-only authoring, and `/pet admin reload` use the same staged registry generation boundary; active Studio sessions block removal references. Hatching, player menus, runtime stat application, renderers, and economy services remain later phases.
 
 ## Compatibility probes
 
@@ -75,7 +75,7 @@ For 26.x, supply a Java 25 toolchain and an exact alpha/stable coordinate. A suc
 
 ## Verification evidence
 
-The Phase 2 validation passed `gradlew.bat test --no-daemon --rerun-tasks` on JDK 21 with 89/89 tests: 58 core and 31 Paper. The single artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar`, authored by `SalyVn`, with no bundled Paper/vendor packages or `META-INF/maven` entries.
+The Phase 2 validation passed `gradlew.bat test --no-daemon --rerun-tasks` on JDK 21 with 108/108 tests: 66 core and 42 Paper. Exact compatibility probes also passed for Paper `1.21.11-R0.1-SNAPSHOT` on Java 21 and `26.1.1.build.29-alpha`, `26.1.2.build.74-stable`, and `26.2.build.87-stable` on Java 25. The single artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar`, authored by `SalyVn`, with no bundled Paper/vendor packages or `META-INF/maven` entries.
 
 There is no live Paper server smoke-test evidence yet. Treat runtime certification and every optional integration as later release gates.
 

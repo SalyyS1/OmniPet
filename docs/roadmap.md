@@ -16,7 +16,7 @@ The Phase 1 Gradle/persistence foundation and the Phase 2 Admin Pet Studio slice
 
 | Capability | Status | Boundary/acceptance note |
 | --- | --- | --- |
-| Admin Pet Studio GUI and Studio Save | Shipped Phase 2 slice | D/C/B/A/S browser, draft editor, archive mode, guarded inventory/chat input, and shared atomic generation transaction. Live server UX smoke remains a release gate. |
+| Admin Pet Studio GUI and Studio Save | Shipped Phase 2 slice | D/C/B/A/S browser, dynamic MythicLib stat picker/manual fallback, draft editor, archive, exact-ID hard delete with reference blocking, clone-only authoring, guarded inventory/chat input, and shared atomic generation transaction. Full reference migration and live server UX smoke remain gates. |
 | Incubation/hatching and rarity rolls | Deferred to Phase 3 | Must define online-time, escrow, idempotence, and migration semantics. |
 | Multi-pet active slots, vault, and economy | Deferred to Phase 4 | Requires canonical activation intent and provider reconciliation. |
 | Paper/ModelEngine renderers and smooth movement | Deferred to Phase 5 | ModelEngine class loading, cleanup, fallback, and exact-version tests required. |

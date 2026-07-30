@@ -1,6 +1,6 @@
 # Getting started
 
-This guide covers the verified Phase 1 foundation. The JAR boots, loads versioned pet definitions, establishes persistence/migration seams, and registers a minimal command. Studio, hatching, slots, renderers, integrations, economy, and progression are later phases.
+This guide covers the verified Gradle foundation and the shipped Admin Pet Studio slice. The JAR boots, loads versioned pet definitions, preserves migration seams, and exposes transaction-backed definition authoring. Hatching, slots, renderers, gameplay integrations, economy, and progression remain later phases.
 
 ## Requirements
 
@@ -32,16 +32,16 @@ build/release/OmniPet-3.0.0-SNAPSHOT.jar
 
 The producing module also writes `omnipet-paper/build/libs/OmniPet-3.0.0-SNAPSHOT.jar`. The descriptor author is `SalyVn`.
 
-## Foundation server check
+## Foundation and Studio server check
 
 1. Stop the test server.
 2. Back up any existing `plugins/PassivePet/` and `plugins/OmniPet/` directories.
 3. Put the release JAR in `plugins/`.
 4. Start Paper with the Java runtime required by that exact server build.
-5. Confirm the log contains `OmniPet foundation enabled` or a clear fail-closed initialization error.
-6. Run `/pet` and `/pets`. Both currently return the foundation status message; they do not open a menu.
+5. Confirm the log contains `OmniPet foundation enabled` with Pet Studio or a clear fail-closed initialization error.
+6. Run `/pet` and `/pets` for the player entry point. Staff with `omnipet.admin.managepet` can run `/pet admin browse` or `/pets admin browse` to open the D/C/B/A/S Studio.
 
-The command requires `omnipet.general`, which defaults to `true`. Declared admin permissions are reserved for later command branches.
+The player command requires `omnipet.general`, which defaults to `true`; Studio also requires `omnipet.admin.managepet`. Hatching and player lifecycle commands are not shipped yet.
 
 ## Data used by Phase 1
 

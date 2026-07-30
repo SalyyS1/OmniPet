@@ -6,6 +6,17 @@ description: "OmniPet greenfield foundation."
 website: https://github.com/SalyyS1/OmniPet
 main: io.github.salyvn.omnipet.paper.OmniPetPlugin
 
+dependencies:
+  server:
+    MythicLib:
+      load: BEFORE
+      required: false
+      join-classpath: false
+    MMOItems:
+      load: BEFORE
+      required: false
+      join-classpath: false
+
 permissions:
   omnipet.*:
     description: Wildcard permission for OmniPet administrators

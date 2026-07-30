@@ -12,7 +12,7 @@ import io.github.salyvn.omnipet.paper.studio.session.StudioViewToken;
 
 /** Inventory capability bound to one viewer, session, and immutable action map. */
 public final class StudioInventoryHolder implements InventoryHolder {
-    public enum Screen { TIERS, LIST, EDITOR, ARCHIVE_CONFIRM }
+    public enum Screen { TIERS, LIST, EDITOR, ARCHIVE_CONFIRM, STAT_PICKER }
 
     private final UUID viewerId;
     private final StudioViewToken token;

@@ -21,5 +21,11 @@ public enum StudioActionType {
     SAVE,
     CANCEL,
     CONFIRM_ARCHIVE,
-    CANCEL_ARCHIVE
+    CANCEL_ARCHIVE,
+    HARD_DELETE,
+    STAT,
+    STAT_MANUAL,
+    STAT_SEARCH,
+    STAT_REFRESH,
+    CLONE
 }

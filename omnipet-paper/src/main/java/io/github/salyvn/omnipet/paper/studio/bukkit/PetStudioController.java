@@ -2,7 +2,9 @@ package io.github.salyvn.omnipet.paper.studio.bukkit;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,6 +16,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
 import io.github.salyvn.omnipet.core.domain.DisplayDefinition;
 import io.github.salyvn.omnipet.core.domain.HeadIcon;
 import io.github.salyvn.omnipet.core.domain.PetDefinition;
@@ -38,6 +41,7 @@ import io.github.salyvn.omnipet.paper.studio.session.StudioClock;
 import io.github.salyvn.omnipet.paper.studio.session.StudioScheduler;
 import io.github.salyvn.omnipet.paper.studio.session.StudioThreadGuard;
 import io.github.salyvn.omnipet.paper.studio.session.StudioViewToken;
+import io.github.salyvn.omnipet.paper.catalog.PaperStatCatalogContext;
 
 /** Bukkit-facing orchestration for the detached, transaction-backed Pet Studio. */
 public final class PetStudioController {
@@ -47,22 +51,27 @@ public final class PetStudioController {
     private final PetDefinitionStudioService service;
     private final PetStudioSessionManager sessions;
     private final ChatInputService inputs;
+    private final PaperStatCatalogContext statCatalog;
     private final StudioInventoryRenderer renderer = new StudioInventoryRenderer();
     private final Map<UUID, StudioState> states = new HashMap<>();
 
     public PetStudioController(JavaPlugin plugin, YamlPetDefinitionRepository definitions,
                                RegistrySnapshotRepository registry) {
-        this(plugin, definitions, registry, java.util.List.of());
+        this(plugin, definitions, registry, List.of(), PaperStatCatalogContext.unavailable());
     }
 
     public PetStudioController(JavaPlugin plugin, YamlPetDefinitionRepository definitions,
                                RegistrySnapshotRepository registry, java.util.List<PetReferenceScanner> referenceScanners) {
+        this(plugin, definitions, registry, referenceScanners, PaperStatCatalogContext.unavailable());
+    }
+
+    public PetStudioController(JavaPlugin plugin, YamlPetDefinitionRepository definitions,
+                               RegistrySnapshotRepository registry, List<PetReferenceScanner> referenceScanners,
+                               PaperStatCatalogContext statCatalog) {
         this.plugin = plugin;
         this.definitions = definitions;
         this.registry = registry;
-        this.service = new PetDefinitionStudioService(definitions, registry, ignored -> {}, referenceScanners,
-                entry -> plugin.getLogger().info("Studio audit " + entry.operation() + " " + entry.definitionId()
-                        + " generation=" + entry.registryGeneration() + " key=" + entry.idempotencyKey()));
+        this.statCatalog = statCatalog;
         StudioThreadGuard guard = () -> { if (!Bukkit.isPrimaryThread()) throw new IllegalStateException("Studio must run on the main thread"); };
         StudioScheduler scheduler = (delay, task) -> {
             long ticks = Math.max(1L, (delay.toMillis() + 49L) / 50L);
@@ -71,6 +80,11 @@ public final class PetStudioController {
         };
         StudioClock clock = Instant::now;
         this.sessions = new PetStudioSessionManager(clock, scheduler, guard, Duration.ofMinutes(15), this::onSessionClosed);
+        List<PetReferenceScanner> scanners = new ArrayList<>(referenceScanners == null ? List.of() : referenceScanners);
+        scanners.add(sessions::references);
+        this.service = new PetDefinitionStudioService(definitions, registry, ignored -> {}, scanners,
+                entry -> plugin.getLogger().info("Studio audit " + entry.operation() + " " + entry.definitionId()
+                        + " generation=" + entry.registryGeneration() + " key=" + entry.idempotencyKey()));
         StudioMainThreadDispatcher dispatcher = task -> plugin.getServer().getScheduler().runTask(plugin, task);
         this.inputs = new ChatInputService(clock, dispatcher, guard, sessions::isCurrent);
     }
@@ -83,7 +97,7 @@ public final class PetStudioController {
         assertMainThread();
         closeStudioInventories();
         sessions.onReload();
-        try { service.reload(); return true; }
+        try { statCatalog.invalidate(); service.reload(); return true; }
         catch (Exception error) {
             plugin.getLogger().severe("OmniPet reload failed: " + error.getMessage());
             return false;
@@ -120,13 +134,25 @@ public final class PetStudioController {
             case CREATE -> awaitId(player, state);
             case SEARCH -> awaitSearch(player, state);
             case TOGGLE_ARCHIVE -> { state.archiveMode = !state.archiveMode; render(state, StudioInventoryHolder.Screen.LIST); }
-            case PREVIOUS -> { state.page = Math.max(0, state.page - 1); render(state, StudioInventoryHolder.Screen.LIST); }
-            case NEXT -> { state.page++; render(state, StudioInventoryHolder.Screen.LIST); }
-            case BACK -> openBrowse(player, state.tier, holder.screen() == StudioInventoryHolder.Screen.LIST ? false : true);
+            case PREVIOUS -> {
+                if (holder.screen() == StudioInventoryHolder.Screen.STAT_PICKER) state.statPage = Math.max(0, state.statPage - 1);
+                else state.page = Math.max(0, state.page - 1);
+                render(state, holder.screen());
+            }
+            case NEXT -> {
+                if (holder.screen() == StudioInventoryHolder.Screen.STAT_PICKER) state.statPage++;
+                else state.page++;
+                render(state, holder.screen());
+            }
+            case BACK -> {
+                if (holder.screen() == StudioInventoryHolder.Screen.STAT_PICKER) render(state, StudioInventoryHolder.Screen.EDITOR);
+                else openBrowse(player, state.tier, holder.screen() != StudioInventoryHolder.Screen.LIST);
+            }
             case EDIT_TIER -> editTier(state);
             case EDIT_ICON -> awaitField(player, state, "icon.head", StudioDraftInputParsers::icon, state.draft::withIcon);
             case EDIT_DISPLAY -> awaitField(player, state, "display", StudioDraftInputParsers::display, state.draft::withDisplay);
-            case EDIT_STATS -> awaitField(player, state, "stats", StudioDraftInputParsers::stats, state.draft::withStats);
+            case EDIT_STATS -> openStats(state);
+            case CLONE -> awaitCloneId(player, state);
             case EDIT_RARITY -> awaitField(player, state, "rarity", StudioDraftInputParsers::rarity, state.draft::withRarityBands);
             case EDIT_PROGRESSION -> awaitField(player, state, "progression", StudioDraftInputParsers::progression, state.draft::withProgression);
             case EDIT_SKILLS -> awaitField(player, state, "skills", StudioDraftInputParsers::skills, state.draft::withSkills);
@@ -136,7 +162,55 @@ public final class PetStudioController {
             case CANCEL -> openBrowse(player, state.tier, true);
             case CONFIRM_ARCHIVE -> archive(player, state);
             case CANCEL_ARCHIVE -> render(state, StudioInventoryHolder.Screen.LIST);
+            case HARD_DELETE -> awaitHardDelete(player, state);
+            case STAT -> awaitStat(player, state, action.value());
+            case STAT_MANUAL -> awaitField(player, state, "stats", StudioDraftInputParsers::stats, state.draft::withStats);
+            case STAT_SEARCH -> awaitStatSearch(player, state);
+            case STAT_REFRESH -> { statCatalog.invalidate(); openStats(state); }
         }
+    }
+
+    private void openStats(StudioState state) {
+        state.statSnapshot = statCatalog.snapshot(registry.current().generation());
+        state.statPage = 0;
+        render(state, StudioInventoryHolder.Screen.STAT_PICKER);
+    }
+
+    private void awaitStat(Player player, StudioState state, String statId) {
+        state.statSnapshot = statCatalog.snapshot(registry.current().generation());
+        StatCatalogEntry entry = state.statSnapshot.entries().stream()
+                .filter(candidate -> candidate.id().equals(statId)).findFirst().orElse(null);
+        if (entry == null) {
+            player.sendMessage("OmniPet: selected stat is no longer in the catalog; reopen the picker.");
+            return;
+        }
+        awaitField(player, state, "stats." + entry.id(), raw -> StudioDraftInputParsers.catalogStat(raw, entry),
+                value -> state.draft.withStats(StudioDraftInputParsers.upsertStat(state.draft.stats(), value)),
+                StudioInventoryHolder.Screen.STAT_PICKER);
+    }
+
+    private void awaitStatSearch(Player player, StudioState state) {
+        StudioViewToken inputToken = sessions.nextView(state.token);
+        state.token = inputToken;
+        sessions.setPendingInput(inputToken, true);
+        player.closeInventory();
+        PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "stats.search",
+                Duration.ofMinutes(2), raw -> {
+            String value = raw == null ? "" : raw.trim();
+            if (value.equalsIgnoreCase("none")) return "";
+            if (value.length() > 64 || value.chars().anyMatch(Character::isISOControl)) {
+                throw new IllegalArgumentException("search text is invalid");
+            }
+            return value.toLowerCase(java.util.Locale.ROOT);
+        }, value -> {
+                    state.statFilter = value;
+                    state.statPage = 0;
+                    sessions.setPendingInput(inputToken, false);
+                    render(state, StudioInventoryHolder.Screen.STAT_PICKER);
+                }, failure -> inputFailure(player, state, inputToken, failure,
+                        StudioInventoryHolder.Screen.STAT_PICKER));
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
     }
 
     private void actionPet(Player player, StudioState state, String id) {
@@ -148,6 +222,7 @@ public final class PetStudioController {
             state.archiveHash = StudioPetDraft.semanticHash(definition.rawNode());
             state.archiveGeneration = registry.current().generation();
             state.archiveKey = UUID.randomUUID();
+            state.hardDeleteKey = UUID.randomUUID();
             render(state, StudioInventoryHolder.Screen.ARCHIVE_CONFIRM);
             return;
         }
@@ -167,6 +242,37 @@ public final class PetStudioController {
         render(next, StudioInventoryHolder.Screen.EDITOR);
     }
 
+    private void awaitCloneId(Player player, StudioState state) {
+        StudioPetDraft source = state.draft;
+        if (source == null || source.id() == null || source.mode() != StudioPetDraft.Mode.EDIT) {
+            player.sendMessage("OmniPet: only a persisted definition can be cloned.");
+            return;
+        }
+        StudioViewToken inputToken = sessions.nextView(state.token);
+        state.token = inputToken;
+        sessions.setPendingInput(inputToken, true);
+        player.closeInventory();
+        PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "clone.definition.id",
+                Duration.ofMinutes(2), raw -> {
+                    String id = StudioInputParsers.parseStableId(raw);
+                    if (id.equalsIgnoreCase(source.id())) {
+                        throw new IllegalArgumentException("clone ID must differ from the source");
+                    }
+                    return id;
+                },
+                id -> {
+                    long generation = registry.current().generation();
+                    PetStudioSession session = sessions.open(player.getUniqueId(), id, 0, "", generation);
+                    StudioState next = new StudioState(player.getUniqueId(), session);
+                    next.tier = source.tier();
+                    next.draft = source.cloneTo(id, generation);
+                    states.put(player.getUniqueId(), next);
+                    render(next, StudioInventoryHolder.Screen.EDITOR);
+                }, failure -> inputFailure(player, state, inputToken, failure, StudioInventoryHolder.Screen.EDITOR));
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
+    }
+
     private void editTier(StudioState state) {
         PetTier next = PetTier.values()[(state.draft.tier().ordinal() + 1) % PetTier.values().length];
         state.draft = state.draft.withTier(next);
@@ -176,6 +282,7 @@ public final class PetStudioController {
 
     private void save(Player player, StudioState state) {
         try {
+            validateCatalogSelections(state);
             service.save(state.draft, state.saveKey);
             player.sendMessage("OmniPet: definition saved and registry generation advanced.");
             openBrowse(player, state.tier, false);
@@ -183,6 +290,11 @@ public final class PetStudioController {
             plugin.getLogger().log(Level.WARNING, "OmniPet Studio save failed for " + state.draft.id(), error);
             player.sendMessage("OmniPet: save rejected - " + StudioErrorMessages.forAdmin(error));
         }
+    }
+
+    private void validateCatalogSelections(StudioState state) {
+        state.statSnapshot = statCatalog.snapshot(registry.current().generation());
+        StudioCatalogSelections.validate(state.statSnapshot, state.draft.stats());
     }
 
     private void archive(Player player, StudioState state) {
@@ -198,6 +310,43 @@ public final class PetStudioController {
         } catch (Exception error) {
             plugin.getLogger().log(Level.WARNING, "OmniPet Studio archive failed for " + state.archiveTarget, error);
             player.sendMessage("OmniPet: archive rejected - " + StudioErrorMessages.forAdmin(error));
+        }
+    }
+
+    private void awaitHardDelete(Player player, StudioState state) {
+        if (state.archiveTarget == null) {
+            player.sendMessage("OmniPet: hard-delete confirmation is stale.");
+            return;
+        }
+        String expectedId = state.archiveTarget;
+        StudioViewToken inputToken = sessions.nextView(state.token);
+        state.token = inputToken;
+        sessions.setPendingInput(inputToken, true);
+        player.closeInventory();
+        player.sendMessage("OmniPet: type the exact definition ID '" + expectedId
+                + "' to permanently delete it, or type cancel.");
+        PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "hard-delete.confirmation",
+                Duration.ofMinutes(2), raw -> StudioDraftInputParsers.exactDefinitionId(raw, expectedId),
+                typedId -> hardDelete(player, state, inputToken, typedId),
+                failure -> inputFailure(player, state, inputToken, failure,
+                        StudioInventoryHolder.Screen.ARCHIVE_CONFIRM));
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
+    }
+
+    private void hardDelete(Player player, StudioState state, StudioViewToken token, String typedId) {
+        sessions.setPendingInput(token, false);
+        if (!sessions.isCurrent(token) || state.archiveTarget == null) return;
+        try {
+            service.hardDelete(state.archiveTarget, typedId, state.archiveRevision, state.archiveHash,
+                    state.archiveGeneration, state.hardDeleteKey);
+            player.sendMessage("OmniPet: definition permanently deleted.");
+            openBrowse(player, state.tier, false);
+        } catch (Exception error) {
+            plugin.getLogger().log(Level.WARNING,
+                    "OmniPet Studio hard delete failed for " + state.archiveTarget, error);
+            player.sendMessage("OmniPet: hard delete rejected - " + StudioErrorMessages.forAdmin(error));
+            if (sessions.isCurrent(token)) render(state, StudioInventoryHolder.Screen.ARCHIVE_CONFIRM);
         }
     }
 
@@ -241,6 +390,11 @@ public final class PetStudioController {
 
     private <T> void awaitField(Player player, StudioState state, String path, ChatInputParser<T> parser,
                                 Function<T, StudioPetDraft> apply) {
+        awaitField(player, state, path, parser, apply, StudioInventoryHolder.Screen.EDITOR);
+    }
+
+    private <T> void awaitField(Player player, StudioState state, String path, ChatInputParser<T> parser,
+                                Function<T, StudioPetDraft> apply, StudioInventoryHolder.Screen resumeScreen) {
         StudioViewToken inputToken = sessions.nextView(state.token);
         state.token = inputToken;
         sessions.setPendingInput(inputToken, true);
@@ -250,8 +404,8 @@ public final class PetStudioController {
                     state.draft = apply.apply(value);
                     sessions.setPendingInput(inputToken, false);
                     sessions.markDirty(inputToken);
-                    render(state, StudioInventoryHolder.Screen.EDITOR);
-                }, failure -> inputFailure(player, state, inputToken, failure, StudioInventoryHolder.Screen.EDITOR));
+                    render(state, resumeScreen);
+                }, failure -> inputFailure(player, state, inputToken, failure, resumeScreen));
         plugin.getServer().getScheduler().runTaskLater(plugin,
                 () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
     }
@@ -268,7 +422,7 @@ public final class PetStudioController {
     }
 
     private void openBrowse(Player player, PetTier tier, boolean list) {
-        PetStudioSession session = sessions.open(player.getUniqueId(), "browse", 0, "", registry.current().generation());
+        PetStudioSession session = sessions.open(player.getUniqueId(), "", 0, "", registry.current().generation());
         StudioState state = new StudioState(player.getUniqueId(), session);
         state.tier = tier;
         states.put(player.getUniqueId(), state);
@@ -281,11 +435,15 @@ public final class PetStudioController {
         if (player == null || !sessions.isCurrent(state.token)) return;
         if (!sessions.touch(state.token)) return;
         state.token = sessions.nextView(state.token);
+        if (screen == StudioInventoryHolder.Screen.EDITOR || screen == StudioInventoryHolder.Screen.STAT_PICKER) {
+            state.statSnapshot = statCatalog.snapshot(registry.current().generation());
+        }
         Inventory inventory = switch (screen) {
             case TIERS -> renderer.tiers(player, state, registry.current());
             case LIST -> renderer.list(player, state, registry.current());
             case EDITOR -> renderer.editor(player, state);
             case ARCHIVE_CONFIRM -> renderer.archiveConfirm(player, state);
+            case STAT_PICKER -> renderer.stats(player, state);
         };
         player.openInventory(inventory);
     }

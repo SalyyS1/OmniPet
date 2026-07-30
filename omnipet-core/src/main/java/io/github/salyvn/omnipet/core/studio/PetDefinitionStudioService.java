@@ -22,6 +22,7 @@ import io.github.salyvn.omnipet.core.domain.PetDefinitionEnvelope;
 import io.github.salyvn.omnipet.core.domain.RawNodeValues;
 import io.github.salyvn.omnipet.core.persistence.PetDefinitionDraft;
 import io.github.salyvn.omnipet.core.persistence.PetDefinitionArchiveReceipt;
+import io.github.salyvn.omnipet.core.persistence.PetDefinitionDeleteReceipt;
 import io.github.salyvn.omnipet.core.persistence.PetDefinitionRepository;
 import io.github.salyvn.omnipet.core.persistence.PetDefinitionWriteReceipt;
 import io.github.salyvn.omnipet.core.persistence.PetReferenceScanner;
@@ -42,6 +43,7 @@ public final class PetDefinitionStudioService {
     private final ReentrantLock transactionLock = new ReentrantLock();
     private final LinkedHashMap<UUID, SaveResult> completedSaves = new LinkedHashMap<>();
     private final LinkedHashMap<UUID, RegistrySnapshot> completedArchives = new LinkedHashMap<>();
+    private final LinkedHashMap<UUID, RegistrySnapshot> completedDeletes = new LinkedHashMap<>();
 
     public PetDefinitionStudioService(
             PetDefinitionRepository definitions,
@@ -155,31 +157,12 @@ public final class PetDefinitionStudioService {
         try {
             RegistrySnapshot completed = completedArchives.get(idempotencyKey);
             if (completed != null) return completed;
-            RegistrySnapshot current = snapshots.current();
-            if (current.generation() != registryGeneration) {
-                throw new StudioConflictException("registry changed while this archive confirmation was open");
-            }
-            PetDefinition definition = definitions.read(id)
-                    .orElseThrow(() -> new StudioConflictException("definition does not exist: " + id))
-                    .definition();
-            if (definition.revision() != baseRevision) {
-                throw new StudioConflictException("definition revision changed: " + id);
-            }
-            if (!StudioPetDraft.semanticHash(definition.rawNode()).equals(baseSemanticHash)) {
-                throw new StudioConflictException("definition content changed: " + id);
-            }
-            Map<String, PetDefinition> diskDefinitions = loadAllDefinitions();
-            requireDiskMatchesRegistry(current, diskDefinitions);
-            Set<String> references = new java.util.LinkedHashSet<>(definitions.referenceScan(id));
-            references.removeIf(reference -> reference.equalsIgnoreCase(id));
-            for (PetReferenceScanner scanner : referenceScanners) references.addAll(scanner.references(id));
-            if (!references.isEmpty()) {
-                throw new StudioConflictException("definition is still referenced by: " + String.join(", ", references));
-            }
+            RemovalContext removal = validateRemoval(id, baseRevision, baseSemanticHash, registryGeneration,
+                    "archive confirmation");
 
-            Map<String, PetDefinition> candidate = new LinkedHashMap<>(diskDefinitions);
+            Map<String, PetDefinition> candidate = new LinkedHashMap<>(removal.diskDefinitions());
             candidate.remove(id);
-            RegistrySnapshot staged = snapshots.stage(current.generation() + 1, candidate);
+            RegistrySnapshot staged = snapshots.stage(removal.current().generation() + 1, candidate);
             ArchiveHolder receipt = new ArchiveHolder();
             RegistrySnapshot activated;
             try {
@@ -201,6 +184,70 @@ public final class PetDefinitionStudioService {
         } finally {
             transactionLock.unlock();
         }
+    }
+
+    public RegistrySnapshot hardDelete(
+            String id,
+            String typedConfirmation,
+            long baseRevision,
+            String baseSemanticHash,
+            long registryGeneration,
+            UUID idempotencyKey) throws IOException {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(idempotencyKey, "idempotencyKey");
+        if (!id.equals(typedConfirmation)) throw new StudioConflictException("hard-delete confirmation must match the exact definition ID");
+        transactionLock.lock();
+        try {
+            RegistrySnapshot completed = completedDeletes.get(idempotencyKey);
+            if (completed != null) return completed;
+            RemovalContext removal = validateRemoval(id, baseRevision, baseSemanticHash, registryGeneration,
+                    "hard-delete confirmation");
+            Map<String, PetDefinition> candidate = new LinkedHashMap<>(removal.diskDefinitions());
+            candidate.remove(id);
+            RegistrySnapshot staged = snapshots.stage(removal.current().generation() + 1, candidate);
+            DeleteHolder receipt = new DeleteHolder();
+            RegistrySnapshot activated;
+            try {
+                activated = transaction.commit(staged, () -> receipt.delete(definitions, id), receipt::rollback, activation);
+            } catch (UncheckedIOException failure) {
+                throw failure.getCause();
+            }
+            completedDeletes.put(idempotencyKey, activated);
+            audit.accept(new StudioAuditEntry(Instant.now(), idempotencyKey, StudioAuditEntry.Operation.HARD_DELETE,
+                    id, activated.generation(), true, "hard deleted"));
+            while (completedDeletes.size() > IDEMPOTENCY_HISTORY_LIMIT) {
+                completedDeletes.remove(completedDeletes.keySet().iterator().next());
+            }
+            return activated;
+        } finally {
+            transactionLock.unlock();
+        }
+    }
+
+    private RemovalContext validateRemoval(String id, long baseRevision, String baseSemanticHash,
+                                           long registryGeneration, String operation) throws IOException {
+        RegistrySnapshot current = snapshots.current();
+        if (current.generation() != registryGeneration) {
+            throw new StudioConflictException("registry changed while this " + operation + " was open");
+        }
+        PetDefinition definition = definitions.read(id)
+                .orElseThrow(() -> new StudioConflictException("definition does not exist: " + id))
+                .definition();
+        if (definition.revision() != baseRevision) {
+            throw new StudioConflictException("definition revision changed: " + id);
+        }
+        if (!StudioPetDraft.semanticHash(definition.rawNode()).equals(baseSemanticHash)) {
+            throw new StudioConflictException("definition content changed: " + id);
+        }
+        Map<String, PetDefinition> diskDefinitions = loadAllDefinitions();
+        requireDiskMatchesRegistry(current, diskDefinitions);
+        Set<String> references = new java.util.LinkedHashSet<>(definitions.referenceScan(id));
+        references.removeIf(reference -> reference.equalsIgnoreCase(id));
+        for (PetReferenceScanner scanner : referenceScanners) references.addAll(scanner.references(id));
+        if (!references.isEmpty()) {
+            throw new StudioConflictException("definition is still referenced by: " + String.join(", ", references));
+        }
+        return new RemovalContext(current, diskDefinitions);
     }
 
     private static void validateBase(StudioPetDraft draft, Optional<PetDefinitionEnvelope> existing) {
@@ -245,7 +292,7 @@ public final class PetDefinitionStudioService {
 
         Set<String> statIds = new HashSet<>();
         draft.stats().forEach(stat -> {
-            if (!statIds.add(stat.id().toLowerCase(Locale.ROOT))) {
+            if (!statIds.add(StatLogicalIdentity.key(stat))) {
                 throw new IllegalArgumentException("duplicate stat ID: " + stat.id());
             }
         });
@@ -447,4 +494,27 @@ public final class PetDefinitionStudioService {
             }
         }
     }
+
+    private static final class DeleteHolder {
+        private PetDefinitionDeleteReceipt receipt;
+
+        private void delete(PetDefinitionRepository definitions, String id) {
+            try {
+                receipt = definitions.deleteWithRollback(id);
+            } catch (IOException failure) {
+                throw new UncheckedIOException(failure);
+            }
+        }
+
+        private void rollback() {
+            if (receipt == null) return;
+            try {
+                receipt.rollback();
+            } catch (IOException failure) {
+                throw new UncheckedIOException(failure);
+            }
+        }
+    }
+
+    private record RemovalContext(RegistrySnapshot current, Map<String, PetDefinition> diskDefinitions) {}
 }

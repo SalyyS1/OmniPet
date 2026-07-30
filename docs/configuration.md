@@ -2,6 +2,8 @@
 
 OmniPet reads YAML from `plugins/OmniPet/`. Files are UTF-8 and user-visible text uses Adventure MiniMessage. Use spaces, not tabs. Keep identifiers ASCII-safe unless a feature explicitly documents Unicode handling.
 
+> The definition envelope and Admin Pet Studio sections below describe the current authoritative runtime. Egg, item, hatching, trigger, expression, and renderer examples are retained as future/non-authoritative design reference until their roadmap phase ships.
+
 ## Stable contracts
 
 The following names are persistent or referenced across files. Do not rename them casually:
@@ -24,7 +26,9 @@ The Studio is code-owned and deliberately does not require a second GUI YAML sch
 - Definition IDs are ASCII-safe and immutable while editing.
 - Head icons are mandatory. Supported sources are `TEXTURE_URL`, `BASE64`, and capability-gated `HEAD_CATALOG`.
 - Renderer choices are `HEAD` or `MODELENGINE`; selecting ModelEngine still keeps the head icon for cards/eggs.
-- Stats use `id MODIFIER min max`; rarity uses `id qualityMin qualityMax weight hatchMultiplier`.
+- Stats can be selected from the live MythicLib registry and configured as `MODIFIER min max`. The manual fallback accepts `id MODIFIER min max`; new picker IDs use `mythiclib:<lowercase-id>` and retain the exact vendor ID for the runtime adapter.
+- MMOItems can contribute owner stat handlers through MythicLib, but its item-template stat registry is intentionally not mixed into the owner-buff picker.
+- Rarity uses `id qualityMin qualityMax weight hatchMultiplier`.
 - Progression uses `maxLevel;formula`; skills use `provider:id|trigger|cooldown|chance|stamina|target`.
 - Type/chat validation happens before a draft can be saved. Unknown raw YAML nodes are retained.
 - Save, archive, and `/pets admin reload` use one optimistic, atomic registry-generation transaction. A stale revision, reference, or activation failure leaves the prior disk/live generation active.
@@ -235,4 +239,4 @@ Preserve placeholders when translating. A missing placeholder may remove useful 
 - Every optional component/provider has its plugin installed.
 - Every expression returns the type expected by its field.
 - Menu size and placeholders are valid.
-- A clean staging start and `/pets reload` complete without errors.
+- A clean staging start and `/pets admin reload` complete without errors.

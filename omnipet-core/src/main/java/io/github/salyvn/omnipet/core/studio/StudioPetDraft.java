@@ -73,6 +73,20 @@ public record StudioPetDraft(
         return edit(definition, semanticHash, registryGeneration);
     }
 
+    /** Creates a new-ID draft from the current detached values without touching the source definition. */
+    public StudioPetDraft cloneTo(String newId) {
+        return cloneTo(newId, registryGeneration);
+    }
+
+    public StudioPetDraft cloneTo(String newId, long targetRegistryGeneration) {
+        if (id == null) throw new IllegalStateException("a source definition ID is required before cloning");
+        String target = StableId.requireValid(newId);
+        Map<String, Object> clonedRaw = StudioRawNodes.put(rawNode, target, "definitionId");
+        clonedRaw = StudioRawNodes.put(clonedRaw, 0, "revision");
+        return new StudioPetDraft(target, Mode.CREATE, 0, "", targetRegistryGeneration, tier, icon, display, clonedRaw,
+                stats, rarityBands, progression, skills, behaviorExtensions, releasePolicy);
+    }
+
     public static String semanticHash(Map<String, ?> rawNode) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(RawNodeValues.semanticBytes(rawNode == null ? Map.of() : rawNode));

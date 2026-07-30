@@ -10,7 +10,7 @@ The authoritative runtime registers the Gradle-built Paper command and the Admin
 | `/pet admin browse` | `/pets admin browse` | `omnipet.general` + `omnipet.admin.managepet` | Opens the D/C/B/A/S definition browser and editor. |
 | `/pet admin reload` | `/pets admin reload` | `omnipet.admin.reload` | Closes Studio sessions, stages all definitions, and swaps one registry generation. |
 
-Studio Save and archive mutate only definition files through the shared transaction boundary. Player data, hatching, items, and summoning remain later phases.
+Studio Save, archive, clone-only authoring, and exact-ID hard delete mutate only definition files through the shared transaction boundary. Hard delete is blocked while YAML, egg, player, or active Studio references exist. Player data, hatching, items, and summoning remain later phases.
 
 ## Descriptor defaults
 

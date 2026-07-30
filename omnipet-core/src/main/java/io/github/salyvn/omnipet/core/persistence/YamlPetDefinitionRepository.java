@@ -142,6 +142,48 @@ public final class YamlPetDefinitionRepository implements PetDefinitionRepositor
     }
 
     @Override
+    public PetDefinitionDeleteReceipt deleteWithRollback(String id) throws IOException {
+        return withIdLock(id, () -> {
+            Optional<YamlPetDefinitionFiles.DefinitionFile> existing = definitionFiles.find(id);
+            if (existing.isEmpty()) throw new IOException("definition does not exist: " + id);
+            Path source = existing.orElseThrow().path();
+            Path backup = AtomicFileStore.backupPath(source);
+            byte[] sourceContent = Files.readAllBytes(source);
+            byte[] backupContent = Files.isRegularFile(backup, LinkOption.NOFOLLOW_LINKS)
+                    ? Files.readAllBytes(backup)
+                    : null;
+            try {
+                fileStore.restore(source, null, null);
+            } catch (IOException failure) {
+                try {
+                    fileStore.restore(source, sourceContent, backupContent);
+                } catch (IOException restoreFailure) {
+                    failure.addSuppressed(restoreFailure);
+                }
+                throw failure;
+            }
+            return new PetDefinitionDeleteReceipt() {
+                @Override
+                public String definitionId() {
+                    return id;
+                }
+
+                @Override
+                public void rollback() throws IOException {
+                    withIdLock(id, () -> {
+                        if (Files.exists(source, LinkOption.NOFOLLOW_LINKS)
+                                || Files.exists(backup, LinkOption.NOFOLLOW_LINKS)) {
+                            throw new IOException("definition path was recreated; refusing delete rollback: " + id);
+                        }
+                        fileStore.restore(source, sourceContent, backupContent);
+                        return null;
+                    });
+                }
+            };
+        });
+    }
+
+    @Override
     public Set<String> referenceScan(String id) throws IOException {
         String expected = StableId.requireValid(id);
         LinkedHashSet<String> references = new LinkedHashSet<>();

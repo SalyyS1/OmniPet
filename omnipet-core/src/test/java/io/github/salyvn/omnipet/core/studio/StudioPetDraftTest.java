@@ -50,6 +50,30 @@ class StudioPetDraftTest {
     }
 
     @Test
+    void cloneToCreatesACreateDraftWithoutChangingTheSourceId() {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("definitionId", "fox");
+        raw.put("revision", 2);
+        raw.put("custom", Map.of("kept", true));
+        StudioPetDraft source = StudioPetDraft.edit(
+                new PetDefinition("fox", 2, PetTier.D, icon(), display(), raw),
+                StudioPetDraft.semanticHash(raw), 5);
+
+        StudioPetDraft clone = source.cloneTo("wolf");
+
+        assertEquals("fox", source.id());
+        assertEquals("wolf", clone.id());
+        assertEquals(StudioPetDraft.Mode.CREATE, clone.mode());
+        assertEquals(0, clone.baseRevision());
+        assertEquals("", clone.baseSemanticHash());
+        assertEquals("wolf", clone.rawNode().get("definitionId"));
+        assertEquals(0, clone.rawNode().get("revision"));
+        assertEquals(Map.of("kept", true), clone.rawNode().get("custom"));
+        assertEquals("fox", source.rawNode().get("definitionId"));
+        assertThrows(IllegalStateException.class, () -> clone.withId("other"));
+    }
+
+    @Test
     void draftCollectionsAndNestedExtensionsAreImmutableCopies() {
         List<StudioStat> sourceStats = new ArrayList<>();
         sourceStats.add(new StudioStat("mythiclib:attack_damage", StatModifierType.FLAT,

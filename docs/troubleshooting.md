@@ -9,11 +9,15 @@ Check:
 1. The server is Paper, not Spigot or CraftBukkit.
 2. Paper 1.21.x runs on Java 21; Paper 26.1+ runs on Java 25.
 3. The JAR is named `OmniPet-<version>.jar` and contains `paper-plugin.yml`.
-4. Descriptor entry points resolve to `io.github.salyvn.omnipet.OmniPetPlugin` and `OmniPetBootstrap`.
+4. The descriptor entry point resolves to `io.github.salyvn.omnipet.paper.OmniPetPlugin`; there is no bootstrapper entry in the current Gradle artifact.
 5. No old PassivePet JAR is loading beside OmniPet.
 6. The first exception in the log is captured; later errors may only be symptoms.
 
 An `UnsupportedClassVersionError` usually means the Java runtime is older than the compiled target. A `NoClassDefFoundError` mentioning a vendor plugin usually means an optional adapter loaded against a missing or incompatible API.
+
+## Current runtime boundary
+
+The current release ships definition persistence, migration journaling, the `/pet` command, and the Admin Pet Studio. The egg, hatching, slot, render, trigger, economy, and player-storage sections below are future design troubleshooting notes; they are not live gameplay contracts until their roadmap phases land.
 
 ## Configuration fails to load
 
