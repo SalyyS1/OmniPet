@@ -8,6 +8,8 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -64,6 +66,37 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
         }
     }
 
+    @Override
+    public Set<String> referenceScan(String definitionId) throws IOException {
+        String expected = io.github.salyvn.omnipet.core.domain.StableId.requireValid(definitionId);
+        Set<String> references = new HashSet<>();
+        if (!Files.isDirectory(paths.root(), LinkOption.NOFOLLOW_LINKS)) return Set.of();
+        Path quarantineDirectory = paths.root().resolve("quarantine");
+        if (Files.isDirectory(quarantineDirectory, LinkOption.NOFOLLOW_LINKS)) {
+            try (DirectoryStream<Path> quarantined = Files.newDirectoryStream(quarantineDirectory, "*.yml")) {
+                for (Path ignored : quarantined) {
+                    throw new IOException("quarantined player state prevents a safe definition reference scan");
+                }
+            }
+        }
+        try (DirectoryStream<Path> files = Files.newDirectoryStream(paths.root(), "*.yml")) {
+            for (Path file : files) {
+                if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) continue;
+                String fileName = file.getFileName().toString();
+                String uuidText = fileName.substring(0, fileName.length() - 4);
+                UUID playerId;
+                try { playerId = UUID.fromString(uuidText); }
+                catch (IllegalArgumentException error) { throw new IOException("invalid player state filename: " + fileName, error); }
+                PlayerState state = snapshot(playerId);
+                boolean found = state.pets().stream().anyMatch(pet -> expected.equals(pet.definitionId()))
+                        || containsString(state.legacyCurrentEgg(), expected)
+                        || containsString(state.extensions(), expected);
+                if (found) references.add("player:" + playerId);
+            }
+        }
+        return Set.copyOf(references);
+    }
+
     private PlayerState load(UUID playerId) throws IOException {
         Path path = paths.resolveUuid(playerId, ".yml");
         if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
@@ -107,6 +140,13 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
                 }
             }
         }
+        return false;
+    }
+
+    private static boolean containsString(Object value, String expected) {
+        if (expected.equals(value)) return true;
+        if (value instanceof Map<?, ?> map) return map.values().stream().anyMatch(nested -> containsString(nested, expected));
+        if (value instanceof List<?> list) return list.stream().anyMatch(nested -> containsString(nested, expected));
         return false;
     }
 }

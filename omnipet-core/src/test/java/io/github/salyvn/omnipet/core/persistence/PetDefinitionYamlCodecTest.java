@@ -45,6 +45,25 @@ class PetDefinitionYamlCodecTest {
     }
 
     @Test
+    void preservesUnknownNestedDisplayIconAndClassificationNodes() {
+        String yaml = """
+                schemaVersion: 2
+                definitionId: nahara
+                revision: 4
+                classification: { tier: A, vendorFlag: true }
+                icon:
+                  head: { source: TEXTURE_URL, value: 'https://textures.minecraft.net/texture/example', providerFlag: true }
+                display: { provider: HEAD, model: null, rendererFlag: true }
+                """;
+
+        var roundTripped = codec.decode("nahara", codec.encode(codec.decode("nahara", yaml)));
+
+        assertEquals(true, ((Map<?, ?>) roundTripped.definition().rawNode().get("classification")).get("vendorFlag"));
+        assertEquals(true, ((Map<?, ?>) ((Map<?, ?>) roundTripped.definition().rawNode().get("icon")).get("head")).get("providerFlag"));
+        assertEquals(true, ((Map<?, ?>) roundTripped.definition().rawNode().get("display")).get("rendererFlag"));
+    }
+
+    @Test
     void rejectsInvalidBoundsFilenameMismatchAndMissingModel() {
         String base = """
                 schemaVersion: 2

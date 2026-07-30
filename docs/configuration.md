@@ -16,6 +16,19 @@ The following names are persistent or referenced across files. Do not rename the
 
 Renaming a pet filename changes its ID and can break eggs, player saves, commands, expressions, and items.
 
+## Admin Pet Studio
+
+The Studio is code-owned and deliberately does not require a second GUI YAML schema. Open it with `/pet admin browse` or `/pets admin browse` after granting `omnipet.admin.managepet`.
+
+- Tier order is fixed: `D`, `C`, `B`, `A`, `S`.
+- Definition IDs are ASCII-safe and immutable while editing.
+- Head icons are mandatory. Supported sources are `TEXTURE_URL`, `BASE64`, and capability-gated `HEAD_CATALOG`.
+- Renderer choices are `HEAD` or `MODELENGINE`; selecting ModelEngine still keeps the head icon for cards/eggs.
+- Stats use `id MODIFIER min max`; rarity uses `id qualityMin qualityMax weight hatchMultiplier`.
+- Progression uses `maxLevel;formula`; skills use `provider:id|trigger|cooldown|chance|stamina|target`.
+- Type/chat validation happens before a draft can be saved. Unknown raw YAML nodes are retained.
+- Save, archive, and `/pets admin reload` use one optimistic, atomic registry-generation transaction. A stale revision, reference, or activation failure leaves the prior disk/live generation active.
+
 ## `config.yml`
 
 ```yaml

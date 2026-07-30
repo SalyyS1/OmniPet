@@ -32,6 +32,11 @@ public final class InMemoryRegistrySnapshotRepository implements RegistrySnapsho
             return staged;
         } catch (RuntimeException | Error failure) {
             current = previous;
+            try {
+                activation.accept(previous);
+            } catch (RuntimeException | Error rollbackFailure) {
+                failure.addSuppressed(rollbackFailure);
+            }
             throw failure;
         }
     }

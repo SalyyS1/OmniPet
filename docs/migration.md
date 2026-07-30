@@ -57,7 +57,7 @@ The journal includes `schemaVersion`, `kind: legacy-egg-definitions`, a SHA-256 
 
 Keep pet filenames, egg map keys, item IDs, component IDs, and expression references byte-for-byte stable. The migration boundary recognizes legacy item namespace `passivepet` for `pet`, `egg`, `food`, `hatcher`, and `evolver` keys. New Phase 1 Paper code does not ship item gameplay or an item conversion command.
 
-The foundation command checks `omnipet.general`. Move permission grants to `omnipet.*` names; the Phase 1 command does not provide the old runtime's legacy permission fallback.
+The command entry point checks `omnipet.general`, while Studio branches additionally check their declared admin permission. Move permission grants to `omnipet.*` names; the rewritten runtime does not provide the old runtime's legacy permission fallback.
 
 ## Staging checklist
 

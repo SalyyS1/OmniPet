@@ -1,6 +1,6 @@
 # Developer guide
 
-OmniPet Phase 1 is a Java 21, Gradle Kotlin DSL, multi-project foundation. The authoritative implementation lives in `omnipet-core` and `omnipet-paper`; the older root `src/` tree remains migration and behavior reference, not the shipped gameplay authority.
+OmniPet is a Java 21, Gradle Kotlin DSL, multi-project rewrite. The authoritative implementation lives in `omnipet-core` and `omnipet-paper`; the older root `src/` tree remains migration and behavior reference, not the shipped gameplay authority.
 
 ## Build contract
 
@@ -43,18 +43,19 @@ Do not add vendor modules until an owning phase proves a real API/classloader bo
 
 Unknown top-level fields, pet-instance fields, component maps, current egg data, and definition raw nodes are copied into immutable raw maps and written back. This preservation is intentional: later phases may understand data that Phase 1 does not.
 
-## Paper bootstrap
+## Paper bootstrap and Studio
 
-`io.github.salyvn.omnipet.paper.OmniPetPlugin` performs only foundation wiring:
+`io.github.salyvn.omnipet.paper.OmniPetPlugin` wires the foundation and Studio:
 
 1. Reject a symbolic-link data folder.
 2. Create the data root.
 3. Journal legacy `eggs.yml` if present.
 4. Construct pet/player repositories and load a registry snapshot.
-5. Register `/pet` with `/pets` as alias.
-6. Disable the plugin on initialization failure.
+5. Create the shared Studio save/reload transaction and session manager.
+6. Register the guarded Studio listener and `/pet` with `/pets` as alias.
+7. Disable the plugin on initialization failure.
 
-The command returns a foundation status message. No Studio, hatching, player menu, admin mutation tree, renderer, vendor adapter, or economy service is wired yet.
+`/pet admin browse` opens the tokenized Studio tier/list/editor flow. Save/archive and `/pet admin reload` use the same staged registry generation boundary. Hatching, player menus, renderers, vendor adapters, and economy services remain later phases.
 
 ## Compatibility probes
 
@@ -74,10 +75,10 @@ For 26.x, supply a Java 25 toolchain and an exact alpha/stable coordinate. A suc
 
 ## Verification evidence
 
-The final Phase 1 validation passed `gradlew.bat clean build --no-daemon` on JDK 21 with 37/37 tests: 33 core and 4 Paper. The single artifact was `build/release/OmniPet-3.0.0-SNAPSHOT.jar`, authored by `SalyVn`, with no bundled Paper/vendor packages or `META-INF/maven` entries.
+The Phase 2 validation passed `gradlew.bat test --no-daemon --rerun-tasks` on JDK 21 with 89/89 tests: 58 core and 31 Paper. The single artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar`, authored by `SalyVn`, with no bundled Paper/vendor packages or `META-INF/maven` entries.
 
 There is no live Paper server smoke-test evidence yet. Treat runtime certification and every optional integration as later release gates.
 
 ## Deferred extension surfaces
 
-Studio Save and `/pets reload` must consume the tested `RegistrySnapshotTransaction` seam when implemented. Incubation, multi-pet/vault slots, renderers, MythicMobs skills, ModelEngine, economy adapters, and a published addon API remain phase-owned roadmap work.
+Incubation, multi-pet/vault slots, renderers, MythicMobs skills, ModelEngine, economy adapters, and a published addon API remain phase-owned roadmap work. Any new mutation must reuse `RegistrySnapshotTransaction` and preserve unknown raw nodes.

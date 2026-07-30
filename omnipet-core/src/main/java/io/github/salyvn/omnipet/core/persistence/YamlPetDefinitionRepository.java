@@ -47,9 +47,22 @@ public final class YamlPetDefinitionRepository implements PetDefinitionRepositor
 
     @Override
     public PetDefinitionEnvelope saveDraft(PetDefinitionDraft draft) throws IOException {
+        return saveDraftWithRollback(draft).persisted();
+    }
+
+    @Override
+    public PetDefinitionWriteReceipt saveDraftWithRollback(PetDefinitionDraft draft) throws IOException {
         if (draft == null) throw new IllegalArgumentException("draft is required");
         String id = draft.definition().id();
         return withIdLock(id, () -> {
+            Optional<YamlPetDefinitionFiles.DefinitionFile> sourceFile = definitionFiles.find(id);
+            Path sourcePath = sourceFile.map(YamlPetDefinitionFiles.DefinitionFile::path).orElse(null);
+            byte[] previousContent = sourcePath == null ? null : Files.readAllBytes(sourcePath);
+            Path previousBackupPath = sourcePath == null ? null : AtomicFileStore.backupPath(sourcePath);
+            byte[] previousBackup = previousBackupPath != null
+                    && Files.isRegularFile(previousBackupPath, LinkOption.NOFOLLOW_LINKS)
+                    ? Files.readAllBytes(previousBackupPath)
+                    : null;
             Optional<PetDefinitionEnvelope> existing = readUnlocked(id);
             long currentRevision = existing.map(value -> value.definition().revision()).orElse(0L);
             if (currentRevision != draft.expectedRevision()) {
@@ -65,21 +78,66 @@ public final class YamlPetDefinitionRepository implements PetDefinitionRepositor
                     ? existingFile.orElseThrow().path()
                     : definitionFiles.defaultPath(id);
             fileStore.write(destination, codec.encode(envelope).getBytes(StandardCharsets.UTF_8));
-            return envelope;
+            Path rollbackPath = sourcePath == null ? destination : sourcePath;
+            return new PetDefinitionWriteReceipt() {
+                @Override
+                public PetDefinitionEnvelope persisted() {
+                    return envelope;
+                }
+
+                @Override
+                public void rollback() throws IOException {
+                    withIdLock(id, () -> {
+                        Optional<PetDefinitionEnvelope> current = readUnlocked(id);
+                        long revision = current.map(value -> value.definition().revision()).orElse(0L);
+                        if (revision != envelope.definition().revision()) {
+                            throw new IOException("definition changed after Studio write; refusing rollback: " + id);
+                        }
+                        fileStore.restore(rollbackPath, previousContent, previousBackup);
+                        return null;
+                    });
+                }
+            };
         });
     }
 
     @Override
     public void archive(String id) throws IOException {
-        withIdLock(id, () -> {
+        archiveWithRollback(id);
+    }
+
+    @Override
+    public PetDefinitionArchiveReceipt archiveWithRollback(String id) throws IOException {
+        return withIdLock(id, () -> {
             Optional<YamlPetDefinitionFiles.DefinitionFile> existing = definitionFiles.find(id);
-            if (existing.isEmpty()) return null;
+            if (existing.isEmpty()) throw new IOException("definition does not exist: " + id);
+            Path source = existing.orElseThrow().path();
             Path archive;
             do {
                 archive = paths.resolveArchive(id, UUID.randomUUID().toString());
             } while (Files.exists(archive, LinkOption.NOFOLLOW_LINKS));
-            fileStore.moveWithoutReplacing(existing.orElseThrow().path(), archive);
-            return null;
+            fileStore.moveWithoutReplacing(source, archive);
+            Path archived = archive;
+            return new PetDefinitionArchiveReceipt() {
+                @Override
+                public String definitionId() {
+                    return id;
+                }
+
+                @Override
+                public void rollback() throws IOException {
+                    withIdLock(id, () -> {
+                        if (Files.exists(source, LinkOption.NOFOLLOW_LINKS)) {
+                            throw new IOException("definition path was recreated; refusing archive rollback: " + id);
+                        }
+                        if (!Files.isRegularFile(archived, LinkOption.NOFOLLOW_LINKS)) {
+                            throw new IOException("archived definition is unavailable for rollback: " + id);
+                        }
+                        fileStore.moveWithoutReplacing(archived, source);
+                        return null;
+                    });
+                }
+            };
         });
     }
 

@@ -14,15 +14,19 @@ import io.github.salyvn.omnipet.core.persistence.FoundationRegistryLoader;
 import io.github.salyvn.omnipet.core.persistence.InMemoryRegistrySnapshotRepository;
 import io.github.salyvn.omnipet.core.persistence.PlayerStateRepository;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository;
+import io.github.salyvn.omnipet.core.persistence.PetReferenceScanner;
 import io.github.salyvn.omnipet.core.persistence.YamlPetDefinitionRepository;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrationResult;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrator;
-import io.github.salyvn.omnipet.paper.command.FoundationCommand;
 import io.github.salyvn.omnipet.paper.command.FoundationCommandContract;
+import io.github.salyvn.omnipet.paper.command.OmniPetCommand;
+import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
+import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioListener;
 
 public final class OmniPetPlugin extends JavaPlugin {
     private PlayerStateRepository playerStates;
     private RegistrySnapshotRepository registry;
+    private PetStudioController studio;
 
     @Override
     public void onEnable() {
@@ -37,12 +41,21 @@ public final class OmniPetPlugin extends JavaPlugin {
             playerStates = new FilePlayerStateRepository(dataRoot.resolve("data/players"));
             registry = new InMemoryRegistrySnapshotRepository();
             var snapshot = new FoundationRegistryLoader().load(definitions, registry);
-            registerFoundationCommands();
-            getLogger().info("OmniPet foundation enabled with " + snapshot.definitions().size() + " definitions.");
+            studio = new PetStudioController(this, definitions, registry, java.util.List.of(
+                    playerStates::referenceScan,
+                    PetReferenceScanner.yamlFiles(java.util.List.of(dataRoot.resolve("eggs.yml")))));
+            getServer().getPluginManager().registerEvents(new PetStudioListener(studio), this);
+            registerCommands();
+            getLogger().info("OmniPet enabled with Pet Studio and " + snapshot.definitions().size() + " definitions.");
         } catch (IOException | RuntimeException failure) {
             getLogger().severe("OmniPet foundation failed to initialize: " + failure.getMessage());
             getServer().getPluginManager().disablePlugin(this);
         }
+    }
+
+    @Override
+    public void onDisable() {
+        if (studio != null) studio.onDisable();
     }
 
     private void migrateLegacyEggDefinitions(Path dataRoot) throws IOException {
@@ -58,12 +71,12 @@ public final class OmniPetPlugin extends JavaPlugin {
         }
     }
 
-    private void registerFoundationCommands() {
+    private void registerCommands() {
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
                 event.registrar().register(
                         FoundationCommandContract.NAME,
                         FoundationCommandContract.ALIASES,
-                        new FoundationCommand()));
+                        new OmniPetCommand(studio)));
     }
 
     PlayerStateRepository playerStates() {

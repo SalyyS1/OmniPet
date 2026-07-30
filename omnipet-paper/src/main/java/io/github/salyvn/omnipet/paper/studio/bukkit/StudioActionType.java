@@ -1,0 +1,25 @@
+package io.github.salyvn.omnipet.paper.studio.bukkit;
+
+public enum StudioActionType {
+    TIER,
+    PET,
+    CREATE,
+    SEARCH,
+    TOGGLE_ARCHIVE,
+    PREVIOUS,
+    NEXT,
+    BACK,
+    EDIT_TIER,
+    EDIT_ICON,
+    EDIT_DISPLAY,
+    EDIT_STATS,
+    EDIT_RARITY,
+    EDIT_PROGRESSION,
+    EDIT_SKILLS,
+    EDIT_BEHAVIOR,
+    EDIT_RELEASE,
+    SAVE,
+    CANCEL,
+    CONFIRM_ARCHIVE,
+    CANCEL_ARCHIVE
+}

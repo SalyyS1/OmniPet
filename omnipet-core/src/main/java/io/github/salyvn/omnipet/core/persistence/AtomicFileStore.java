@@ -63,6 +63,18 @@ public final class AtomicFileStore {
         }
     }
 
+    public void restore(Path destination, byte[] content, byte[] backupContent) throws IOException {
+        Path target = destination.toAbsolutePath().normalize();
+        Path parent = target.getParent();
+        if (parent == null) throw new IOException("destination has no parent: " + destination);
+        rejectSymbolicLink(target);
+        Files.createDirectories(parent);
+        rejectSymbolicLink(parent);
+
+        restoreOne(target, content);
+        restoreOne(backupPath(target), backupContent);
+    }
+
     public static Path backupPath(Path destination) {
         return destination.resolveSibling(destination.getFileName() + ".bak");
     }
@@ -86,6 +98,22 @@ public final class AtomicFileStore {
             Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (AtomicMoveNotSupportedException ignored) {
             Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static void restoreOne(Path destination, byte[] content) throws IOException {
+        rejectSymbolicLink(destination);
+        if (content == null) {
+            Files.deleteIfExists(destination);
+            return;
+        }
+        Path parent = destination.getParent();
+        Path temporary = Files.createTempFile(parent, destination.getFileName() + ".restore.", ".tmp");
+        try {
+            writeAndSync(temporary, content);
+            moveReplacing(temporary, destination);
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 

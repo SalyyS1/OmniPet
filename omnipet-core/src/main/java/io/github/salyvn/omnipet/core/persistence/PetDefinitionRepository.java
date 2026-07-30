@@ -14,7 +14,11 @@ public interface PetDefinitionRepository {
 
     PetDefinitionEnvelope saveDraft(PetDefinitionDraft draft) throws IOException;
 
+    PetDefinitionWriteReceipt saveDraftWithRollback(PetDefinitionDraft draft) throws IOException;
+
     void archive(String id) throws IOException;
+
+    PetDefinitionArchiveReceipt archiveWithRollback(String id) throws IOException;
 
     Set<String> referenceScan(String id) throws IOException;
 }

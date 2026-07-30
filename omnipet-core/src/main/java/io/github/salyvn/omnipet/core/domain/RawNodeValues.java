@@ -1,6 +1,7 @@
 package io.github.salyvn.omnipet.core.domain;
 
 import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -87,6 +88,8 @@ public final class RawNodeValues {
             output.append('[');
             list.forEach(item -> appendCanonical(output, item));
             output.append(']');
+        } else if (value instanceof Number number) {
+            output.append("number:").append(new BigDecimal(number.toString()).stripTrailingZeros().toPlainString()).append(';');
         } else {
             output.append(value == null ? "null" : value.getClass().getName() + ':' + value).append(';');
         }

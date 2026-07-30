@@ -44,10 +44,16 @@ public final class PetDefinitionYamlCodec {
         raw.put("schemaVersion", PetDefinitionEnvelope.CURRENT_SCHEMA_VERSION);
         raw.put("definitionId", definition.id());
         raw.put("revision", definition.revision());
-        raw.put("classification", new LinkedHashMap<>(Map.of("tier", definition.tier().name())));
-        raw.put("icon", new LinkedHashMap<>(Map.of("head", new LinkedHashMap<>(Map.of(
-                "source", definition.icon().source(), "value", definition.icon().value())))));
-        LinkedHashMap<String, Object> display = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> classification = mutableMap(raw.get("classification"));
+        classification.put("tier", definition.tier().name());
+        raw.put("classification", classification);
+        LinkedHashMap<String, Object> icon = mutableMap(raw.get("icon"));
+        LinkedHashMap<String, Object> head = mutableMap(icon.get("head"));
+        head.put("source", definition.icon().source());
+        head.put("value", definition.icon().value());
+        icon.put("head", head);
+        raw.put("icon", icon);
+        LinkedHashMap<String, Object> display = mutableMap(raw.get("display"));
         display.put("provider", definition.display().provider().name());
         display.put("model", definition.display().model());
         raw.put("display", display);
@@ -100,5 +106,13 @@ public final class PetDefinitionYamlCodec {
         } catch (IllegalArgumentException error) {
             throw new IllegalArgumentException(path + " is invalid", error);
         }
+    }
+
+    private static LinkedHashMap<String, Object> mutableMap(Object value) {
+        LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+        if (value instanceof Map<?, ?> map) {
+            map.forEach((key, nested) -> result.put(String.valueOf(key), RawNodeValues.mutableCopy(nested)));
+        }
+        return result;
     }
 }

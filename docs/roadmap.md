@@ -1,6 +1,6 @@
 # Roadmap
 
-The Phase 1 Gradle/persistence foundation is implemented and verified. The execution plan remains in progress until later phases consume the shared registry transaction and add live gameplay evidence. Later phases must not be described as shipped until their code, tests, exact Paper matrix, migration fixtures, and live smoke evidence exist.
+The Phase 1 Gradle/persistence foundation and the Phase 2 Admin Pet Studio slice are implemented and verified. The execution plan remains in progress until later phases add live gameplay evidence. Later phases must not be described as shipped until their code, tests, exact Paper matrix, migration fixtures, and live smoke evidence exist.
 
 ## Shipped foundation
 
@@ -16,7 +16,7 @@ The Phase 1 Gradle/persistence foundation is implemented and verified. The execu
 
 | Capability | Status | Boundary/acceptance note |
 | --- | --- | --- |
-| Admin Pet Studio GUI and Studio Save | Deferred to Phase 2 | Must use the staged registry transaction and rollback seam. |
+| Admin Pet Studio GUI and Studio Save | Shipped Phase 2 slice | D/C/B/A/S browser, draft editor, archive mode, guarded inventory/chat input, and shared atomic generation transaction. Live server UX smoke remains a release gate. |
 | Incubation/hatching and rarity rolls | Deferred to Phase 3 | Must define online-time, escrow, idempotence, and migration semantics. |
 | Multi-pet active slots, vault, and economy | Deferred to Phase 4 | Requires canonical activation intent and provider reconciliation. |
 | Paper/ModelEngine renderers and smooth movement | Deferred to Phase 5 | ModelEngine class loading, cleanup, fallback, and exact-version tests required. |
@@ -27,7 +27,7 @@ The Phase 1 Gradle/persistence foundation is implemented and verified. The execu
 
 ## Non-claims
 
-The current JAR does not ship a Studio menu, hatching loop, multi-pet slots, vault/economy provider, live renderer, MythicMobs skill system, ModelEngine adapter, or full gameplay API. Old configuration and integration examples are retained as future design/reference material and are explicitly non-authoritative until their phase lands.
+The current JAR ships the definition Studio but not the hatching loop, multi-pet slots, vault/economy provider, live renderer, MythicMobs skill execution, ModelEngine adapter, or full gameplay API. Old configuration and integration examples are retained as future design/reference material and are explicitly non-authoritative until their phase lands.
 
 ## Release gates
 
