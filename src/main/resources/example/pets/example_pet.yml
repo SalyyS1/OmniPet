@@ -1,0 +1,46 @@
+# The filename is the stable pet ID: example_pet.
+general:
+  name: "<gold>Trail<yellow>blazer"
+  texture: "https://textures.minecraft.net/texture/dd871e28db04d3711792e0fa549e997f846ac950412ba091a606f324459d38d3"
+  description:
+    - "<!i><gray>A steady companion for long journeys."
+    - "<!i><dark_gray>Walk together to earn pet experience."
+
+display:
+  texture: "https://textures.minecraft.net/texture/dd871e28db04d3711792e0fa549e997f846ac950412ba091a606f324459d38d3"
+
+hatching:
+  defaultRarity: 0
+
+leveling:
+  maxLevel: 50
+  maxExp: 100 + leveling.level * 25
+  maxEvolution: 5
+
+stamina:
+  maxStamina: 120 + leveling.level * 4
+
+trigger:
+  - type: walk
+    script:
+      - if: stamina.tryTaking(trigger.walkDistance * 0.05)
+        onTrue: leveling.addExp(trigger.walkDistance)
+
+  - type: interval
+    cooldown: 100
+    precondition: stamina.value >= 5
+    lore:
+      - ""
+      - "<!i><gray>Scavenger <trigger_progressbar:18:'|'> <yellow><trigger_cooldown>"
+      - "<!i><dark_gray>Finds one flint every five seconds."
+    script:
+      - stamina.take(5)
+      - player.giveItem(items.FLINT)
+
+  - type: release
+    script:
+      - player.giveItem(items.FEATHER
+          .withAmount(1 + leveling.level / 10 + leveling.evolution)
+          .withName("<aqua>Memory Feather")
+          .withLore("<!i><gray>A keepsake from a released companion."))
+

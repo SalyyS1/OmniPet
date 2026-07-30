@@ -1,0 +1,53 @@
+# Standalone OmniPet items. MMOItems servers can use the OmniPet item stats
+# documented in docs/integrations.md instead.
+
+# /pets item food <food-id> [players]
+foods:
+  petSteak:
+    type: COOKED_BEEF
+    name: "<red>Pet Steak"
+    lore:
+      - "<!i><gray>A hearty meal for a summoned pet."
+      - "<!i><yellow>+50 <gray>stamina"
+      - ""
+      - "<!i><yellow>Use <gray>on your active pet"
+    stamina: 50
+
+  berryBowl:
+    type: SWEET_BERRIES
+    name: "<light_purple>Berry Bowl"
+    lore:
+      - "<!i><gray>A light snack for short adventures."
+      - "<!i><yellow>+25 <gray>stamina"
+      - ""
+      - "<!i><yellow>Use <gray>on your active pet"
+    stamina: 25
+
+# /pets item evolver [players]
+evolver:
+  type: PAPER
+  name: "<light_purple>Scroll of Ascension"
+  lore:
+    - "<!i><gray>Advances an eligible pet by one evolution."
+    - ""
+    - "<!i><yellow>Use <gray>on your active pet"
+
+# /pets item egg <egg-id> [players]
+egg:
+  type: EGG
+  name: "<yellow><egg_name> Egg"
+  lore:
+    - "<!i><gray>Right-click to begin hatching."
+    - "<!i><gray>Requires an empty permitted pet slot."
+
+# /pets item hatcher <hatcher-id> [players]
+hatchers:
+  elixir:
+    type: HONEY_BOTTLE
+    name: "<aqua>Time Elixir"
+    lore:
+      - "<!i><gray>Reduces the current hatch time by <yellow>3 hours<gray>."
+      - ""
+      - "<!i><yellow>Right-click <gray>while hatching an egg"
+    duration: 3h
+

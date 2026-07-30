@@ -1,0 +1,6 @@
+# Maximum number of slot permissions OmniPet can evaluate.
+globalMaxSlots: 1000
+
+# Keep this stable during migration. %s becomes the 1-based slot number.
+slotPermission: petstorage.slot.%s
+

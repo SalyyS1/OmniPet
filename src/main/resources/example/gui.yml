@@ -1,0 +1,64 @@
+title: "<dark_green>OmniPet <gray>- Companions"
+size: 54
+
+border:
+  type: BLACK_STAINED_GLASS_PANE
+  tooltip: false
+
+emptySlot:
+  type: LIME_STAINED_GLASS_PANE
+  name: "<green>Open Pet Slot"
+  lore:
+    - "<!i><gray>Start hatching an egg to fill this slot."
+
+lockedSlot:
+  type: RED_STAINED_GLASS_PANE
+  name: "<red>Locked Pet Slot"
+  lore:
+    - "<!i><gray>You do not have permission for this slot."
+    - "<!i><dark_gray>Ask a server administrator about storage upgrades."
+
+voidSlot:
+  type: GRAY_STAINED_GLASS_PANE
+  tooltip: false
+
+egg:
+  type: EGG
+  name: "<egg_name> <white>Egg"
+  lore:
+    - "<!i><gray>Remaining hatch time: <yellow><egg_hatch_duration>"
+    - ""
+    - "<!i><gray>The result is selected from this egg's pet pool."
+
+pet:
+  name: "<pet_name>"
+  lore:
+    - "{{ leveling }}"
+    - "{{ stamina }}"
+    - "{{ trigger }}"
+    - ""
+    - "{{ general }}"
+    - ""
+    - "<!i><yellow>Left-click <gray>to summon"
+    - "<!i><yellow>Shift + right-click <gray>to <red>release"
+
+activePet:
+  name: "<pet_name> <bold><green>ACTIVE"
+  lore:
+    - "{{ leveling }}"
+    - "{{ stamina }}"
+    - "{{ trigger }}"
+    - ""
+    - "{{ general }}"
+    - ""
+    - "<!i><yellow>Left-click <gray>to recall"
+    - "<!i><yellow>Shift + right-click <gray>to <red>release"
+
+nextPage:
+  type: ARROW
+  name: "<white>Next page <dark_gray>| <gray><page>/<max_page>"
+
+prevPage:
+  type: ARROW
+  name: "<white>Previous page <dark_gray>| <gray><page>/<max_page>"
+

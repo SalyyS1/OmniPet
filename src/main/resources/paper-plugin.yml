@@ -1,0 +1,39 @@
+name: OmniPet
+version: ${version}
+api-version: '1.21'
+authors: [SalyVn]
+description: "Configurable Paper pets with MythicLib stats, skills, hatching, and optional integrations."
+website: https://github.com/SalyyS1/OmniPet
+
+main: io.github.salyvn.omnipet.OmniPetPlugin
+bootstrapper: io.github.salyvn.omnipet.OmniPetBootstrap
+
+dependencies:
+  server:
+    MMOItems: { load: BEFORE, required: false, join-classpath: true }
+    MythicLib: { load: BEFORE, required: false, join-classpath: true }
+
+permissions:
+   omnipet.*:
+      description: Wildcard permission for administrators
+      default: op
+      children:
+         omnipet.general: true
+         omnipet.admin.*: true
+   omnipet.general: { description: "Default permission for using OmniPet", default: true }
+   omnipet.admin.*:
+      description: Wildcard permission for administrators
+      default: false
+      children:
+         omnipet.admin.reload: true
+         omnipet.admin.inspect: true
+         omnipet.admin.explore: true
+         omnipet.admin.managepet: true
+         omnipet.admin.manageegg: true
+         omnipet.admin.item: true
+   omnipet.admin.reload: { description: "Allow reloading plugin", default: false }
+   omnipet.admin.inspect: { description: "Allow viewing player's pet information", default: false }
+   omnipet.admin.explore: { description: "Allow exploring player data", default: false }
+   omnipet.admin.managepet: { description: "Managing player's pet storage", default: false }
+   omnipet.admin.manageegg: { description: "Managing player's egg", default: false }
+   omnipet.admin.item: { description: "Giving items", default: false }

@@ -1,0 +1,32 @@
+# Each top-level key is a stable egg ID used by commands, items, and player data.
+common:
+  name: "<white>Common Egg"
+  duration: 1h
+  rarity: 1
+  pets:
+    - example_pet
+
+rare:
+  name: "<blue>Rare Egg"
+  duration: 3h
+  rarity: 2
+  pets:
+    - example_pet
+    - nahara
+
+epic:
+  name: "<dark_purple>Epic Egg"
+  duration: 6h
+  rarity: 3
+  pets:
+    - example_pet
+    - nahara
+
+legendary:
+  name: "<gold>Legendary Egg"
+  duration: 12h
+  rarity: 4
+  pets:
+    - example_pet
+    - nahara
+
