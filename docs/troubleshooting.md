@@ -17,19 +17,17 @@ An `UnsupportedClassVersionError` usually means the Java runtime is older than t
 
 ## Current runtime boundary
 
-The current release ships definition persistence, migration journaling, `/pet [page]`, the player vault/active-intent slice, and Admin Pet Studio. Egg, hatching, render, trigger, provider economy, and live pet-runtime sections below are future design troubleshooting notes until their roadmap phases land.
+The current release ships definition persistence, migration journaling, `/pet [page]`, the player vault/active-intent slice, slot purchase/reconciliation logic, and Admin Pet Studio. Egg, hatching, render, trigger, and live pet-runtime sections below are future design troubleshooting notes until their roadmap phases land.
 
 ## Configuration fails to load
 
 - Use spaces, not tabs.
-- Quote MiniMessage strings when YAML punctuation makes them ambiguous.
-- Confirm material IDs exist on the exact Paper version.
-- Confirm every egg pet ID exactly matches a filename under `pets/`.
-- Use a positive duration such as `10s`, `30m`, or `2h15m`.
-- Remove `mythiclibBuffs` or `mythiclib.*` expressions from configs that must run without MythicLib.
-- Keep ModelEngine fields out of `display`; the current schema accepts only `texture`.
 - For current storage config, require the complete `storage.vault` and `storage.activeSlots` tree shown in [Configuration](configuration.md). Unknown or partial current-schema keys fail closed.
 - A legacy file with only `globalMaxSlots` and/or `slotPermission` is migrated automatically. Inspect `config.yml.bak` after first successful boot.
+- PlayerPoints prices must be whole integers. Vault prices permit at most eight decimal places and must fit the provider-safe `double` range.
+- Quote slot keys such as `"2"`; unquoted numeric YAML keys are rejected by the strict map decoder.
+- Permission templates must contain exactly one `%s` and produce safe nodes no longer than 128 characters. The LuckPerms template is checked for every slot through `storage.activeSlots.max`.
+- Definition `display.provider` accepts `HEAD` or `MODELENGINE`; ModelEngine metadata is stored but no live ModelEngine renderer ships yet.
 
 Test one pet file at a time. Preserve the failed file and log; do not replace player data with an empty profile to make an error disappear.
 
@@ -52,61 +50,21 @@ Admin branches require the specific `omnipet.admin.*` node and the root `omnipet
 
 Console use must include a target when the syntax otherwise defaults to the executing player.
 
-## Egg item does nothing
+## Slot purchase is unavailable or ambiguous
 
-Check:
+- Run `/pet slot` and read the disabled provider reason. Vault needs both the Vault plugin and a registered economy service; PlayerPoints needs its current UUID/int API.
+- If LuckPerms/hybrid mode is configured, confirm consecutive `omnipet.slot.unlocked.N` nodes match the persisted OmniPet count.
+- A timeout or exception after an external call is intentionally not retried. Run `/pet admin transactions 20`, verify the provider ledger, then use the matching `charge`, `no-charge`, or `refund` decision.
+- If the economy decision is settled but the row is `ENTITLEMENT_SYNC_PENDING`, verify the local entitlement and configured node, then run `/pet admin reconcile <transaction-uuid> sync`; this retries only idempotent entitlement verification/grant.
+- Schema 1 rows previously marked `COMPLETED` or `ENTITLEMENT_PERSISTED` intentionally appear in this queue. Sync does not replay the economy call; successful persistence writes schema 2 and keeps `.bak`.
+- If one provider disappears after a plugin disable, inspect only its dependency: Vault plus the registered economy service owner, PlayerPoints, or LuckPerms. The affected adapter is unavailable until the coalesced next-tick refresh; unrelated healthy providers remain usable.
+- If a next cursor is printed, copy the opaque token unchanged into `/pet admin transactions 20 <cursor>`. The limit range is 1-50.
+- Unreadable transaction files are listed separately. Reads stop at 16 KiB per file; output includes at most 20 issue details plus omission/truncation summaries. Preserve entries and their `.bak` files; do not delete the whole `data/purchases` folder.
+- The adapters are not live-certified yet. Reproduce on staging with exact provider versions before treating a failure as an OmniPet data problem.
 
-- the player has an empty permitted slot;
-- the player is not already hatching an egg;
-- the egg ID still exists in `eggs.yml`;
-- the item was created by OmniPet or a registered MMOItems stat;
-- legacy items carry one of the `passivepet:*` keys OmniPet reads;
-- MMOItems string stat matches the egg ID exactly.
+## A deferred gameplay feature does nothing
 
-Do not identify eggs from lore or display names.
-
-## Hatching bar is invalid or stuck
-
-- Reject zero/blank durations.
-- Confirm a hatcher did not reduce the value into an unexpected state.
-- Test quit/rejoin and server restart behavior on staging.
-- Record whether progress is expected to continue offline; legacy state stores remaining time and may not match a future completion-timestamp design.
-
-## Pet does not render
-
-The current vault persists desired-active UUIDs but does not spawn pet entities yet. Rendering belongs to Phase 5; changing active intent alone cannot create a visible companion in this checkpoint.
-
-- Confirm the pet has a `display.texture` URL using the Minecraft texture host.
-- Confirm the player summoned the pet from `/pets`.
-- Check for entity cleanup after world changes, death, recall, or reload.
-- ModelEngine and the built-in Paper display runtime are not shipped in this checkpoint.
-
-## Trigger does not run
-
-- Confirm the active pet has a `trigger` component and the trigger ID is correct.
-- Cooldown values are positive ticks; `100` is approximately five seconds, and `interval` triggers require one.
-- Confirm the precondition evaluates true and referenced namespaces exist.
-- For `walk`, test ordinary same-world movement, not teleport or vehicle movement.
-- For MythicLib casts, confirm the exact skill ID exists and the hook initialized at startup.
-- Keep scripts short; an expression error occurs on the main server thread.
-
-## MythicLib stats are missing
-
-- Confirm MythicLib loaded before OmniPet and OmniPet logged hook initialization.
-- Confirm the stat ID and modifier type exist in the pinned MythicLib build.
-- Summon and recall once while watching logs.
-- Verify modifiers are removed on recall, logout, reload, and disable.
-- Test without MMOItems to distinguish MythicLib core from MMOItems adapter issues.
-
-## MMOItems item is not recognized
-
-Check the registered stat ID and data type:
-
-- number: `OMNIPET_PET_FOOD`, `OMNIPET_EGG_HATCHER`;
-- boolean: `OMNIPET_PET_EVOLVER`;
-- string egg ID: `OMNIPET_EGG`.
-
-Legacy `PASSIVEPET_*` IDs are also read. Rebuild/reload the MMOItems template after stat registration and verify the item carries live stat data, not only matching lore.
+Egg issuing, incubation/hatching, summoned/rendered companions, movement, item gameplay, triggers, runtime MythicLib buffs, MythicMobs execution, MMOItems item integration, and progression are not shipped. Definition metadata or legacy files may be preserved without an owning runtime. Do not troubleshoot these as active features; check [Roadmap](roadmap.md) instead.
 
 ## Migration loaded an empty profile
 

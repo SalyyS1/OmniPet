@@ -1,114 +1,68 @@
 # Integrations
 
-OmniPet's core gameplay does not require another plugin. Integrations are optional capabilities and must be safe to omit. Pin and test exact vendor versions; snapshot artifact availability is not a support guarantee.
+OmniPet's shipped definition/storage features do not require another plugin. Optional integrations are capability-gated; exact artifact availability is not a live compatibility guarantee.
 
 ## Capability matrix
 
 | Capability | Plugin | Current status | Missing-plugin behavior |
 | --- | --- | --- | --- |
-| Studio stat catalog | MythicLib | Implemented as a reflection-safe picker with manual fallback; runtime owner buffs are deferred | The picker is unavailable and manual IDs remain supported. |
-| Owner stat application | MythicLib | Deferred to the gameplay skill/buff phase | Do not advertise a live buff until that phase ships. |
-| Pet food/evolver/egg/hatcher item stats | MMOItems | Deferred to the hatching/economy phases | No item integration is active in the current runtime. |
-| MMOItems expression factory | MMOItems | Deferred | No expression provider is active in the current runtime. |
-| Direct MythicMobs casting | MythicMobs | Not implemented as a direct adapter | No change to core. |
-| 3D model rendering | ModelEngine | Roadmap adapter boundary only | Player vault remains usable; no live pet entity is rendered yet. |
+| Studio stat catalog | MythicLib | Reflection-safe picker with manual fallback | Picker unavailable; manual IDs remain supported. |
+| Owner stat application | MythicLib | Deferred | No runtime buff is applied. |
+| Item stats/expressions | MMOItems | Deferred | No OmniPet item integration is active. |
+| Direct skill execution | MythicMobs | Deferred | No direct adapter is loaded. |
+| Live rendering | ModelEngine | Deferred | Definition metadata remains stored; no pet entity is rendered. |
+| Decimal economy | Vault + economy service | Reflection-safe balance/withdraw/refund adapter implemented | Vault choice is unavailable; other storage features remain usable. |
+| Points economy | PlayerPoints | Reflection-safe UUID/int adapter implemented | PlayerPoints choice is unavailable. |
+| External slot nodes | LuckPerms | Reflection-safe idempotent grant/revoke and precedence implemented | OmniPet-authoritative mode remains usable. |
 
-The Paper descriptor declares MythicLib and MMOItems as optional server dependencies for the catalog boundary. Live buffs, items, expressions, and gameplay hooks remain phase-gated.
+The Paper descriptor declares MythicLib, MMOItems, Vault, PlayerPoints, and LuckPerms as optional server dependencies with isolated classpaths. Economy and LuckPerms use dedicated dynamic registries; no vendor classes appear in core contracts.
 
-> The examples below are future design/reference syntax, not current configuration contracts.
+## Economy and entitlement behavior
 
-## MythicLib
+- Vault amounts are bounded decimals that must round-trip through the provider's `double` API. PlayerPoints amounts are bounded integers.
+- Provider calls execute through Paper's primary thread bridge. YAML I/O, scans, and saga recovery stay on serialized workers.
+- A thrown, timed-out, or null provider result is `UNKNOWN_REQUIRES_RECONCILIATION`, not a retry signal.
+- Use `/pet admin transactions`, verify the external ledger, then choose `charge`, `no-charge`, or `refund` for the specific transaction UUID.
+- Failed LuckPerms propagation remains `ENTITLEMENT_SYNC_PENDING`. Use `/pet admin reconcile <transaction-uuid> sync`; this verifies the local entitlement and retries only idempotent external synchronization.
+- Schema 1 completion rows migrate to the same pending-sync path. No economy operation is replayed; successful persistence rewrites schema 2 and retains `.bak`.
 
-### Passive stat example
+These adapters have unit/compile evidence only. Do not claim compatibility with a specific economy implementation, PlayerPoints build, or LuckPerms build until the live matrix passes.
 
-```yaml
-mythiclibBuffs:
-  - stat: ATTACK_DAMAGE
-    type: FLAT
-    value: 2 + leveling.level * 0.25
-  - stat: MAX_HEALTH
-    type: RELATIVE
-    value: 0.01 * leveling.evolution
-```
+## Selective lifecycle refresh
 
-Use stat IDs and modifier types supported by the exact MythicLib build on the server. Invalid IDs or API changes are vendor-contract failures; test summon, stat update, recall, logout, reload, and disable so no modifier is left behind.
+Plugin lifecycle changes do not clear every provider:
 
-### Skill expression example
+- Vault itself and the plugin owning Vault's registered economy service affect only `VAULT`.
+- PlayerPoints affects only `PLAYER_POINTS`.
+- LuckPerms affects only the entitlement adapter.
+- An unrelated plugin disable leaves healthy adapters published.
+- Enable/disable events queue one coalesced full refresh on the next tick; only adapters passing plugin, service, and ABI probes are republished.
+- Full OmniPet shutdown invalidates all adapters, stops the provider-call executor, cancels queued/active sync work, and rejects later calls.
 
-```yaml
-trigger:
-  - type: interact
-    cooldown: 240
-    precondition: stamina.value >= 20
-    lore:
-      - "<!i><gray>Arc Pulse <yellow><trigger_cooldown>"
-    script:
-      - if: mythiclib.cast(player, "PET_ARC_PULSE")
-        onTrue: stamina.take(20)
-```
+## Deferred integration metadata
 
-The expression calls MythicLib's skill registry, not a direct MythicMobs adapter. Keep casts on the server thread and verify missing-skill behavior before production use.
+Schema 2 definitions can store provider-neutral fields such as MythicLib-oriented stat IDs, opaque skill references, progression metadata, and `display.provider: MODELENGINE`. Admin Pet Studio validates and preserves those values, but persistence does not mean runtime execution.
 
-## MMOItems
-
-The hatching/item phase plans the following stat IDs; this checkpoint does not register or consume them yet:
-
-| Stat ID | Value | Purpose |
-| --- | --- | --- |
-| `OMNIPET_PET_FOOD` | number | Stamina restored when used on the active pet. |
-| `OMNIPET_PET_EVOLVER` | boolean | Marks an item as a pet evolver. |
-| `OMNIPET_EGG` | string | Egg ID from `eggs.yml`. |
-| `OMNIPET_EGG_HATCHER` | number | Hatch-time reduction in seconds. |
-
-The migration plan retains legacy `PASSIVEPET_*` versions of those four IDs. Do not convert production templates until the owning item adapter ships and is smoke-tested.
-
-The optional expression factory creates MMOItems instances:
-
-```text
-mmoitems("MISC", "PET_REWARD_TOKEN")
-```
-
-Validate the type and item ID. A missing template should not be used in a high-frequency trigger.
-
-## ModelEngine boundary
-
-ModelEngine is not declared in `paper-plugin.yml` and no ModelEngine classes are compiled into the current runtime. Planned integration should follow this boundary:
-
-```text
-Pet gameplay/state
-        |
-        v
-PetRendererPort
-   |-- PaperDisplayRenderer (built in)
-   |-- ModelEngineRenderer (optional future adapter)
-   `-- auto selection with fallback
-```
-
-The future adapter must:
-
-- load only after Paper confirms ModelEngine is enabled;
-- keep ModelEngine classes out of core/API class loading;
-- create and remove models on the server thread;
-- clean up on recall, logout, death, world change, reload, and disable;
-- fall back to the Paper display renderer when a model or plugin is unavailable;
-- pin and smoke-test the exact ModelEngine release.
-
-The schema 2 definition can persist provider-neutral `HEAD`/`MODELENGINE` authoring data, but no renderer consumes it yet. Keep a valid head icon for cards/fallback and do not advertise a model as live until Phase 5 ships its adapter.
+No current code applies owner stats, casts MythicMobs skills, creates MMOItems, spawns a HEAD/Paper display renderer, or creates a ModelEngine model. Keep a valid head icon for Studio/vault presentation; treat every live gameplay adapter as roadmap work.
 
 ## Version hazards
 
-- MythicLib and MMOItems coordinates observed in research are snapshots and may change without semver stability.
-- Vendor APIs can be present in Maven while not supporting the selected Paper/Minecraft line.
-- Public MythicMobs/ModelEngine information inspected for this release did not establish 26.x support.
-- Direct third-party references in always-loaded classes can cause linkage failure before a presence check. Keep adapters isolated.
-- All entity, inventory, stat, and skill mutations belong on the Paper server thread.
+- Vendor snapshots can change without semantic-version stability.
+- A Maven coordinate can resolve while still being incompatible with the selected Paper/Minecraft line.
+- Direct third-party references in always-loaded classes can fail before a presence check; keep adapters isolated.
+- Inventory and provider mutations must remain on the Paper thread boundary defined by the current adapters.
 
 ## Release test permutations
 
-At minimum, boot and exercise OmniPet with:
+Before advertising provider support, exercise at least:
 
-1. Neither optional plugin.
-2. MythicLib only.
-3. MythicLib and MMOItems.
-4. Every exact vendor version advertised by the release.
-5. Missing/invalid stat IDs, skill IDs, MMOItems IDs, and legacy IDs.
+1. No optional plugins.
+2. MythicLib absent/present for the Studio picker and manual fallback.
+3. Vault only, PlayerPoints only, both currencies, and each provider disabled during confirmation.
+4. Disable/re-enable Vault, the registered Vault economy service owner, PlayerPoints, and LuckPerms.
+5. Disable an unrelated plugin and confirm healthy providers remain available.
+6. Repeat lifecycle events and confirm they coalesce to one next-tick refresh.
+7. LuckPerms absent/present with every configured entitlement precedence.
+8. Restart with schema 1 completion journals and prove sync causes no second withdrawal.
+
+See [Configuration](configuration.md), [Commands and permissions](commands-and-permissions.md), and [Roadmap](roadmap.md).

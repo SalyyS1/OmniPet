@@ -2,7 +2,7 @@
 
 > **Warning:** Stop the server and make a complete, restorable backup before changing the plugin JAR or data-folder name. Do not run PassivePet and OmniPet against the same data at the same time. Preserve every pet, egg, component, expression, command, and user-defined ID.
 
-Phase 1 provides read/migration contracts in `omnipet-core`; it does not promise a complete gameplay cutover or a silent folder merge. Rehearse on a staging copy and keep the original source untouched until verification is complete.
+The current checkpoint provides read/migration contracts in `omnipet-core`, Admin Pet Studio, the player vault/active-intent slice, and transaction-backed active-slot purchases. It does not promise a complete gameplay cutover or a silent folder merge. Rehearse on a staging copy and keep the original source untouched until verification is complete.
 
 ## Rebrand and folder handling
 
@@ -51,7 +51,7 @@ Current schema 2 definitions retain their raw nodes on decode/encode. IDs come f
 
 ## Egg definition journal
 
-When `plugins/OmniPet/eggs.yml` exists, the Phase 1 Paper bootstrap validates stable egg IDs and pet references before repository initialization. It writes a canonical, sorted journal to:
+When `plugins/OmniPet/eggs.yml` exists, the Paper bootstrap validates stable egg IDs and pet references before repository initialization. It writes a canonical, sorted journal to:
 
 ```text
 plugins/OmniPet/migration/legacy-eggs-v1.yml
@@ -59,9 +59,23 @@ plugins/OmniPet/migration/legacy-eggs-v1.yml
 
 The journal includes `schemaVersion`, `kind: legacy-egg-definitions`, a SHA-256 semantic hash of the source, and canonical raw definitions. Repeating the migration with the same content is idempotent. The source `eggs.yml` is never overwritten by the journal, and source/journal identity is rejected.
 
+## Purchase journal schema 1
+
+The current purchase journal schema is 2. Older schema 1 rows need conservative entitlement verification because historical completion did not prove the current external entitlement contract.
+
+- Schema 1 `COMPLETED`, `ENTITLEMENT_PERSISTED`, and `ENTITLEMENT_SYNC_PENDING` decode as `ENTITLEMENT_SYNC_PENDING` with `externalEntitlementRequired: true`.
+- Withdrawal/refund evidence and financial state are preserved. Migration never replays a Vault or PlayerPoints call.
+- The row appears in `/pet admin transactions [limit] [cursor]` after upgrade; continuation cursors are opaque and must be copied from command output.
+- Verify the matching local slot entitlement and configured external node, then run `/pet admin reconcile <transaction-uuid> sync`.
+- Sync refuses completion if the transaction's local OmniPet entitlement is missing; repair/reconcile that data instead of forcing terminal state.
+- Successful sync/save writes schema 2 atomically and preserves the schema 1 journal as `<transaction-uuid>.yml.bak`.
+- Journal reads are capped at 16 KiB. Corrupt, oversized, or overlong entries are reported without hiding valid pending transactions; at most 20 issue details are printed before omission/truncation summaries.
+
+Schema 1 `FAILED` rows with a proven withdrawal and proven refund failure enter `REFUND_PENDING`; they still require explicit ledger-backed operator recovery.
+
 ## IDs, items, and permissions
 
-Keep pet filenames, egg map keys, item IDs, component IDs, and expression references byte-for-byte stable. The migration boundary recognizes legacy item namespace `passivepet` for `pet`, `egg`, `food`, `hatcher`, and `evolver` keys. New Phase 1 Paper code does not ship item gameplay or an item conversion command.
+Keep pet filenames, egg map keys, item IDs, component IDs, and expression references byte-for-byte stable. The migration boundary recognizes legacy item namespace `passivepet` for `pet`, `egg`, `food`, `hatcher`, and `evolver` keys. The current Gradle-built JAR does not ship item gameplay or an item conversion command.
 
 The command entry point checks `omnipet.general`, while Studio branches additionally check their declared admin permission. Move permission grants to `omnipet.*` names; the rewritten runtime does not provide the old runtime's legacy permission fallback.
 
@@ -70,9 +84,11 @@ The command entry point checks `omnipet.general`, while Studio branches addition
 1. Stop the server and archive both plugin folders.
 2. Copy legacy files into a clean target layout without merging conflicting player folders.
 3. Start the foundation on staging and inspect every migration warning/error.
-4. Verify schema 3 output, `.bak` files, raw unknown nodes, journal hash, and quarantine contents.
-5. Verify `/pet` and `/pets` only after the plugin reports foundation initialization.
-6. Keep full gameplay migration steps deferred until the owning phases implement hatching, slots, GUI, and runtime services.
+4. Verify schema 3 player output, schema 2 definitions, `.bak` files, raw unknown nodes, journal hash, and quarantine contents.
+5. Verify migrated `config.yml`, vault/active limits, `/pet`, `/pet slot`, and `/pet admin transactions` only after successful initialization.
+6. Test Vault/PlayerPoints-disabled fallbacks and LuckPerms entitlement policy without claiming live provider certification.
+7. Resolve schema 1 purchase rows by transaction UUID; prove no economy replay and confirm the schema 2 rewrite/backup.
+8. Keep hatching, items, renderers, skills, movement, and progression migration deferred until those runtime phases ship.
 
 ## Rollback
 

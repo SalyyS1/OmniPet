@@ -1,26 +1,20 @@
 # Configuration reference
 
-OmniPet reads YAML from `plugins/OmniPet/`. Files are UTF-8 and user-visible text uses Adventure MiniMessage. Use spaces, not tabs. Keep identifiers ASCII-safe unless a feature explicitly documents Unicode handling.
+OmniPet reads current configuration and data from `plugins/OmniPet/`. Files are UTF-8 YAML; use spaces, not tabs. This page documents only contracts implemented by the Gradle-built Phase 4 checkpoint.
 
-> The definition envelope and Admin Pet Studio sections below describe the current authoritative runtime. Egg, item, hatching, trigger, expression, and renderer examples are retained as future/non-authoritative design reference until their roadmap phase ships.
+## Authoritative files
 
-## Stable contracts
+| Path | Current purpose |
+| --- | --- |
+| `config.yml` | Vault capacity, active-slot limits, entitlement policy, and provider prices. |
+| `pets/*.yml` | Schema 2 definition metadata edited by Admin Pet Studio. |
+| `data/players/*.yml` | Schema 3 owned-pet, capacity, entitlement, and desired-active state. |
+| `data/purchases/*.yml` | Schema 2 slot-purchase recovery journal. |
+| `migration/legacy-eggs-v1.yml` | Validation/hash journal created from a legacy `eggs.yml`; not a hatching runtime. |
 
-The following names are persistent or referenced across files. Do not rename them casually:
+Legacy `eggs.yml`, `items.yml`, `gui.yml`, `lang.yml`, hatching components, triggers, expressions, and item recipes are not current gameplay configuration contracts. Their runtime systems and commands have not shipped.
 
-- Files: `config.yml`, `eggs.yml`, `gui.yml`, `items.yml`, `lang.yml`, `pets/*.yml`.
-- Storage keys: `storage.vault` and `storage.activeSlots`.
-- Egg keys: `name`, `duration`, `rarity`, `pets`.
-- Component IDs: `general`, `display`, `hatching`, `leveling`, `stamina`, `trigger`, optional `mythiclibBuffs`.
-- User IDs: pet filenames, egg map keys, food map keys, and hatcher map keys.
-- Expression namespaces: `math`, `player`, `items`, `print`, optional `mmoitems`, optional `mythiclib`.
-- Trigger IDs: `walk`, `interval`, `interact`, `punch`, `takingDamage`, `release`.
-
-Renaming a pet filename changes its ID and can break eggs, player saves, commands, expressions, and items.
-
-## Player storage schema
-
-Player files use schema 3. These fields are canonical persistence contracts, not renderer/entity state:
+## Player storage schema 3
 
 ```yaml
 schemaVersion: 3
@@ -34,27 +28,24 @@ slotEntitlements: []
 ```
 
 - `vaultCapacity` is a persisted compatibility floor; configured capacity may increase the effective limit.
-- `activeSlotCount` is unlocked ownership. Disabling multi-pet clamps runtime use to one without deleting entitlements.
-- `desiredActivePetIds` is an ordered list of owned pet UUIDs. Runtime entities are derived later and are never persisted here.
+- `activeSlotCount` is unlocked ownership. Disabling multi-pet use clamps runtime intent to one without deleting entitlements.
+- `desiredActivePetIds` is an ordered list of owned pet UUIDs. It is intent only; no renderer entity is persisted or spawned by this checkpoint.
 - `slotEntitlements` records slot, source, transaction/reference ID, and preserved provider extension data.
 - A lower vault limit never deletes pets. Existing overflow is read-only until capacity is restored.
+- Unknown fields are preserved. Invalid files are quarantined and fail closed rather than becoming empty profiles.
 
-Economy provider configuration and purchase GUI syntax remain non-authoritative until the rest of Phase 4 ships.
+## Purchase journal migration
 
-## Admin Pet Studio
+Purchase journals currently write schema 2. When a schema 1 row is read in `COMPLETED`, `ENTITLEMENT_PERSISTED`, or `ENTITLEMENT_SYNC_PENDING`, OmniPet conservatively treats it as `ENTITLEMENT_SYNC_PENDING` with external entitlement verification required.
 
-The Studio is code-owned and deliberately does not require a second GUI YAML schema. Open it with `/pet admin browse` or `/pets admin browse` after granting `omnipet.admin.managepet`.
-
-- Tier order is fixed: `D`, `C`, `B`, `A`, `S`.
-- Definition IDs are ASCII-safe and immutable while editing.
-- Head icons are mandatory. Supported sources are `TEXTURE_URL`, `BASE64`, and capability-gated `HEAD_CATALOG`.
-- Renderer choices are `HEAD` or `MODELENGINE`; selecting ModelEngine still keeps the head icon for cards/eggs.
-- Stats can be selected from the live MythicLib registry and configured as `MODIFIER min max`. The manual fallback accepts `id MODIFIER min max`; new picker IDs use `mythiclib:<lowercase-id>` and retain the exact vendor ID for the runtime adapter.
-- MMOItems can contribute owner stat handlers through MythicLib, but its item-template stat registry is intentionally not mixed into the owner-buff picker.
-- Rarity uses `id qualityMin qualityMax weight hatchMultiplier`.
-- Progression uses `maxLevel;formula`; skills use `provider:id|trigger|cooldown|chance|stamina|target`.
-- Type/chat validation happens before a draft can be saved. Unknown raw YAML nodes are retained.
-- Save, archive, and `/pets admin reload` use one optimistic, atomic registry-generation transaction. A stale revision, reference, or activation failure leaves the prior disk/live generation active.
+- Financial state and provider evidence are preserved.
+- No Vault or PlayerPoints withdrawal/refund is replayed by this migration.
+- The operator verifies the local entitlement and configured external node, then runs `/pet admin reconcile <transaction-uuid> sync`.
+- Sync verifies the matching local OmniPet entitlement before any idempotent external grant/check.
+- A successful save writes schema 2 atomically; the prior schema 1 file remains as `.bak`.
+- Each journal file read is capped at 16 KiB. Oversized entries fail closed and appear as unreadable issues.
+- `/pet admin transactions [limit] [cursor]` returns bounded pages and prints an opaque continuation cursor when more candidates remain.
+- At most 20 unreadable issues are printed per page. Additional issues use an omission count, and truncated invalid-name discovery is reported separately.
 
 ## `config.yml`
 
@@ -71,207 +62,83 @@ storage:
     multiPetEnabled: true
     base: 1
     max: 5
+    entitlement:
+      mode: OMNIPET
+      precedence: OMNIPET_AUTHORITATIVE
+      luckPermsPermissionTemplate: "omnipet.slot.unlocked.%s"
+    unlocks:
+      "2":
+        permission: ""
+        costs: { VAULT: 25000, PLAYER_POINTS: 50 }
+      "3":
+        permission: ""
+        costs: { VAULT: 75000, PLAYER_POINTS: 125 }
+      "4":
+        permission: "omnipet.slot.purchase.4"
+        costs: { VAULT: 175000, PLAYER_POINTS: 250 }
+      "5":
+        permission: "omnipet.slot.purchase.5"
+        costs: { VAULT: 350000, PLAYER_POINTS: 500 }
 ```
 
 - `baseCapacity` is the minimum configured vault size; `maxCapacity` bounds configuration and legacy permission-derived capacity.
-- Legacy permission checks are consecutive and stop at the first missing `petstorage.slot.N` node. Disable the resolver explicitly when those grants are no longer used.
-- `base` is the active-slot floor for new/reconciled profiles; `max` clamps purchased entitlements. Turning `multiPetEnabled` off recalls ordered overflow without deleting pets or entitlements.
-- The loader validates the complete tree before replacing the live snapshot. Unknown keys, unsafe permission templates, inverted limits, and unsupported sizes fail closed.
+- Legacy permission checks are consecutive and stop at the first missing `petstorage.slot.N` node. Disable the resolver explicitly when those grants are retired.
+- `base` is the active-slot floor; `max` clamps purchased entitlements. Turning `multiPetEnabled` off recalls ordered overflow intent without deleting pets or entitlements.
+- `unlocks.<slot>.permission` is eligibility-only. Empty text allows every player.
+- `costs` accepts bounded decimal `VAULT` values and non-negative integer `PLAYER_POINTS` values. If both providers are available, the GUI asks the player to choose; OmniPet never auto-selects currency.
+- `entitlement.mode` is `OMNIPET`, `LUCKPERMS`, or `HYBRID`. Non-hybrid modes require matching authoritative precedence. Hybrid precedence is `OMNIPET_AUTHORITATIVE`, `LUCKPERMS_AUTHORITATIVE`, `REQUIRE_BOTH`, or `UNION`.
+- LuckPerms nodes are consecutive. The configured permission template is expanded and validated for every slot from 2 through `storage.activeSlots.max`; an unsafe or overlong generated node rejects the config before activation. A mismatch between persisted OmniPet slots and observed nodes blocks another purchase.
+- Failed external propagation stays `ENTITLEMENT_SYNC_PENDING`; retry with `/pet admin reconcile <transaction-uuid> sync` after verifying the transaction.
+- Unknown keys, unsafe templates, inconsistent mode/precedence pairs, inverted limits, and unsupported values fail closed before the live snapshot changes.
 
-Old files containing optional `globalMaxSlots` and/or `slotPermission` keys are accepted once and rewritten atomically to this schema. Missing old keys use the original defaults (`1000` and `petstorage.slot.%s`); `globalMaxSlots: 0` becomes a zero-capacity vault with legacy scanning disabled. The original remains as `config.yml.bak`. Keep the permission template stable unless all grants are migrated together.
+Old files containing `globalMaxSlots` and/or `slotPermission` are accepted once and rewritten atomically. Missing old keys use the legacy defaults (`1000` and `petstorage.slot.%s`); `globalMaxSlots: 0` becomes zero capacity with legacy scanning disabled. The original file remains `config.yml.bak`.
 
-## `eggs.yml`
+## Provider lifecycle
 
-Each top-level key is an egg ID.
+Provider availability is dynamic and selective:
 
-```yaml
-common:
-  name: "<white>Common Egg"
-  duration: 1h
-  rarity: 1
-  pets:
-    - example_pet
-    - nahara
-```
+- disabling Vault or the plugin that owns its registered economy service invalidates only `VAULT`;
+- disabling PlayerPoints invalidates only `PLAYER_POINTS`;
+- disabling LuckPerms invalidates only the external entitlement adapter;
+- unrelated plugin disables do not evict healthy providers;
+- enable/disable events coalesce to one full refresh on the next tick.
 
-- `name`: MiniMessage component used in items, HUD, and messages.
-- `duration`: positive duration using `w`, `d`, `h`, `m`, and `s`, for example `1w2d3h4m5s`.
-- `rarity`: numeric value copied into a hatched pet's `hatching.rarity` state.
-- `pets`: pet IDs from filenames under `pets/`. The current selection is uniform; weighted pools are roadmap work.
+During the refresh gap, only the affected choice reports refresh-pending/unavailable. Full OmniPet shutdown invalidates all adapters and rejects or cancels provider calls.
 
-Avoid blank/zero durations and empty pools in production.
+## Pet definition schema 2
 
-## `pets/<id>.yml`
-
-Each top-level key is a component. An intentionally minimal pet may be empty, but most pets need at least `general` and `display` for usable presentation.
-
-### `general`
+The definition ID comes from the filename and must match `definitionId` when that field is present.
 
 ```yaml
-general:
-  name: "<gold>Trailblazer"
-  texture: "https://textures.minecraft.net/texture/..."
-  description:
-    - "<!i><gray>A steady companion for long journeys."
-```
-
-The texture must use the Minecraft texture URL prefix to render as a player head.
-
-### `display`
-
-```yaml
+schemaVersion: 2
+definitionId: trailblazer
+revision: 0
+classification:
+  tier: D
+icon:
+  head:
+    source: TEXTURE_URL
+    value: "https://textures.minecraft.net/texture/example"
 display:
-  texture: "https://textures.minecraft.net/texture/..."
+  provider: HEAD
+  model: null
 ```
 
-The current renderer creates Paper display/interaction entities. ModelEngine-specific fields are not accepted by this schema yet.
+Current required fields are `classification.tier`, `icon.head.source`, `icon.head.value`, and `display.provider`. Tier is one of `D`, `C`, `B`, `A`, or `S`. Supported Studio icon sources are `TEXTURE_URL`, `BASE64`, and capability-gated `HEAD_CATALOG`.
 
-### `hatching`
+`display.provider` accepts `HEAD` or `MODELENGINE`; `MODELENGINE` requires a non-blank `display.model`. These are authoring/persistence values only. No HEAD, Paper display-entity, or ModelEngine live renderer ships in this checkpoint.
 
-```yaml
-hatching:
-  defaultRarity: 0
-```
-
-Runtime values:
-
-- `hatching.rarity`: rarity supplied by the egg.
-- `seed`: persisted internal state used for deterministic randomization seams.
-
-### `leveling`
-
-```yaml
-leveling:
-  maxLevel: 50
-  maxExp: 100 + leveling.level * 25
-  maxEvolution: 5
-```
-
-Available values/methods include `leveling.exp`, `leveling.level`, `leveling.evolution`, `leveling.maxExp`, `leveling.maxLevel`, `leveling.maxEvolution`, `leveling.addExp(amount)`, `leveling.setExp(value)`, `leveling.setLevel(value)`, `leveling.setEvolution(value)`, and `leveling.evolve()`.
-
-Keep maximum expressions finite and positive.
-
-### `stamina`
-
-```yaml
-stamina:
-  maxStamina: 120 + leveling.level * 4
-```
-
-Available values/methods include `stamina.value`, `stamina.max`, `stamina.set(value)`, `stamina.add(amount)`, `stamina.take(amount)`, and `stamina.tryTaking(amount)`.
-
-### `trigger`
-
-```yaml
-trigger:
-  - type: walk
-    script:
-      - if: stamina.tryTaking(trigger.walkDistance * 0.05)
-        onTrue: leveling.addExp(trigger.walkDistance)
-
-  - type: interval
-    cooldown: 100
-    precondition: stamina.value >= 5
-    lore:
-      - ""
-      - "<!i><gray>Scavenger <trigger_progressbar:20:'|'> <yellow><trigger_cooldown>"
-    script:
-      - stamina.take(5)
-      - player.giveItem(items.FLINT)
-```
-
-Cooldowns are measured in ticks (`20` ticks is approximately one second) and must evaluate to a positive value when present. `interval` triggers require a cooldown; invalid triggers are skipped instead of running every tick. A script can be one expression, a list, or an `if` block with `onTrue` and `onFalse`.
-
-Trigger-specific values:
-
-- `walk`: `trigger.walkDistance` in blocks.
-- `takingDamage`: `trigger.damage` and `trigger.realDamage`.
-- `interval`, `interact`, `punch`, `release`: no additional values.
-
-Expressions execute on the server thread. Keep scripts short, validate every referenced item/skill ID, and avoid high-frequency work.
-
-### Optional `mythiclibBuffs`
-
-Use only when MythicLib is installed:
-
-```yaml
-mythiclibBuffs:
-  - stat: ATTACK_DAMAGE
-    type: FLAT
-    value: 2 + leveling.level * 0.25
-```
-
-Do not include this component in a pet that must load on a server without MythicLib. See [Integrations](integrations.md).
-
-## Expressions
-
-Expressions support numeric/string literals, parentheses, arithmetic, comparison, bitwise operators, property lookup, method calls, indexing, and ternary selection.
-
-```text
-100 + leveling.level * 25
-stamina.value >= 10 ? 1 : 0
-player.giveItem(items.EMERALD.withAmount(1 + leveling.evolution))
-math.max(10, leveling.level * 2)
-```
-
-Comparison returns truth-compatible values. Text may use single or double quotes. The `items` namespace creates vanilla items and supports `withAmount`, `withName`, and `withLore`.
-
-## `items.yml`
-
-Standalone items use these stable sections:
-
-```yaml
-foods:
-  petSteak:
-    type: COOKED_BEEF
-    name: "<red>Pet Steak"
-    lore:
-      - "<!i><gray>Restores <yellow>50</yellow> stamina."
-    stamina: 50
-
-evolver:
-  type: PAPER
-  name: "<light_purple>Scroll of Ascension"
-
-egg:
-  type: EGG
-  name: "<yellow><egg_name> Egg"
-
-hatchers:
-  elixir:
-    type: GLASS_BOTTLE
-    name: "<aqua>Time Elixir"
-    duration: 3h
-```
-
-OmniPet identifies these items using persistent data, not lore. New items use the `omnipet` namespace; legacy `passivepet:*` keys are read for migration compatibility.
-
-## `gui.yml`
-
-Required template IDs are `border`, `emptySlot`, `lockedSlot`, `voidSlot`, `egg`, `pet`, `activePet`, `nextPage`, and `prevPage`. Each item template may use:
-
-- `type`: Bukkit material ID.
-- `name`: MiniMessage.
-- `lore`: MiniMessage lines or component insertion such as `{{ leveling }}`.
-- `tooltip: false`: hide the vanilla tooltip on supported Paper builds.
-
-Use a chest size of `27`, `36`, `45`, or `54`. The default starter uses `54`.
-
-Common placeholders include `<pet_name>`, `<egg_name>`, `<egg_hatch_duration>`, `<page>`, `<max_page>`, `{{ general }}`, `{{ leveling }}`, `{{ stamina }}`, and `{{ trigger }}`.
-
-## `lang.yml`
-
-`lang.yml` contains `hud`, `messages`, and component lore. It is MiniMessage, not legacy ampersand color codes. Preview formatting with [Adventure MiniMessage Web UI](https://webui.advntr.dev/).
-
-Preserve placeholders when translating. A missing placeholder may remove useful context; an unknown custom tag can fail deserialization.
+Admin Pet Studio can also persist bounded `stats`, `rarity.bands`, `progression`, `skills`, `behavior`, and `release` metadata. The editor validates these fields and preserves unknown raw nodes, but no hatching, progression, skill execution, release gameplay, or owner-stat application consumes them yet.
 
 ## Validation checklist
 
 - YAML parses with spaces and consistent indentation.
-- Every egg pet ID matches a pet filename exactly.
-- Every duration is positive.
-- Every material is a valid enum for the target Paper build.
-- Every optional component/provider has its plugin installed.
-- Every expression returns the type expected by its field.
-- Menu size and placeholders are valid.
-- A clean staging start succeeds and `/pets admin reload` reports config/definition activation; inspect logs for the queued online-player reconciliation result.
+- Definition filename/`definitionId` values are ASCII-safe and case-fold unique.
+- Required schema 2 maps and fields are present.
+- Numeric stat/range values are finite and ordered.
+- Slot keys such as `"2"` are quoted.
+- PlayerPoints prices are integers; Vault prices round-trip safely through the provider boundary.
+- Entitlement mode and precedence are consistent.
+- `/pets admin reload` stages and validates configuration/definitions before activation.
+
+See [Commands and permissions](commands-and-permissions.md), [Migration](migration.md), and [Integrations](integrations.md).

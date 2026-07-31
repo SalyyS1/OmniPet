@@ -1,135 +1,98 @@
 # Examples
 
-The bundled starter pack under `src/main/resources/example/` is the canonical copy-safe example. These smaller recipes demonstrate common patterns without changing the live schema.
+These examples match contracts accepted by the current Gradle-built JAR. They cover definition metadata and Phase 4 storage/economy configuration only. The legacy root `src/main/resources/example/` tree is not packaged by `omnipet-paper` and is not a copy-safe runtime starter.
 
-## Balanced starter pet
+## Minimal schema 2 definition
+
+Save as `plugins/OmniPet/pets/trailblazer.yml`:
 
 ```yaml
-general:
-  name: "<gold>Trailblazer"
-  texture: "https://textures.minecraft.net/texture/dd871e28db04d3711792e0fa549e997f846ac950412ba091a606f324459d38d3"
-  description:
-    - "<!i><gray>A steady companion for long journeys."
-
+schemaVersion: 2
+definitionId: trailblazer
+revision: 0
+classification:
+  tier: D
+icon:
+  head:
+    source: TEXTURE_URL
+    value: "https://textures.minecraft.net/texture/dd871e28db04d3711792e0fa549e997f846ac950412ba091a606f324459d38d3"
 display:
-  texture: "https://textures.minecraft.net/texture/dd871e28db04d3711792e0fa549e997f846ac950412ba091a606f324459d38d3"
-
-hatching:
-  defaultRarity: 0
-
-leveling:
-  maxLevel: 50
-  maxExp: 100 + leveling.level * 25
-  maxEvolution: 5
-
-stamina:
-  maxStamina: 120 + leveling.level * 4
-
-trigger:
-  - type: walk
-    script:
-      - if: stamina.tryTaking(trigger.walkDistance * 0.05)
-        onTrue: leveling.addExp(trigger.walkDistance)
+  provider: HEAD
+  model: null
 ```
 
-Save as `pets/trailblazer.yml`; the pet ID becomes `trailblazer`.
+The ID is the filename without `.yml`. `HEAD` is persisted authoring metadata and supplies a Studio/vault icon; it does not summon or render a live companion.
 
-## Egg pool
+## ModelEngine metadata
+
+Schema 2 accepts ModelEngine metadata:
 
 ```yaml
-traveler:
-  name: "<green>Traveler Egg"
-  duration: 45m
-  rarity: 1
-  pets:
-    - trailblazer
-    - nahara
+display:
+  provider: MODELENGINE
+  model: ember_fox
 ```
 
-The current pool is uniform. Repeating an ID to fake weights is not recommended; weighted pools belong to the versioned roadmap schema.
+This is storage/editor support only. No ModelEngine adapter or fallback Paper renderer consumes it in the current JAR, so do not advertise a visible model.
 
-## Standalone food
+## Active-slot pricing
 
 ```yaml
-foods:
-  berryBowl:
-    type: SWEET_BERRIES
-    name: "<red>Berry Bowl"
-    lore:
-      - "<!i><gray>Restores <yellow>25</yellow> stamina."
-      - ""
-      - "<!i><yellow>Use on your summoned pet."
-    stamina: 25
+storage:
+  activeSlots:
+    multiPetEnabled: true
+    base: 1
+    max: 3
+    entitlement:
+      mode: HYBRID
+      precedence: REQUIRE_BOTH
+      luckPermsPermissionTemplate: "omnipet.slot.unlocked.%s"
+    unlocks:
+      "2":
+        permission: ""
+        costs: { VAULT: 25000, PLAYER_POINTS: 50 }
+      "3":
+        permission: "omnipet.slot.purchase.3"
+        costs: { VAULT: 75000 }
 ```
 
-Give it with:
+When both prices are available, `/pet slot` presents separate choices and never auto-selects currency. This code path has automated evidence but still requires live certification against the exact Vault, economy, PlayerPoints, and LuckPerms builds used by the server.
+
+## Recovery command
+
+List actionable or unreadable journal entries:
 
 ```text
-/pets item food berryBowl <player>
+/pet admin transactions 20
 ```
 
-## Conditional release reward
+If OmniPet prints a next cursor, paste that opaque token unchanged:
 
-```yaml
-trigger:
-  - type: release
-    script:
-      - player.giveItem(items.FEATHER
-          .withAmount(1 + leveling.level / 10)
-          .withName("<aqua>Memory Feather")
-          .withLore("<!i><gray>A keepsake from a released companion."))
+```text
+/pet admin transactions 20 <next-cursor-from-output>
 ```
 
-Keep reward formulas bounded. Releasing is destructive gameplay; test the exact GUI interaction and backup behavior.
+The list limit is 1-50. Each journal file read is capped at 16 KiB, and each page reports at most 20 unreadable issues before an omission summary.
 
-## Optional MythicLib passive
+After checking the external ledger, apply only the matching decision:
 
-```yaml
-mythiclibBuffs:
-  - stat: ATTACK_DAMAGE
-    type: FLAT
-    value: 1 + leveling.level * 0.2
+```text
+/pet admin reconcile <transaction-uuid> charge
+/pet admin reconcile <transaction-uuid> no-charge
+/pet admin reconcile <transaction-uuid> refund
+/pet admin reconcile <transaction-uuid> sync
 ```
 
-This pet requires MythicLib to decode that optional component. Do not put it in a universal starter pack intended to boot without vendor plugins.
+`sync` verifies the local entitlement and retries only idempotent external entitlement synchronization. It does not withdraw currency again. A migrated schema 1 completion is rewritten as schema 2 after successful persistence, retaining `.bak`.
 
-## Optional MythicLib skill
+## Not shipped
 
-```yaml
-trigger:
-  - type: interact
-    cooldown: 240
-    precondition: stamina.value >= 20
-    lore:
-      - "<!i><gray>Arc Pulse <trigger_progressbar:20:'|'> <yellow><trigger_cooldown>"
-    script:
-      - if: mythiclib.cast(player, "PET_ARC_PULSE")
-        onTrue: stamina.take(20)
-```
+Do not copy legacy examples that imply any of these work in the current JAR:
 
-The cooldown is in ticks. Confirm the skill ID and failure result against the pinned MythicLib build.
+- egg issue commands, incubation, hatching, or rarity rolls;
+- summoned pets, Paper display entities, ModelEngine rendering, or movement;
+- food, evolver, egg, or hatcher item commands/integrations;
+- stamina, triggers, expressions, MythicMobs execution, or MythicLib runtime buffs;
+- progression, cultivation, release rewards, or player-management gameplay.
 
-## MMOItems reward expression
-
-```yaml
-trigger:
-  - type: release
-    script:
-      - player.giveItem(mmoitems("MISC", "PET_MEMORY_TOKEN"))
-```
-
-This requires MMOItems and a matching item template. Prefer standalone vanilla items when a config must work without MMOItems.
-
-## What not to copy yet
-
-The following is roadmap syntax and is not accepted by the current pet codec:
-
-```yaml
-# Not supported yet.
-display:
-  provider: modelengine
-  model-id: ember_fox
-```
-
-Use only `display.texture` until the renderer adapter and versioned migration are implemented.
-
+The Studio may persist some future-facing metadata, but persistence is not runtime execution. Track implementation gates in [Roadmap](roadmap.md).

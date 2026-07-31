@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="OmniPet operator and developer field manual for Paper servers.">
+  <meta name="description" content="OmniPet operator and developer field manual for the verified Paper foundation, Pet Studio, vault, and slot recovery slice.">
   <meta name="theme-color" content="#102a2b">
   <title>OmniPet Field Manual</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,53 +32,53 @@
   <main id="main">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow">Paper pets, documented like infrastructure</p>
-        <h1 id="hero-title">Build a pet system players remember.</h1>
-        <p class="lede">OmniPet turns YAML definitions into hatchable, summonable companions with leveling, stamina, triggers, and optional Mythic integrations. This manual separates what ships today from what belongs on the roadmap.</p>
+        <p class="eyebrow">Paper pet data, documented like infrastructure</p>
+        <h1 id="hero-title">Author safely. Store durably. Recover explicitly.</h1>
+        <p class="lede">OmniPet currently ships Admin Pet Studio, schema-v3 player vault and active intent, explicit-currency slot purchases, and audited recovery. Incubation, visible companions, renderers, skills, items, and progression remain roadmap work.</p>
         <div class="hero-actions">
-          <a class="button primary" href="#start">Install OmniPet</a>
-          <a class="button ghost" href="https://github.com/SalyyS1/OmniPet/wiki">Open wiki</a>
+          <a class="button primary" href="#start">Stage OmniPet</a>
+          <a class="button ghost" href="https://github.com/SalyyS1/OmniPet/tree/main/docs">Browse source docs</a>
         </div>
       </div>
-      <aside class="status-panel" aria-label="Runtime status">
-        <p class="panel-label">Runtime card</p>
+      <aside class="status-panel" aria-label="Verification status">
+        <p class="panel-label">Checkpoint card</p>
         <dl>
-          <div><dt>Primary line</dt><dd>Paper 1.21.x</dd></div>
-          <div><dt>Runtime</dt><dd>Java 21</dd></div>
-          <div><dt>26.1+</dt><dd>Java 25 / experimental</dd></div>
-          <div><dt>Renderer</dt><dd>Paper display entities</dd></div>
-          <div><dt>Adapters</dt><dd>MythicLib + MMOItems optional</dd></div>
+          <div><dt>Build</dt><dd>54 suites / 203 tests</dd></div>
+          <div><dt>Runtime target</dt><dd>Java 21 bytecode</dd></div>
+          <div><dt>Paper evidence</dt><dd>Exact compile probes only</dd></div>
+          <div><dt>Shipped UI</dt><dd>Studio + vault + slot flow</dd></div>
+          <div><dt>Visible pets</dt><dd>Deferred</dd></div>
         </dl>
-        <p class="warning"><strong>ModelEngine:</strong> planned adapter boundary, not a shipped renderer.</p>
+        <p class="warning"><strong>Certification:</strong> no live Paper/provider smoke matrix has been completed.</p>
       </aside>
     </section>
 
     <section id="start" class="section split" aria-labelledby="start-title">
       <div>
-        <p class="section-index">01 / First boot</p>
-        <h2 id="start-title">From JAR to first hatch</h2>
-        <p>Use Paper, install the correct Java runtime, and let OmniPet copy its starter pack. Existing servers should complete the migration checklist before the first production start.</p>
+        <p class="section-index">01 / Staging boot</p>
+        <h2 id="start-title">From verified JAR to a controlled server check.</h2>
+        <p>Use the Gradle release artifact on staging, preserve old data, and verify only the features that currently ship.</p>
       </div>
       <ol class="steps">
-        <li><span>01</span><div><strong>Place the artifact</strong><p>Copy `OmniPet-&lt;version&gt;.jar` into `plugins/`.</p></div></li>
-        <li><span>02</span><div><strong>Start once</strong><p>Review the generated `plugins/OmniPet/` YAML files.</p></div></li>
-        <li><span>03</span><div><strong>Grant slots</strong><p>Assign `petstorage.slot.1` and additional slot permissions.</p></div></li>
-        <li><span>04</span><div><strong>Issue an egg</strong><p>Run `/pets item egg common &lt;player&gt;`.</p></div></li>
+        <li><span>01</span><div><strong>Place the artifact</strong><p>Copy <code>OmniPet-3.0.0-SNAPSHOT.jar</code> into <code>plugins/</code>.</p></div></li>
+        <li><span>02</span><div><strong>Start on staging</strong><p>Confirm the Studio-enabled log line or capture the first fail-closed error.</p></div></li>
+        <li><span>03</span><div><strong>Open shipped flows</strong><p>Use <code>/pet</code>, <code>/pet slot</code>, and permitted Studio/admin branches.</p></div></li>
+        <li><span>04</span><div><strong>Verify recovery</strong><p>Run <code>/pet admin transactions 20</code>; paste the opaque next cursor when provided, and never replay an ambiguous economy call.</p></div></li>
       </ol>
     </section>
 
     <section id="compatibility" class="section" aria-labelledby="compat-title">
       <div class="section-heading">
-        <div><p class="section-index">02 / Compatibility truth table</p><h2 id="compat-title">Exact builds beat hopeful ranges.</h2></div>
+        <div><p class="section-index">02 / Compatibility truth table</p><h2 id="compat-title">Exact probes beat hopeful ranges.</h2></div>
         <a class="text-link" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/compatibility.md">Full matrix</a>
       </div>
       <div class="table-wrap" tabindex="0" role="region" aria-label="Compatibility table">
         <table>
-          <thead><tr><th>Server</th><th>Java</th><th>Project status</th><th>Operator rule</th></tr></thead>
+          <thead><tr><th>Paper API coordinate</th><th>Compiler</th><th>Evidence</th><th>Operator rule</th></tr></thead>
           <tbody>
-            <tr><td>Paper 1.21.x</td><td>21</td><td><span class="tag stable">Primary</span></td><td>Certify the exact Paper build used in production.</td></tr>
-            <tr><td>Paper 26.1.1</td><td>25</td><td><span class="tag preview">Alpha caveat</span></td><td>Use only as a pinned preview after smoke tests.</td></tr>
-            <tr><td>Paper 26.1.2+</td><td>25</td><td><span class="tag probe">Experimental</span></td><td>Test core and every optional adapter separately.</td></tr>
+            <tr><td>1.21-R0.1-SNAPSHOT / 1.21.11-R0.1-SNAPSHOT</td><td>Java 21</td><td><span class="tag stable">Passed compile</span></td><td>Live-certify the exact server build before production.</td></tr>
+            <tr><td>26.1.1.build.29-alpha</td><td>Java 25</td><td><span class="tag preview">Passed compile</span></td><td>Treat as a pinned preview, not a support range.</td></tr>
+            <tr><td>26.1.2.build.74-stable / 26.2.build.87-stable</td><td>Java 25</td><td><span class="tag probe">Passed compile</span></td><td>Test boot, scheduler, inventory, and every provider separately.</td></tr>
           </tbody>
         </table>
       </div>
@@ -90,27 +90,27 @@
         <label class="search"><span class="sr-only">Filter manuals</span><input id="doc-search" type="search" placeholder="Filter manuals..." autocomplete="off"></label>
       </div>
       <div id="doc-grid" class="doc-grid">
-        <a class="doc-card" data-search="install first boot setup operator" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/getting-started.md"><span>OPS / 01</span><h3>Getting started</h3><p>Install, generate files, grant slots, and run the first hatch.</p></a>
-        <a class="doc-card" data-search="yaml config pets eggs gui items language expressions" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/configuration.md"><span>OPS / 02</span><h3>Configuration</h3><p>Stable fields, component schemas, triggers, expressions, and copy-safe examples.</p></a>
-        <a class="doc-card" data-search="commands permissions admin pets pet" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/commands-and-permissions.md"><span>OPS / 03</span><h3>Commands and permissions</h3><p>Player aliases, admin mutations, selectors, and permission nodes.</p></a>
-        <a class="doc-card" data-search="mythiclib mmoitems modelengine integrations optional" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/integrations.md"><span>OPS / 04</span><h3>Integrations</h3><p>Optional hooks, supported boundaries, version hazards, and ModelEngine roadmap.</p></a>
-        <a class="doc-card" data-search="passivepet migration backup rollback legacy pdc" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/migration.md"><span>OPS / 05</span><h3>Migration</h3><p>Move from PassivePet without silently renaming persistent contracts.</p></a>
-        <a class="doc-card" data-search="java api addon gradle developer component" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/developer-guide.md"><span>DEV / 01</span><h3>Developer guide</h3><p>Gradle workflow, API access, extension seams, and release checks.</p></a>
-        <a class="doc-card" data-search="examples yaml pet egg trigger mythiclib mmoitems" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/examples.md"><span>DEV / 02</span><h3>Copy-safe examples</h3><p>Balanced pets, eggs, rewards, and optional integration recipes.</p></a>
-        <a class="doc-card" data-search="troubleshooting errors yaml server logs hooks" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/troubleshooting.md"><span>OPS / 06</span><h3>Troubleshooting</h3><p>Diagnose startup, config, item, GUI, hook, and compatibility failures.</p></a>
-        <a class="doc-card" data-search="roadmap features skills quests modelengine future" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/roadmap.md"><span>PLAN / 01</span><h3>Roadmap</h3><p>Prioritized follow-ups with status and risk, not implied release promises.</p></a>
+        <a class="doc-card" data-search="build staging setup operator artifact" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/getting-started.md"><span>OPS / 01</span><h3>Getting started</h3><p>Build with Gradle, locate the verified artifact, and run a scoped staging check.</p></a>
+        <a class="doc-card" data-search="yaml config definitions storage slots entitlement" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/configuration.md"><span>OPS / 02</span><h3>Configuration</h3><p>Current schema-v2 definitions, schema-v3 player state, pricing, and provider policy.</p></a>
+        <a class="doc-card" data-search="commands permissions admin transactions reconcile" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/commands-and-permissions.md"><span>OPS / 03</span><h3>Commands and permissions</h3><p>Shipped player, Studio, transaction, and reconciliation commands.</p></a>
+        <a class="doc-card" data-search="vault playerpoints luckperms mythiclib modelengine integrations" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/integrations.md"><span>OPS / 04</span><h3>Integrations</h3><p>Implemented adapters, selective refresh behavior, and deferred runtime boundaries.</p></a>
+        <a class="doc-card" data-search="passivepet migration backup rollback journal schema" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/migration.md"><span>OPS / 05</span><h3>Migration</h3><p>Preserve legacy data and recover schema-v1 purchase journals safely.</p></a>
+        <a class="doc-card" data-search="java api gradle developer module architecture" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/developer-guide.md"><span>DEV / 01</span><h3>Developer guide</h3><p>Gradle workflow, module boundaries, lifecycle contracts, and release evidence.</p></a>
+        <a class="doc-card" data-search="examples yaml definition slots recovery" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/examples.md"><span>DEV / 02</span><h3>Current examples</h3><p>Copy-safe definition metadata, slot pricing, and recovery commands.</p></a>
+        <a class="doc-card" data-search="troubleshooting errors yaml providers journal" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/troubleshooting.md"><span>OPS / 06</span><h3>Troubleshooting</h3><p>Diagnose startup, storage, provider refresh, and recovery failures.</p></a>
+        <a class="doc-card" data-search="roadmap hatching renderer progression future" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/roadmap.md"><span>PLAN / 01</span><h3>Roadmap</h3><p>Shipped code slices and deferred gameplay gates without release promises.</p></a>
       </div>
       <p id="empty-state" class="empty-state" hidden>No manual matches that filter.</p>
     </section>
 
     <section class="section callout" aria-labelledby="boundary-title">
-      <div><p class="section-index">Architecture boundary</p><h2 id="boundary-title">Core rules. Optional adapters. Honest fallbacks.</h2></div>
-      <p>The intended direction keeps Paper gameplay in the core while MythicLib, MMOItems, and future ModelEngine support live behind capability checks. Missing vendor plugins should disable only their feature, not OmniPet.</p>
+      <div><p class="section-index">Architecture boundary</p><h2 id="boundary-title">Persisted intent is not a live pet.</h2></div>
+      <p>The current runtime stores definitions, owned pets, desired-active UUIDs, slot entitlements, and recovery evidence. Hatching, entities, movement, runtime buffs, skills, and item gameplay need later implementations and live certification.</p>
     </section>
   </main>
 
   <footer>
-    <p>OmniPet documentation by <strong>SalyVn</strong>.</p>
+    <p>OmniPet documentation by <strong>SalyVn</strong>. Published from <code>main</code>; branch changes appear after merge and successful deployment.</p>
     <p><a href="https://github.com/SalyyS1/OmniPet">GitHub</a> <span aria-hidden="true">/</span> <a href="https://github.com/SalyyS1/OmniPet/issues">Issues</a> <span aria-hidden="true">/</span> <a href="https://github.com/SalyyS1/OmniPet/blob/main/CHANGELOG.md">Changelog</a></p>
   </footer>
 </body>
