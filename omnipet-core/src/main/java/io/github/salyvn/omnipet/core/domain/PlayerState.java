@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import io.github.salyvn.omnipet.core.domain.incubation.IncubationState;
+
 public record PlayerState(
         UUID playerId,
         long revision,
@@ -15,6 +17,7 @@ public record PlayerState(
         List<UUID> desiredActivePetIds,
         List<SlotEntitlement> slotEntitlements,
         Map<String, Object> legacyCurrentEgg,
+        IncubationState incubation,
         Map<String, Object> extensions) {
     public static final int MAX_VAULT_CAPACITY = 100_000;
     public static final int MAX_ACTIVE_SLOT_COUNT = SlotEntitlement.MAX_SLOT;
@@ -60,8 +63,22 @@ public record PlayerState(
         RawNodeValues.rejectNonFinite(extensions, "extensions");
     }
 
+    public PlayerState(
+            UUID playerId,
+            long revision,
+            List<PetInstance> pets,
+            int vaultCapacity,
+            int activeSlotCount,
+            List<UUID> desiredActivePetIds,
+            List<SlotEntitlement> slotEntitlements,
+            Map<String, Object> legacyCurrentEgg,
+            Map<String, Object> extensions) {
+        this(playerId, revision, pets, vaultCapacity, activeSlotCount, desiredActivePetIds,
+                slotEntitlements, legacyCurrentEgg, null, extensions);
+    }
+
     public static PlayerState empty(UUID playerId) {
-        return new PlayerState(playerId, 0, List.of(), 0, 1, List.of(), List.of(), Map.of(), Map.of());
+        return new PlayerState(playerId, 0, List.of(), 0, 1, List.of(), List.of(), Map.of(), null, Map.of());
     }
 
     public PlayerState withRevision(long nextRevision) {
@@ -74,6 +91,7 @@ public record PlayerState(
                 desiredActivePetIds,
                 slotEntitlements,
                 legacyCurrentEgg,
+                incubation,
                 extensions);
     }
 
@@ -92,6 +110,21 @@ public record PlayerState(
                 nextDesiredActivePetIds,
                 nextSlotEntitlements,
                 legacyCurrentEgg,
+                incubation,
+                extensions);
+    }
+
+    public PlayerState withIncubation(IncubationState nextIncubation) {
+        return new PlayerState(
+                playerId,
+                revision,
+                pets,
+                vaultCapacity,
+                activeSlotCount,
+                desiredActivePetIds,
+                slotEntitlements,
+                legacyCurrentEgg,
+                nextIncubation,
                 extensions);
     }
 }

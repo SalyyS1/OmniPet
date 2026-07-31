@@ -18,18 +18,20 @@ class LegacyPlayerStateReaderTest {
         var result = reader.read("uuid: " + playerId + "\npets: []\ncapacity: 4\n");
 
         assertEquals(1, result.report().sourceSchemaVersion());
-        assertEquals(3, result.envelope().schemaVersion());
+        assertEquals(4, result.envelope().schemaVersion());
         assertEquals(4, result.envelope().state().vaultCapacity());
         assertTrue(result.report().migrated());
     }
 
     @Test
-    void rejectsSchemaTwoAndCurrentSchema() {
+    void rejectsSchemaTwoThreeAndCurrentSchema() {
         UUID playerId = UUID.randomUUID();
         String schemaTwo = "schemaVersion: 2\nuuid: " + playerId + "\npets: []\n";
         String schemaThree = "schemaVersion: 3\nuuid: " + playerId + "\npets: []\n";
+        String schemaFour = "schemaVersion: 4\nuuid: " + playerId + "\npets: []\n";
 
         assertThrows(IllegalArgumentException.class, () -> reader.read(schemaTwo));
         assertThrows(IllegalArgumentException.class, () -> reader.read(schemaThree));
+        assertThrows(IllegalArgumentException.class, () -> reader.read(schemaFour));
     }
 }

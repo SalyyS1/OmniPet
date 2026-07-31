@@ -40,7 +40,7 @@ class PlayerStateYamlCodecTest {
         assertEquals(1, first.report().assignedInstanceIds().size());
         assertFalse(second.report().migrated());
         assertEquals(first.envelope(), second.envelope());
-        assertEquals(3, first.envelope().schemaVersion());
+        assertEquals(4, first.envelope().schemaVersion());
         assertEquals(12, first.envelope().state().vaultCapacity());
         assertEquals(1, first.envelope().state().activeSlotCount());
         assertEquals(
@@ -69,7 +69,7 @@ class PlayerStateYamlCodecTest {
     void rejectsMalformedAndDuplicateInstanceUuids() {
         assertThrows(IllegalArgumentException.class, () -> codec.decode("uuid: nope\npets: []\n"));
         String duplicate = """
-                schemaVersion: 3
+                schemaVersion: 4
                 uuid: %s
                 revision: 0
                 pets:
@@ -120,7 +120,7 @@ class PlayerStateYamlCodecTest {
     @Test
     void roundTripsSlotEntitlementExtensionsAndExplicitNulls() {
         String current = """
-                schemaVersion: 3
+                schemaVersion: 4
                 uuid: %s
                 revision: 2
                 pets: []

@@ -108,7 +108,7 @@ class FilePlayerStateRepositoryTest {
 
         FilePlayerStateRepository repository = new FilePlayerStateRepository(root);
         assertEquals(4, repository.snapshot(playerId).vaultCapacity());
-        assertTrue(Files.readString(file).contains("schemaVersion: 3"));
+        assertTrue(Files.readString(file).contains("schemaVersion: 4"));
         assertTrue(Files.exists(AtomicFileStore.backupPath(file)));
 
         byte[] rewritten = Files.readAllBytes(file);
@@ -147,7 +147,7 @@ class FilePlayerStateRepositoryTest {
     }
 
     @Test
-    void newProfilesUseSafeSchemaThreeDefaults() throws Exception {
+    void newProfilesUseSafeSchemaFourDefaults() throws Exception {
         UUID playerId = UUID.randomUUID();
         PlayerStateRepository repository = new FilePlayerStateRepository(temporary.resolve("players"));
 

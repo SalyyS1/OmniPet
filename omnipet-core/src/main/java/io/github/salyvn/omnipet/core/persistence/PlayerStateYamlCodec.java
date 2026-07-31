@@ -13,11 +13,13 @@ import io.github.salyvn.omnipet.core.domain.PlayerStateEnvelope;
 import io.github.salyvn.omnipet.core.domain.RawNodeValues;
 
 public final class PlayerStateYamlCodec {
+    private static final String LEGACY_SCHEMA_NODES = "legacySchemaNodes";
     private static final List<String> PLAYER_KEYS = List.of(
             "schemaVersion", "uuid", "revision", "pets", "currentPetIndex", "currentEgg", "capacity",
-            "vaultCapacity", "activeSlotCount", "desiredActivePetIds", "slotEntitlements");
+            "vaultCapacity", "activeSlotCount", "desiredActivePetIds", "slotEntitlements", "incubation");
     private static final List<String> PET_KEYS = List.of(
             "id", "definitionId", "definitionRevision", "type", "components");
+    private final IncubationYamlCodec incubationCodec = new IncubationYamlCodec();
 
     public PlayerMigrationResult decodeWithReport(String yaml) {
         Map<String, Object> raw = YamlDocuments.readMap(yaml);
@@ -65,7 +67,13 @@ public final class PlayerStateYamlCodec {
         PlayerStorageYamlCodec.DecodedStorage storage = PlayerStorageYamlCodec.decode(
                 raw, schema, pets, currentIndex, appliedMigrations, warnings);
         Map<String, Object> currentEgg = mapOrEmpty(raw.get("currentEgg"));
+        var incubation = schema >= 4 ? incubationCodec.decode(raw.get("incubation")) : null;
         Map<String, Object> extensions = without(raw, PLAYER_KEYS);
+        if (schema < 4 && raw.containsKey("incubation")) {
+            extensions = preserveLegacyIncubation(extensions, raw.get("incubation"));
+            appliedMigrations.add("PRESERVE_LEGACY_INCUBATION_NODE");
+            warnings.add("legacy top-level incubation node was preserved under " + LEGACY_SCHEMA_NODES);
+        }
         PlayerState state = new PlayerState(
                 playerId,
                 revision,
@@ -75,6 +83,7 @@ public final class PlayerStateYamlCodec {
                 storage.desiredActivePetIds(),
                 storage.slotEntitlements(),
                 currentEgg,
+                incubation,
                 extensions);
         boolean migrated = schema < PlayerStateEnvelope.CURRENT_SCHEMA_VERSION
                 || !assigned.isEmpty()
@@ -120,6 +129,7 @@ public final class PlayerStateYamlCodec {
         output.put("desiredActivePetIds", state.desiredActivePetIds().stream().map(UUID::toString).toList());
         output.put("slotEntitlements", PlayerStorageYamlCodec.encodeEntitlements(state.slotEntitlements()));
         if (!state.legacyCurrentEgg().isEmpty()) output.put("currentEgg", RawNodeValues.mutableCopy(state.legacyCurrentEgg()));
+        if (state.incubation() != null) output.put("incubation", incubationCodec.encode(state.incubation()));
         state.extensions().forEach((key, value) -> output.putIfAbsent(key, RawNodeValues.mutableCopy(value)));
         return YamlDocuments.writeMap(output);
     }
@@ -152,6 +162,30 @@ public final class PlayerStateYamlCodec {
         LinkedHashMap<String, Object> result = new LinkedHashMap<>(value);
         keys.forEach(result::remove);
         return result;
+    }
+
+    private static Map<String, Object> preserveLegacyIncubation(
+            Map<String, Object> extensions,
+            Object legacyIncubation) {
+        LinkedHashMap<String, Object> result = new LinkedHashMap<>(RawNodeValues.mutableMap(extensions));
+        LinkedHashMap<String, Object> legacyNodes = new LinkedHashMap<>();
+        if (result.containsKey(LEGACY_SCHEMA_NODES)) {
+            Object existing = result.remove(LEGACY_SCHEMA_NODES);
+            if (existing instanceof Map<?, ?> map) {
+                legacyNodes.putAll(stringMap(map, LEGACY_SCHEMA_NODES));
+            } else {
+                legacyNodes.put("previousValue", RawNodeValues.mutableCopy(existing));
+            }
+        }
+        String key = "incubation";
+        if (legacyNodes.containsKey(key)) {
+            key = "incubationFromSchema1To3";
+            int suffix = 2;
+            while (legacyNodes.containsKey(key)) key = "incubationFromSchema1To3_" + suffix++;
+        }
+        legacyNodes.put(key, RawNodeValues.mutableCopy(legacyIncubation));
+        result.put(LEGACY_SCHEMA_NODES, legacyNodes);
+        return RawNodeValues.immutableMap(result);
     }
 
     private static String string(Object value, String path) {

@@ -78,6 +78,8 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
                 catch (IllegalArgumentException error) { throw new IOException("invalid player state filename: " + fileName, error); }
                 PlayerState state = snapshot(playerId);
                 boolean found = state.pets().stream().anyMatch(pet -> expected.equals(pet.definitionId()))
+                        || (state.incubation() != null
+                                && expected.equals(state.incubation().outcome().definitionId()))
                         || containsString(state.legacyCurrentEgg(), expected)
                         || containsString(state.extensions(), expected);
                 if (found) references.add("player:" + playerId);
