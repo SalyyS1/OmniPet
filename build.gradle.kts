@@ -46,6 +46,7 @@ val checkGradleOnly = tasks.register("checkGradleOnly") {
             .filter { candidate ->
                 candidate != repositoryRoot.toFile() && candidate.name !in ignoredDirectories &&
                         (candidate.name == "pom.xml" || candidate.name == "mvnw" || candidate.name == "mvnw.cmd" ||
+                                candidate.name == "dependency-reduced-pom.xml" ||
                                 (candidate.isDirectory && (candidate.name == ".mvn" || candidate.name == "target")))
             }
             .toList()
@@ -98,7 +99,7 @@ tasks.named("check") {
     dependsOn(checkCoreBoundary, checkGradleOnly, checkBranding, checkDistributionArtifact)
 }
 
-tasks.register<Copy>("copyReleaseArtifact") {
+tasks.register<Sync>("copyReleaseArtifact") {
     dependsOn(checkDistributionArtifact)
     from(distributionJar)
     into(layout.buildDirectory.dir("release"))

@@ -1,11 +1,9 @@
 .gradle/
 build/
 out/
-target/
 *.iml
 .idea/
 .vscode/
-dependency-reduced-pom.xml
 *.log
 run/
 server/
