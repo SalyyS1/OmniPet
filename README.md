@@ -1,6 +1,6 @@
 # OmniPet
 
-OmniPet is a Paper plugin rewrite. This checkout is the verified Gradle-only foundation plus the first usable Admin Pet Studio slice: a two-module boundary, versioned YAML/domain contracts, legacy migration seams, tokenized GUI sessions, and transaction-backed definition authoring. Player gameplay remains phased work.
+OmniPet is a Paper plugin rewrite. This checkout is the verified Gradle-only foundation plus Admin Pet Studio and the first player-vault slice: versioned YAML/domain contracts, migration seams, tokenized GUIs, transaction-backed definition authoring, persisted vault capacity, and ordered multi-pet activation intent. Incubation and live pet entities remain phased work.
 
 ## Shipped foundation and Studio
 
@@ -10,14 +10,16 @@ OmniPet is a Paper plugin rewrite. This checkout is the verified Gradle-only fou
 - The descriptor is branded `OmniPet`, authored by `SalyVn`, and loads `io.github.salyvn.omnipet.paper.OmniPetPlugin`.
 - Paper registers `/pet` with `/pets` as its alias. Both names expose the phased player entry point and the live `/pet admin browse` Studio branch.
 - `omnipet.general` defaults to `true`; `omnipet.*` defaults to `op`; declared `omnipet.admin.*` nodes default to `false`. Admin command branches are descriptor contracts only and are not shipped gameplay commands yet.
-- Player and pet definition envelopes use schema version 2. The core preserves raw unknown nodes, stable IDs, legacy state hints, and recoverable orphan data instead of silently replacing a profile.
+- Player envelopes use schema version 3 and pet definitions use schema version 2. The core preserves raw unknown nodes, stable IDs, canonical vault/active intent, legacy egg state, and recoverable orphan data instead of silently replacing a profile.
 - Atomic writes create `.bak` snapshots when replacing an existing file. Invalid player files are quarantined; a quarantined profile fails closed until an operator performs explicit recovery.
 - Legacy egg definitions are validated and written to `migration/legacy-eggs-v1.yml` with a semantic SHA-256 journal. The source `eggs.yml` is never overwritten by that journal.
 - `/pet admin browse` and `/pets admin browse` open the D/C/B/A/S Studio tier browser for `omnipet.admin.managepet` staff. The Studio supports paginated definition lists, a reflection-safe MythicLib stat picker with manual fallback, create/edit drafts, typed rarity/progression/skill/release fields, archive mode, safe inventory events, chat input expiry/cancel, optimistic conflict checks, and atomic Save/reload generation swaps.
+- `/pet [page]` and `/pets [page]` open the UUID/revision-safe player vault. View/reconcile reads are coalesced per player, one mutation is admitted at a time, and repository work is serialized off-thread; Bukkit permissions and inventory operations remain on the main thread.
+- `config.yml` now owns separate vault and active-slot limits. Exact legacy `globalMaxSlots`/`slotPermission` files, including omitted defaults and zero capacity, are migrated atomically with `config.yml.bak`.
 
 ## Deferred roadmap
 
-The following remain phased work: incubation/hatching gameplay, multi-pet slots and vault/economy, live renderers, MythicMobs execution, ModelEngine runtime integration, and GitHub Pages publication/maintenance. See [the roadmap](docs/roadmap.md) for ownership and release gates.
+The following remain phased work: provider-backed slot purchase UI/adapters, incubation/hatching gameplay, live renderers, MythicMobs execution, ModelEngine runtime integration, and GitHub Pages publication/maintenance. See [the roadmap](docs/roadmap.md) for ownership and release gates.
 
 ## Compatibility
 
@@ -50,7 +52,7 @@ Before any rebrand or data-folder move, stop the server and make a complete back
 - [Getting started](docs/getting-started.md)
 - [Commands and permissions](docs/commands-and-permissions.md)
 - [Compatibility](docs/compatibility.md)
-- [Configuration and schema (future/non-authoritative)](docs/configuration.md)
+- [Configuration and schema](docs/configuration.md)
 - [Developer guide](docs/developer-guide.md)
 - [Migration](docs/migration.md)
 - [Roadmap](docs/roadmap.md)

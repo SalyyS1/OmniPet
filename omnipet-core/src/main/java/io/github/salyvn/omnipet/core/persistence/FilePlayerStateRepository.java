@@ -11,8 +11,6 @@ import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.UnaryOperator;
 
 import io.github.salyvn.omnipet.core.domain.PlayerState;
@@ -22,7 +20,6 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
     private final SafeRepositoryPaths paths;
     private final PlayerStateYamlCodec codec;
     private final AtomicFileStore fileStore;
-    private final ConcurrentHashMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     public FilePlayerStateRepository(Path root) {
         this(root, new PlayerStateYamlCodec(), new AtomicFileStore());
@@ -36,21 +33,15 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
 
     @Override
     public PlayerState snapshot(UUID playerId) throws IOException {
-        ReentrantLock lock = locks.computeIfAbsent(playerId, ignored -> new ReentrantLock());
-        lock.lock();
-        try {
+        try (var ignored = SharedRepositoryLockRegistry.acquire(paths.resolvePlayerLock(playerId))) {
             return load(playerId);
-        } finally {
-            lock.unlock();
         }
     }
 
     @Override
     public PlayerState withLocked(UUID playerId, long expectedRevision, UnaryOperator<PlayerState> mutation) throws IOException {
         if (mutation == null) throw new IllegalArgumentException("mutation is required");
-        ReentrantLock lock = locks.computeIfAbsent(playerId, ignored -> new ReentrantLock());
-        lock.lock();
-        try {
+        try (var ignored = SharedRepositoryLockRegistry.acquire(paths.resolvePlayerLock(playerId))) {
             PlayerState current = load(playerId);
             if (current.revision() != expectedRevision) throw new StaleRevisionException(expectedRevision, current.revision());
             PlayerState candidate = mutation.apply(current);
@@ -61,8 +52,6 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
             Path path = paths.resolveUuid(playerId, ".yml");
             fileStore.write(path, codec.encodeBytes(new PlayerStateEnvelope(PlayerStateEnvelope.CURRENT_SCHEMA_VERSION, saved)));
             return saved;
-        } finally {
-            lock.unlock();
         }
     }
 
@@ -103,7 +92,7 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
             if (hasQuarantinedState(playerId)) {
                 throw new IOException("player state is quarantined; explicit recovery is required for " + playerId);
             }
-            return new PlayerState(playerId, 0, List.of(), null, Map.of(), null, Map.of());
+            return PlayerState.empty(playerId);
         }
         String yaml = Files.readString(path, StandardCharsets.UTF_8);
         PlayerMigrationResult result;

@@ -31,10 +31,12 @@ class PetReferenceScannerTest {
     void scansPlayerPetDefinitions() throws Exception {
         UUID playerId = UUID.randomUUID();
         FilePlayerStateRepository repository = new FilePlayerStateRepository(temporaryDirectory.resolve("players"));
-        repository.withLocked(playerId, 0, state -> new io.github.salyvn.omnipet.core.domain.PlayerState(
-                state.playerId(), state.revision(),
+        repository.withLocked(playerId, 0, state -> state.withStorage(
                 List.of(new PetInstance(UUID.randomUUID(), "fox", 1, Map.of(), Map.of())),
-                state.legacyCurrentPetIndex(), state.legacyCurrentEgg(), state.legacyCapacity(), state.extensions()));
+                state.vaultCapacity(),
+                state.activeSlotCount(),
+                state.desiredActivePetIds(),
+                state.slotEntitlements()));
 
         assertEquals(Set.of("player:" + playerId), repository.referenceScan("fox"));
     }

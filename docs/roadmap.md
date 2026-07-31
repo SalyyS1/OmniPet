@@ -6,10 +6,12 @@ The Phase 1 Gradle/persistence foundation and the Phase 2 Admin Pet Studio slice
 
 - Gradle Wrapper-only build with dependency locks, Java 21, UTF-8, branding checks, core-boundary checks, Gradle-only checks, and one release artifact.
 - Two-module boundary: `omnipet-core` owns domain/schema/migration/storage seams; `omnipet-paper` owns Paper bootstrap and distribution.
-- Schema 2 player and pet definition envelopes with deterministic legacy pet-instance IDs, revision checks, raw-node preservation, and finite-value validation.
+- Schema 3 player and schema 2 pet definition envelopes with deterministic legacy pet-instance IDs, vault/active intent migration, revision checks, raw-node preservation, and finite-value validation.
 - Atomic write/backup, archive, canonical path/no-follow-link checks, quarantine, and fail-closed player recovery behavior.
 - Legacy egg validation and idempotent semantic-hash journal at bootstrap.
 - Minimal `/pet` command with `/pets` alias and `omnipet.general` default permission.
+- Schema 3 player vault with separate owned capacity and ordered active intent, live consecutive legacy permission resolution, safe overflow behavior, coalesced reads, and serialized per-player Paper I/O.
+- Provider-neutral economy amount, durable purchase journal, refund/recovery saga, and explicit unknown-provider reconciliation state.
 - Compile probes for exact Paper 1.21.x and 26.x coordinates. These remain probes, not runtime certification.
 
 ## Deferred phases
@@ -18,7 +20,8 @@ The Phase 1 Gradle/persistence foundation and the Phase 2 Admin Pet Studio slice
 | --- | --- | --- |
 | Admin Pet Studio GUI and Studio Save | Shipped Phase 2 slice | D/C/B/A/S browser, dynamic MythicLib stat picker/manual fallback, draft editor, archive, exact-ID hard delete with reference blocking, clone-only authoring, guarded inventory/chat input, and shared atomic generation transaction. Full reference migration and live server UX smoke remain gates. |
 | Incubation/hatching and rarity rolls | Deferred to Phase 3 | Must define online-time, escrow, idempotence, and migration semantics. |
-| Multi-pet active slots, vault, and economy | Deferred to Phase 4 | Requires canonical activation intent and provider reconciliation. |
+| Canonical multi-pet active intent and vault admission | Shipped Phase 4 slice | Core schema/storage invariants and Paper player vault are present; live renderer reconciliation belongs to Phase 5. |
+| Economy-backed slot purchases | In progress Phase 4 | Provider-neutral saga core is present; Vault/PlayerPoints/LuckPerms adapters, choices, admin reconciliation, and live evidence remain. |
 | Paper/ModelEngine renderers and smooth movement | Deferred to Phase 5 | ModelEngine class loading, cleanup, fallback, and exact-version tests required. |
 | MythicMobs skills/interactions/riding | Deferred to Phase 6 | No direct MythicMobs adapter is shipped in Phase 1. |
 | Progression, cultivation, release, and player management | Deferred to Phase 7 | Requires the earlier transactions and runtime handles. |
@@ -27,7 +30,7 @@ The Phase 1 Gradle/persistence foundation and the Phase 2 Admin Pet Studio slice
 
 ## Non-claims
 
-The current JAR ships the definition Studio but not the hatching loop, multi-pet slots, vault/economy provider, live renderer, MythicMobs skill execution, ModelEngine adapter, or full gameplay API. Old configuration and integration examples are retained as future design/reference material and are explicitly non-authoritative until their phase lands.
+The current JAR ships the definition Studio and player vault/active-intent slice, but not the hatching loop, provider-backed slot purchase UI, live multi-pet renderer, MythicMobs skill execution, ModelEngine adapter, or full gameplay API. Future configuration and integration examples remain non-authoritative until their owning phase lands.
 
 ## Release gates
 

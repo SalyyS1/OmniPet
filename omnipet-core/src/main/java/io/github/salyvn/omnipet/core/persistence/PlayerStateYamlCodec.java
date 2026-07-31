@@ -14,7 +14,8 @@ import io.github.salyvn.omnipet.core.domain.RawNodeValues;
 
 public final class PlayerStateYamlCodec {
     private static final List<String> PLAYER_KEYS = List.of(
-            "schemaVersion", "uuid", "revision", "pets", "currentPetIndex", "currentEgg", "capacity");
+            "schemaVersion", "uuid", "revision", "pets", "currentPetIndex", "currentEgg", "capacity",
+            "vaultCapacity", "activeSlotCount", "desiredActivePetIds", "slotEntitlements");
     private static final List<String> PET_KEYS = List.of(
             "id", "definitionId", "definitionRevision", "type", "components");
 
@@ -52,20 +53,36 @@ public final class PlayerStateYamlCodec {
             pets.add(new PetInstance(instanceId, definitionId, definitionRevision, components, extensions));
         }
 
-        Integer currentIndex = optionalInteger(raw.get("currentPetIndex"), "currentPetIndex");
-        if (currentIndex != null && (currentIndex < -1 || currentIndex >= pets.size())) currentIndex = -1;
-        Integer capacity = optionalInteger(raw.get("capacity"), "capacity");
-        Map<String, Object> currentEgg = mapOrEmpty(raw.get("currentEgg"));
-        Map<String, Object> extensions = without(raw, PLAYER_KEYS);
-        PlayerState state = new PlayerState(playerId, revision, pets, currentIndex, currentEgg, capacity, extensions);
-        boolean migrated = schema < PlayerStateEnvelope.CURRENT_SCHEMA_VERSION || !assigned.isEmpty();
         List<String> warnings = new ArrayList<>();
-        if (currentIndex != null && currentIndex == -1 && raw.containsKey("currentPetIndex")) {
+        List<String> appliedMigrations = new ArrayList<>();
+        if (!assigned.isEmpty()) appliedMigrations.add("ASSIGN_STABLE_PET_IDS");
+
+        Integer currentIndex = optionalInteger(raw.get("currentPetIndex"), "currentPetIndex");
+        if (currentIndex != null && (currentIndex < -1 || currentIndex >= pets.size())) {
+            currentIndex = -1;
             warnings.add("currentPetIndex was stale and normalized to -1");
         }
+        PlayerStorageYamlCodec.DecodedStorage storage = PlayerStorageYamlCodec.decode(
+                raw, schema, pets, currentIndex, appliedMigrations, warnings);
+        Map<String, Object> currentEgg = mapOrEmpty(raw.get("currentEgg"));
+        Map<String, Object> extensions = without(raw, PLAYER_KEYS);
+        PlayerState state = new PlayerState(
+                playerId,
+                revision,
+                pets,
+                storage.vaultCapacity(),
+                storage.activeSlotCount(),
+                storage.desiredActivePetIds(),
+                storage.slotEntitlements(),
+                currentEgg,
+                extensions);
+        boolean migrated = schema < PlayerStateEnvelope.CURRENT_SCHEMA_VERSION
+                || !assigned.isEmpty()
+                || raw.containsKey("capacity")
+                || raw.containsKey("currentPetIndex");
         return new PlayerMigrationResult(
                 new PlayerStateEnvelope(PlayerStateEnvelope.CURRENT_SCHEMA_VERSION, state),
-                new MigrationReport(schema, migrated, assigned, warnings));
+                new MigrationReport(schema, migrated, assigned, appliedMigrations, warnings));
     }
 
     public PlayerStateEnvelope decode(String yaml) {
@@ -98,9 +115,11 @@ public final class PlayerStateYamlCodec {
             pets.add(pet);
         }
         output.put("pets", pets);
-        if (state.legacyCurrentPetIndex() != null) output.put("currentPetIndex", state.legacyCurrentPetIndex());
+        output.put("vaultCapacity", state.vaultCapacity());
+        output.put("activeSlotCount", state.activeSlotCount());
+        output.put("desiredActivePetIds", state.desiredActivePetIds().stream().map(UUID::toString).toList());
+        output.put("slotEntitlements", PlayerStorageYamlCodec.encodeEntitlements(state.slotEntitlements()));
         if (!state.legacyCurrentEgg().isEmpty()) output.put("currentEgg", RawNodeValues.mutableCopy(state.legacyCurrentEgg()));
-        if (state.legacyCapacity() != null) output.put("capacity", state.legacyCapacity());
         state.extensions().forEach((key, value) -> output.putIfAbsent(key, RawNodeValues.mutableCopy(value)));
         return YamlDocuments.writeMap(output);
     }

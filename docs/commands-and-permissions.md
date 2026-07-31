@@ -1,16 +1,16 @@
 # Commands and permissions
 
-The authoritative runtime registers the Gradle-built Paper command and the Admin Pet Studio. Player gameplay commands remain phased work.
+The authoritative runtime registers the Gradle-built Paper command, player vault, and Admin Pet Studio. Hatching and live pet gameplay remain phased work.
 
 ## Command entry point
 
 | Command | Alias | Permission | Current behavior |
 | --- | --- | --- | --- |
-| `/pet` | `/pets` | `omnipet.general` | Opens the player entry point or reports the current phased status. |
+| `/pet [page]` | `/pets [page]` | `omnipet.general` | Opens the paginated player vault and toggles persisted desired-active intent. |
 | `/pet admin browse` | `/pets admin browse` | `omnipet.general` + `omnipet.admin.managepet` | Opens the D/C/B/A/S definition browser and editor. |
-| `/pet admin reload` | `/pets admin reload` | `omnipet.admin.reload` | Closes Studio sessions, stages all definitions, and swaps one registry generation. |
+| `/pet admin reload` | `/pets admin reload` | `omnipet.admin.reload` | Stages config/definitions, swaps the live generation, then queues online-player limit reconciliation. |
 
-Studio Save, archive, clone-only authoring, and exact-ID hard delete mutate only definition files through the shared transaction boundary. Hard delete is blocked while YAML, egg, player, or active Studio references exist. Player data, hatching, items, and summoning remain later phases.
+Studio Save, archive, clone-only authoring, and exact-ID hard delete mutate only definition files through the shared transaction boundary. Hard delete is blocked while YAML, egg, player, or active Studio references exist. Player vault activation changes only ordered UUID intent; no renderer entity is spawned until Phase 5. Hatching, items, summoning, and slot purchase controls remain later slices.
 
 ## Descriptor defaults
 
@@ -32,4 +32,4 @@ Every Studio action checks both the viewer permission and the current session/vi
 
 ## Migration note
 
-Before cutover, export old permission groups and add the `omnipet.*` names deliberately. Do not assume the rewritten command accepts legacy `passivepet.*` grants. Preserve `petstorage.slot.%s` and other old grants for later gameplay phases rather than deleting them during migration.
+Before cutover, export old permission groups and add the `omnipet.*` names deliberately. Do not assume the rewritten command accepts legacy `passivepet.*` grants. Preserve consecutive `petstorage.slot.N` grants while migrating: the current vault resolver can consume them live according to `config.yml`.

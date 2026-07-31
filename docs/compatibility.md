@@ -20,9 +20,9 @@ OmniPet compiles with Java 21 and emits Java 21 bytecode. Paper 1.21.x probes us
 
 Do not convert these rows into `1.21.x supported`, `26.1.1+ supported`, or `latest supported`. `api-version: '1.21'` is a descriptor contract, not a binary/runtime guarantee.
 
-## Phase 1 runtime scope
+## Current runtime scope
 
-The current Paper code loads repositories, journals legacy eggs, builds a definition snapshot, registers the `/pet` command with `/pets` alias, and exercises the Admin Pet Studio inventories, tokenized chat sessions, scheduler expiry, and reflection-safe stat picker. These Studio paths have compile/unit evidence but no live-server smoke certification. Hatching, player inventories, entities, renderers, skills, economy, and progression remain deferred and have no compatibility claim.
+The current Paper code loads repositories, migrates bounded storage config, journals legacy eggs, builds a definition snapshot, registers `/pet` with `/pets` alias, and exercises Admin Pet Studio plus the player vault. Player storage I/O uses per-UUID async serialization and stale-inventory guards. These paths have compile/unit evidence but no live-server smoke certification. Hatching, entities, renderers, skills, provider-backed purchases, vendor economy adapters, and progression remain deferred and have no compatibility claim.
 
 ## Optional integrations
 
@@ -31,7 +31,7 @@ The current Paper code loads repositories, journals legacy eggs, builds a defini
 | MythicLib/MMOItems | Reflection-safe MythicLib Studio catalog; MMOItems affects provider fingerprint but item stats stay separate | GUI/catalog compile-tested only; live vendor smoke and runtime buff application remain deferred. |
 | MythicMobs skills | Not implemented | Deferred to the skill phase. |
 | ModelEngine | Domain provider value exists; no renderer adapter | Deferred; no runtime or 26.x claim. |
-| Vault/PlayerPoints/economy | Not implemented | Deferred to slot/economy phase. |
+| Vault/PlayerPoints/economy | Provider-neutral amount, journal, saga, refund, and reconciliation core only | Vendor adapters and live purchase UX remain deferred; no provider compatibility claim. |
 
 `OptionalAdapterLoader` proves a fail-closed reflection/linkage seam for absent or incompatible classes. It does not activate a vendor integration.
 

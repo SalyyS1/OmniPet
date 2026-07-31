@@ -1,0 +1,20 @@
+# OmniPet operational storage limits. Changes are staged and validated before activation.
+storage:
+  vault:
+    # Minimum effective owned-pet capacity for every player.
+    baseCapacity: 30
+    # Upper bound for configured and legacy permission-derived capacity.
+    maxCapacity: 200
+    legacyPermission:
+      # Reads consecutive petstorage.slot.N grants live; observations are never persisted.
+      enabled: true
+      template: "petstorage.slot.%s"
+      # Stops at the first missing node and never checks beyond this safe bound.
+      maxScan: 200
+  activeSlots:
+    # When false, core limits active intent to one pet without deleting stored pets.
+    multiPetEnabled: true
+    # Starting entitlement used when new player state is initialized.
+    base: 1
+    # Global clamp for purchased active-slot entitlements.
+    max: 5

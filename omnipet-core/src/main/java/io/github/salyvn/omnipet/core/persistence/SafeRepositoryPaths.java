@@ -47,6 +47,14 @@ public final class SafeRepositoryPaths {
         return requireSafe(directory.resolve(fileName));
     }
 
+    public Path resolvePlayerLock(UUID playerId) throws IOException {
+        if (playerId == null) throw new IllegalArgumentException("UUID is required");
+        Path directory = root.resolve(".locks");
+        requireSafe(directory);
+        Files.createDirectories(directory);
+        return requireSafe(directory.resolve(playerId + ".lck"));
+    }
+
     public Path resolveArchive(String id, String token) throws IOException {
         String validId = StableId.requireValid(id);
         if (token == null || token.isBlank() || token.contains("/") || token.contains("\\")) {

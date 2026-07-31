@@ -11,7 +11,7 @@ OmniPet's core gameplay does not require another plugin. Integrations are option
 | Pet food/evolver/egg/hatcher item stats | MMOItems | Deferred to the hatching/economy phases | No item integration is active in the current runtime. |
 | MMOItems expression factory | MMOItems | Deferred | No expression provider is active in the current runtime. |
 | Direct MythicMobs casting | MythicMobs | Not implemented as a direct adapter | No change to core. |
-| 3D model rendering | ModelEngine | Roadmap adapter boundary only | Built-in Paper display renderer remains active. |
+| 3D model rendering | ModelEngine | Roadmap adapter boundary only | Player vault remains usable; no live pet entity is rendered yet. |
 
 The Paper descriptor declares MythicLib and MMOItems as optional server dependencies for the catalog boundary. Live buffs, items, expressions, and gameplay hooks remain phase-gated.
 
@@ -51,7 +51,7 @@ The expression calls MythicLib's skill registry, not a direct MythicMobs adapter
 
 ## MMOItems
 
-OmniPet registers the following current stat IDs:
+The hatching/item phase plans the following stat IDs; this checkpoint does not register or consume them yet:
 
 | Stat ID | Value | Purpose |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ OmniPet registers the following current stat IDs:
 | `OMNIPET_EGG` | string | Egg ID from `eggs.yml`. |
 | `OMNIPET_EGG_HATCHER` | number | Hatch-time reduction in seconds. |
 
-For migration, OmniPet also registers and reads legacy `PASSIVEPET_*` versions of those four IDs. New templates should use `OMNIPET_*`; keep legacy templates until all issued items have been retired or converted.
+The migration plan retains legacy `PASSIVEPET_*` versions of those four IDs. Do not convert production templates until the owning item adapter ships and is smoke-tested.
 
 The optional expression factory creates MMOItems instances:
 
@@ -93,7 +93,7 @@ The future adapter must:
 - fall back to the Paper display renderer when a model or plugin is unavailable;
 - pin and smoke-test the exact ModelEngine release.
 
-Do not add `display.provider`, `model-id`, or similar fields to live pet YAML yet; the current codec accepts only `display.texture`.
+The schema 2 definition can persist provider-neutral `HEAD`/`MODELENGINE` authoring data, but no renderer consumes it yet. Keep a valid head icon for cards/fallback and do not advertise a model as live until Phase 5 ships its adapter.
 
 ## Version hazards
 

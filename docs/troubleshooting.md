@@ -17,7 +17,7 @@ An `UnsupportedClassVersionError` usually means the Java runtime is older than t
 
 ## Current runtime boundary
 
-The current release ships definition persistence, migration journaling, the `/pet` command, and the Admin Pet Studio. The egg, hatching, slot, render, trigger, economy, and player-storage sections below are future design troubleshooting notes; they are not live gameplay contracts until their roadmap phases land.
+The current release ships definition persistence, migration journaling, `/pet [page]`, the player vault/active-intent slice, and Admin Pet Studio. Egg, hatching, render, trigger, provider economy, and live pet-runtime sections below are future design troubleshooting notes until their roadmap phases land.
 
 ## Configuration fails to load
 
@@ -28,6 +28,8 @@ The current release ships definition persistence, migration journaling, the `/pe
 - Use a positive duration such as `10s`, `30m`, or `2h15m`.
 - Remove `mythiclibBuffs` or `mythiclib.*` expressions from configs that must run without MythicLib.
 - Keep ModelEngine fields out of `display`; the current schema accepts only `texture`.
+- For current storage config, require the complete `storage.vault` and `storage.activeSlots` tree shown in [Configuration](configuration.md). Unknown or partial current-schema keys fail closed.
+- A legacy file with only `globalMaxSlots` and/or `slotPermission` is migrated automatically. Inspect `config.yml.bak` after first successful boot.
 
 Test one pet file at a time. Preserve the failed file and log; do not replace player data with an empty profile to make an error disappear.
 
@@ -42,7 +44,7 @@ petstorage.slot.3
 ...
 ```
 
-Slots are consecutive. A player with slot 3 but without slot 1 still has no usable first slot. Confirm `slotPermission` was not changed during migration.
+Slots are consecutive. A player with slot 3 but without slot 1 contributes no legacy capacity. Confirm `storage.vault.legacyPermission.template` was not changed during migration and `baseCapacity` is not intentionally zero.
 
 ## `/pets` works but an admin subcommand does not
 
@@ -72,10 +74,12 @@ Do not identify eggs from lore or display names.
 
 ## Pet does not render
 
+The current vault persists desired-active UUIDs but does not spawn pet entities yet. Rendering belongs to Phase 5; changing active intent alone cannot create a visible companion in this checkpoint.
+
 - Confirm the pet has a `display.texture` URL using the Minecraft texture host.
 - Confirm the player summoned the pet from `/pets`.
 - Check for entity cleanup after world changes, death, recall, or reload.
-- ModelEngine models are not supported by the current runtime; use the Paper display renderer.
+- ModelEngine and the built-in Paper display runtime are not shipped in this checkpoint.
 
 ## Trigger does not run
 

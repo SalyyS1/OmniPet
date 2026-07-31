@@ -27,13 +27,19 @@ currentEgg: { type, timeLeft }
 capacity
 ```
 
-It emits a schema 2 envelope and:
+It emits a schema 3 envelope and:
 
 - assigns each legacy pet a deterministic UUID from player UUID, list position, and raw pet content;
 - preserves `definitionId` (`type` fallback), definition revision, raw component nodes, and unknown pet fields;
-- keeps `currentEgg`, `capacity`, and `currentPetIndex` as legacy migration hints;
-- normalizes an out-of-range `currentPetIndex` to `-1` and records a warning;
+- converts non-negative `capacity` once to the persisted `vaultCapacity` floor;
+- converts the old `currentPetIndex` once to an ordered `desiredActivePetIds` UUID list;
+- starts `activeSlotCount` at the implicit base slot and leaves `slotEntitlements` empty;
+- keeps `currentEgg` as raw incubation data for the owning phase;
+- normalizes an out-of-range `currentPetIndex` to an empty active-intent list and records a warning;
+- treats the old `capacity: -1` cache-invalid sentinel as `vaultCapacity: 0` with a warning;
 - writes the migrated file atomically, retaining the previous file as `<uuid>.yml.bak`.
+
+The canonical v3 writer removes `capacity` and `currentPetIndex` after conversion. A second read is idempotent and does not create another backup. `vaultCapacity` may be below the number of owned pets after permissions/configuration change; those pets remain read-only overflow and are never deleted. Live `petstorage.slot.N` permission grants are reconciled by the Paper storage service, not by the Bukkit-free codec.
 
 Never treat a missing/invalid player file as an empty profile. Invalid input is quarantined and the repository throws. If the main file is missing while a matching quarantine file exists, reads and mutations fail closed until an operator explicitly restores or recovers the data.
 
@@ -64,7 +70,7 @@ The command entry point checks `omnipet.general`, while Studio branches addition
 1. Stop the server and archive both plugin folders.
 2. Copy legacy files into a clean target layout without merging conflicting player folders.
 3. Start the foundation on staging and inspect every migration warning/error.
-4. Verify schema 2 output, `.bak` files, raw unknown nodes, journal hash, and quarantine contents.
+4. Verify schema 3 output, `.bak` files, raw unknown nodes, journal hash, and quarantine contents.
 5. Verify `/pet` and `/pets` only after the plugin reports foundation initialization.
 6. Keep full gameplay migration steps deferred until the owning phases implement hatching, slots, GUI, and runtime services.
 

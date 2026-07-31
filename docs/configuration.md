@@ -9,7 +9,7 @@ OmniPet reads YAML from `plugins/OmniPet/`. Files are UTF-8 and user-visible tex
 The following names are persistent or referenced across files. Do not rename them casually:
 
 - Files: `config.yml`, `eggs.yml`, `gui.yml`, `items.yml`, `lang.yml`, `pets/*.yml`.
-- Global keys: `globalMaxSlots`, `slotPermission`.
+- Storage keys: `storage.vault` and `storage.activeSlots`.
 - Egg keys: `name`, `duration`, `rarity`, `pets`.
 - Component IDs: `general`, `display`, `hatching`, `leveling`, `stamina`, `trigger`, optional `mythiclibBuffs`.
 - User IDs: pet filenames, egg map keys, food map keys, and hatcher map keys.
@@ -17,6 +17,29 @@ The following names are persistent or referenced across files. Do not rename the
 - Trigger IDs: `walk`, `interval`, `interact`, `punch`, `takingDamage`, `release`.
 
 Renaming a pet filename changes its ID and can break eggs, player saves, commands, expressions, and items.
+
+## Player storage schema
+
+Player files use schema 3. These fields are canonical persistence contracts, not renderer/entity state:
+
+```yaml
+schemaVersion: 3
+uuid: eb70fc61-28ae-4a9f-9bda-a44e4d68101c
+revision: 4
+pets: []
+vaultCapacity: 12
+activeSlotCount: 1
+desiredActivePetIds: []
+slotEntitlements: []
+```
+
+- `vaultCapacity` is a persisted compatibility floor; configured capacity may increase the effective limit.
+- `activeSlotCount` is unlocked ownership. Disabling multi-pet clamps runtime use to one without deleting entitlements.
+- `desiredActivePetIds` is an ordered list of owned pet UUIDs. Runtime entities are derived later and are never persisted here.
+- `slotEntitlements` records slot, source, transaction/reference ID, and preserved provider extension data.
+- A lower vault limit never deletes pets. Existing overflow is read-only until capacity is restored.
+
+Economy provider configuration and purchase GUI syntax remain non-authoritative until the rest of Phase 4 ships.
 
 ## Admin Pet Studio
 
@@ -36,14 +59,26 @@ The Studio is code-owned and deliberately does not require a second GUI YAML sch
 ## `config.yml`
 
 ```yaml
-# Hard ceiling for the generated slot permission list.
-globalMaxSlots: 1000
-
-# %s becomes the 1-based slot number.
-slotPermission: petstorage.slot.%s
+storage:
+  vault:
+    baseCapacity: 30
+    maxCapacity: 200
+    legacyPermission:
+      enabled: true
+      template: "petstorage.slot.%s"
+      maxScan: 200
+  activeSlots:
+    multiPetEnabled: true
+    base: 1
+    max: 5
 ```
 
-Keep the default permission template during migration unless every group and user grant is updated at the same time.
+- `baseCapacity` is the minimum configured vault size; `maxCapacity` bounds configuration and legacy permission-derived capacity.
+- Legacy permission checks are consecutive and stop at the first missing `petstorage.slot.N` node. Disable the resolver explicitly when those grants are no longer used.
+- `base` is the active-slot floor for new/reconciled profiles; `max` clamps purchased entitlements. Turning `multiPetEnabled` off recalls ordered overflow without deleting pets or entitlements.
+- The loader validates the complete tree before replacing the live snapshot. Unknown keys, unsafe permission templates, inverted limits, and unsupported sizes fail closed.
+
+Old files containing optional `globalMaxSlots` and/or `slotPermission` keys are accepted once and rewritten atomically to this schema. Missing old keys use the original defaults (`1000` and `petstorage.slot.%s`); `globalMaxSlots: 0` becomes a zero-capacity vault with legacy scanning disabled. The original remains as `config.yml.bak`. Keep the permission template stable unless all grants are migrated together.
 
 ## `eggs.yml`
 
@@ -239,4 +274,4 @@ Preserve placeholders when translating. A missing placeholder may remove useful 
 - Every optional component/provider has its plugin installed.
 - Every expression returns the type expected by its field.
 - Menu size and placeholders are valid.
-- A clean staging start and `/pets admin reload` complete without errors.
+- A clean staging start succeeds and `/pets admin reload` reports config/definition activation; inspect logs for the queued online-player reconciliation result.
