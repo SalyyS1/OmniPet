@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -44,6 +45,8 @@ import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
 import io.github.salyvn.omnipet.paper.player.PlayerStorageLifecycleListener;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioListener;
+import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
+import io.github.salyvn.omnipet.paper.task.PlayerTaskShutdown;
 
 public final class OmniPetPlugin extends JavaPlugin {
     private PlayerStateRepository playerStates;
@@ -52,6 +55,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PaperStatCatalogContext statCatalog;
     private PlayerPetController playerPets;
     private PlayerSlotPurchaseController slotPurchases;
+    private PerPlayerTaskQueue playerTasks;
     private PaperEconomyProviderRegistry economyProviders;
     private PaperLuckPermsEntitlementRegistry luckPermsEntitlements;
     private SlotTransactionAdminController transactionAdmin;
@@ -84,6 +88,8 @@ public final class OmniPetPlugin extends JavaPlugin {
                     playerStates::referenceScan,
                     PetReferenceScanner.yamlFiles(java.util.List.of(dataRoot.resolve("eggs.yml")))), statCatalog);
             PaperStorageLimitsResolver limitsResolver = new PaperStorageLimitsResolver(phase4Config);
+            playerTasks = new PerPlayerTaskQueue(task ->
+                    getServer().getScheduler().runTaskAsynchronously(this, task));
             economyProviders = new PaperEconomyProviderRegistry(this);
             luckPermsEntitlements = new PaperLuckPermsEntitlementRegistry(this);
             economyProviders.refresh();
@@ -100,11 +106,13 @@ public final class OmniPetPlugin extends JavaPlugin {
                     slotUnlocks,
                     economyProviders,
                     entitlementSync,
-                    limitsResolver);
+                    limitsResolver,
+                    playerTasks);
             playerPets = new PlayerPetController(
                     this,
                     new RepositoryPetStorageService(playerStates),
-                    limitsResolver);
+                    limitsResolver,
+                    playerTasks);
             transactionAdmin = new SlotTransactionAdminController(
                     this,
                     new SlotPurchaseReconciliationService(playerStates, purchaseJournal, purchaseTransactions),
@@ -130,11 +138,26 @@ public final class OmniPetPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (playerPets != null) playerPets.closeAll();
-        if (economyProviders != null) economyProviders.close();
-        if (slotPurchases != null) slotPurchases.close();
+        try {
+            boolean idle = PlayerTaskShutdown.stopAndDrain(
+                    () -> {
+                        if (playerPets != null) playerPets.closeAll();
+                        if (slotPurchases != null) slotPurchases.close();
+                    },
+                    () -> {
+                        if (economyProviders != null) economyProviders.close();
+                        if (luckPermsEntitlements != null) luckPermsEntitlements.invalidate();
+                    },
+                    playerTasks,
+                    Duration.ofSeconds(10));
+            if (!idle) {
+                getLogger().severe("Timed out waiting for accepted player mutations during disable.");
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            getLogger().severe("Interrupted while waiting for accepted player mutations during disable.");
+        }
         if (transactionAdmin != null) transactionAdmin.close();
-        if (luckPermsEntitlements != null) luckPermsEntitlements.invalidate();
         if (studio != null) studio.onDisable();
     }
 

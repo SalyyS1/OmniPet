@@ -1,12 +1,12 @@
 package io.github.salyvn.omnipet.paper.player;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -26,9 +26,11 @@ import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseMenuRenderer;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
+import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
+import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
 
 public final class PlayerSlotPurchaseController {
-    private static final String VIEW_TASK = "slot-purchase-view";
+    private static final String VIEW_TASK = "slot:view";
 
     private final JavaPlugin plugin;
     private final PlayerStateRepository playerStates;
@@ -36,8 +38,8 @@ public final class PlayerSlotPurchaseController {
     private final PaperEconomyProviderRegistry providers;
     private final SlotEntitlementSynchronizer entitlements;
     private final SlotPurchaseMenuRenderer renderer = new SlotPurchaseMenuRenderer();
-    private final PlayerPetAsyncQueue queue;
-    private final PlayerPetRequestTracker requests = new PlayerPetRequestTracker();
+    private final PerPlayerTaskQueue taskQueue;
+    private final PlayerRequestTracker requests = new PlayerRequestTracker();
     private final Set<UUID> mutations = ConcurrentHashMap.newKeySet();
     private volatile PaperStorageLimitsResolver limitsResolver;
     private volatile boolean shuttingDown;
@@ -48,15 +50,15 @@ public final class PlayerSlotPurchaseController {
             SlotUnlockService purchases,
             PaperEconomyProviderRegistry providers,
             SlotEntitlementSynchronizer entitlements,
-            PaperStorageLimitsResolver limitsResolver) {
+            PaperStorageLimitsResolver limitsResolver,
+            PerPlayerTaskQueue taskQueue) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.playerStates = Objects.requireNonNull(playerStates, "player state repository");
         this.purchases = Objects.requireNonNull(purchases, "slot unlock service");
         this.providers = Objects.requireNonNull(providers, "economy provider registry");
         this.entitlements = Objects.requireNonNull(entitlements, "slot entitlement synchronizer");
         this.limitsResolver = Objects.requireNonNull(limitsResolver, "storage limits resolver");
-        this.queue = new PlayerPetAsyncQueue(task ->
-                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, task));
+        this.taskQueue = Objects.requireNonNull(taskQueue, "player task queue");
     }
 
     public void updateLimitsResolver(PaperStorageLimitsResolver next) {
@@ -65,6 +67,7 @@ public final class PlayerSlotPurchaseController {
 
     public void open(Player player, int returnPage) {
         Objects.requireNonNull(player, "player");
+        if (shuttingDown) return;
         PaperStorageLimitsResolver resolver = limitsResolver;
         Phase4PaperConfig.ActiveSlots config = resolver.activeSlots();
         var observedLimits = resolver.resolve(player::hasPermission).limits();
@@ -75,7 +78,8 @@ public final class PlayerSlotPurchaseController {
         long request = requests.begin(playerId);
         Inventory expectedTop = player.getOpenInventory().getTopInventory();
         try {
-            queue.submitLatest(playerId, VIEW_TASK, () -> {
+            boolean accepted = taskQueue.submitLatest(playerId, VIEW_TASK, () -> {
+                if (shuttingDown || !requests.isCurrent(playerId, request)) return;
                 try {
                 var state = playerStates.snapshot(playerId);
                 if (state.activeSlotCount() < config.base()) {
@@ -140,8 +144,11 @@ public final class PlayerSlotPurchaseController {
                             () -> fail(player, "slot options could not be loaded", failure));
                 }
             });
+            if (!accepted && !shuttingDown) {
+                fail(player, "slot options could not be scheduled", new IllegalStateException("queue closed"));
+            }
         } catch (RuntimeException failure) {
-            fail(player, "slot options could not be scheduled", failure);
+            if (!shuttingDown) fail(player, "slot options could not be scheduled", failure);
         }
     }
 
@@ -149,6 +156,7 @@ public final class PlayerSlotPurchaseController {
             Player player,
             SlotPurchaseInventoryHolder holder,
             SlotPurchaseInventoryHolder.Action action) {
+        if (shuttingDown) return;
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (!isCurrent(player, holder)) return;
             switch (action.type()) {
@@ -166,14 +174,10 @@ public final class PlayerSlotPurchaseController {
     public void close() {
         shuttingDown = true;
         requests.clear();
-        queue.shutdown();
-        try {
-            if (!queue.awaitIdle(Duration.ofSeconds(10))) {
-                plugin.getLogger().severe("Timed out waiting for accepted slot purchases during disable.");
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getOpenInventory().getTopInventory().getHolder() instanceof SlotPurchaseInventoryHolder) {
+                player.closeInventory();
             }
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            plugin.getLogger().severe("Interrupted while waiting for accepted slot purchases.");
         }
         mutations.clear();
     }
@@ -205,7 +209,7 @@ public final class PlayerSlotPurchaseController {
         Inventory expectedTop = holder.getInventory();
         long request = requests.begin(playerId);
         try {
-            boolean accepted = queue.submit(playerId, () -> purchaseAsync(
+            boolean accepted = taskQueue.submit(playerId, () -> purchaseAsync(
                     player, holder, action, config, request, expectedTop));
             if (!accepted) mutations.remove(playerId);
         } catch (RuntimeException failure) {

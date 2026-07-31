@@ -1,7 +1,6 @@
 package io.github.salyvn.omnipet.paper.player;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -22,16 +21,17 @@ import io.github.salyvn.omnipet.core.storage.RepositoryPetStorageService;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuRenderer;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
+import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
+import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
 
 public final class PlayerPetController {
-    private static final String VAULT_VIEW_TASK = "vault-view";
-    private static final String LIMIT_RECONCILE_TASK = "limit-reconcile";
+    private static final String VAULT_VIEW_TASK = "vault:view";
 
     private final JavaPlugin plugin;
     private final RepositoryPetStorageService storage;
     private final PlayerPetMenuRenderer renderer;
-    private final PlayerPetAsyncQueue asyncQueue;
-    private final PlayerPetRequestTracker requests;
+    private final PerPlayerTaskQueue taskQueue;
+    private final PlayerRequestTracker requests;
     private final Set<UUID> mutationsInFlight;
     private volatile PaperStorageLimitsResolver limitsResolver;
     private volatile boolean shuttingDown;
@@ -39,14 +39,14 @@ public final class PlayerPetController {
     public PlayerPetController(
             JavaPlugin plugin,
             RepositoryPetStorageService storage,
-            PaperStorageLimitsResolver limitsResolver) {
+            PaperStorageLimitsResolver limitsResolver,
+            PerPlayerTaskQueue taskQueue) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.storage = Objects.requireNonNull(storage, "storage");
         this.limitsResolver = Objects.requireNonNull(limitsResolver, "storage limits resolver");
         this.renderer = new PlayerPetMenuRenderer();
-        this.asyncQueue = new PlayerPetAsyncQueue(task ->
-                plugin.getServer().getScheduler().runTaskAsynchronously(plugin, task));
-        this.requests = new PlayerPetRequestTracker();
+        this.taskQueue = Objects.requireNonNull(taskQueue, "player task queue");
+        this.requests = new PlayerRequestTracker();
         this.mutationsInFlight = ConcurrentHashMap.newKeySet();
     }
 
@@ -56,6 +56,7 @@ public final class PlayerPetController {
 
     public void openVault(Player player, int page) {
         Objects.requireNonNull(player, "player");
+        if (shuttingDown) return;
         UUID playerId = player.getUniqueId();
         PetStorageLimits limits;
         try {
@@ -67,7 +68,7 @@ public final class PlayerPetController {
         long request = requests.begin(playerId);
         Inventory expectedTop = player.getOpenInventory().getTopInventory();
         try {
-            asyncQueue.submitLatest(playerId, VAULT_VIEW_TASK, () -> {
+            boolean accepted = taskQueue.submitLatest(playerId, VAULT_VIEW_TASK, () -> {
                 if (shuttingDown || !requests.isCurrent(playerId, request)) return;
                 try {
                     var snapshot = storage.snapshot(playerId, limits);
@@ -77,6 +78,9 @@ public final class PlayerPetController {
                     failAsync(player, playerId, request, "vault could not be loaded", failure);
                 }
             });
+            if (!accepted && !shuttingDown) {
+                failClosed(player, "vault request could not be scheduled", new IllegalStateException("queue closed"));
+            }
         } catch (RuntimeException failure) {
             if (!shuttingDown) failClosed(player, "vault request could not be scheduled", failure);
         }
@@ -89,6 +93,7 @@ public final class PlayerPetController {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(holder, "holder");
         Objects.requireNonNull(action, "action");
+        if (shuttingDown) return;
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (!isCurrentVault(player, holder)) return;
             switch (action.type()) {
@@ -102,6 +107,7 @@ public final class PlayerPetController {
 
     public void reconcile(Player player) {
         Objects.requireNonNull(player, "player");
+        if (shuttingDown) return;
         UUID playerId = player.getUniqueId();
         PetStorageLimits limits;
         try {
@@ -111,8 +117,11 @@ public final class PlayerPetController {
             return;
         }
         try {
-            asyncQueue.submitLatest(playerId, LIMIT_RECONCILE_TASK,
-                    () -> reconcileAsync(player, playerId, limits));
+            boolean accepted = taskQueue.submit(playerId, () -> reconcileAsync(player, playerId, limits));
+            if (!accepted && !shuttingDown) {
+                reportFailure(player, "storage reconciliation could not be scheduled",
+                        new IllegalStateException("queue closed"));
+            }
         } catch (RuntimeException failure) {
             if (!shuttingDown) reportFailure(player, "storage reconciliation could not be scheduled", failure);
         }
@@ -125,19 +134,10 @@ public final class PlayerPetController {
     public void closeAll() {
         shuttingDown = true;
         requests.clear();
-        asyncQueue.shutdown();
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.getOpenInventory().getTopInventory().getHolder() instanceof PlayerPetInventoryHolder) {
                 player.closeInventory();
             }
-        }
-        try {
-            if (!asyncQueue.awaitIdle(Duration.ofSeconds(10))) {
-                plugin.getLogger().severe("Timed out waiting for active player storage writes to finish during disable.");
-            }
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            plugin.getLogger().severe("Interrupted while waiting for active player storage writes during disable.");
         }
         mutationsInFlight.clear();
     }
@@ -160,7 +160,7 @@ public final class PlayerPetController {
         long request = requests.begin(playerId);
         boolean accepted;
         try {
-            accepted = asyncQueue.submit(playerId, () -> {
+            accepted = taskQueue.submit(playerId, () -> {
                 try {
                     PetStorageResult result = action.active()
                             ? storage.deactivate(playerId, holder.expectedRevision(), action.petId(), limits)
@@ -193,9 +193,7 @@ public final class PlayerPetController {
         try {
             PetStorageResult result = null;
             for (int attempt = 0; attempt < 2; attempt++) {
-                if (shuttingDown) return;
                 var snapshot = storage.snapshot(playerId, limits);
-                if (shuttingDown) return;
                 try {
                     result = storage.reconcileLimits(playerId, snapshot.revision(), limits);
                     break;
