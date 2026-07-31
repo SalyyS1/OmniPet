@@ -9,6 +9,7 @@ public record SlotPurchaseTransaction(
         long expectedRevision,
         int slot,
         EconomyAmount amount,
+        boolean externalEntitlementRequired,
         SlotPurchaseSagaState state,
         EconomyOperationResult withdrawal,
         EconomyOperationResult refund,
@@ -25,12 +26,20 @@ public record SlotPurchaseTransaction(
     }
 
     public static SlotPurchaseTransaction prepared(UUID transactionId, SlotPurchaseQuote quote) {
+        return prepared(transactionId, quote, false);
+    }
+
+    public static SlotPurchaseTransaction prepared(
+            UUID transactionId,
+            SlotPurchaseQuote quote,
+            boolean externalEntitlementRequired) {
         return new SlotPurchaseTransaction(
                 transactionId,
                 quote.playerId(),
                 quote.expectedRevision(),
                 quote.rule().slot(),
                 quote.rule().amount(),
+                externalEntitlementRequired,
                 SlotPurchaseSagaState.PREPARED,
                 null,
                 null,
@@ -55,6 +64,7 @@ public record SlotPurchaseTransaction(
                 expectedRevision,
                 slot,
                 amount,
+                externalEntitlementRequired,
                 nextState,
                 nextWithdrawal,
                 nextRefund,

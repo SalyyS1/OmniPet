@@ -27,12 +27,36 @@ public final class PaperStorageLimitsResolver {
                 legacyPermissions.resolve(config.vault().legacyPermission(), hasPermission);
         int legacyCapacity = Math.min(config.vault().maxCapacity(), legacy.consecutiveGrantedSlots());
         int configuredVaultCapacity = Math.max(config.vault().baseCapacity(), legacyCapacity);
+        int externalActiveSlots = resolveExternalActiveSlots(hasPermission);
         PetStorageLimits limits = new PetStorageLimits(
                 configuredVaultCapacity,
                 config.activeSlots().base(),
                 config.activeSlots().max(),
-                config.activeSlots().multiPetEnabled());
+                config.activeSlots().multiPetEnabled(),
+                externalActiveSlots,
+                config.activeSlots().entitlement().policy());
         return new Resolution(limits, legacy);
+    }
+
+    public Phase4PaperConfig.ActiveSlots activeSlots() {
+        return config.activeSlots();
+    }
+
+    private int resolveExternalActiveSlots(Predicate<String> hasPermission) {
+        int slots = config.activeSlots().base();
+        switch (config.activeSlots().entitlement().policy().mode()) {
+            case OMNIPET -> {
+                return slots;
+            }
+            case LUCKPERMS, HYBRID -> {
+                for (int slot = slots + 1; slot <= config.activeSlots().max(); slot++) {
+                    if (!hasPermission.test(config.activeSlots().entitlement().permissionNode(slot))) break;
+                    slots = slot;
+                }
+                return slots;
+            }
+        }
+        throw new IllegalStateException("unsupported slot entitlement mode");
     }
 
     public record Resolution(

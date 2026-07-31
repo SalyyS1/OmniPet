@@ -23,10 +23,14 @@ final class SlotPurchaseRecovery {
         SlotPurchaseResult completed = completeIfEntitled(transaction);
         if (completed != null) return completed;
         return switch (transaction.state()) {
-            case PREPARED -> preparedPurchase.purchase(transactionId, SlotPurchaseSagaSupport.quoteFrom(transaction));
+            case PREPARED -> preparedPurchase.purchase(
+                    transactionId,
+                    SlotPurchaseSagaSupport.quoteFrom(transaction),
+                    transaction.externalEntitlementRequired());
             case EXTERNAL_PENDING -> recoverExternalPending(transaction);
-            case REFUND_PENDING -> markUnknown(transaction, "refund commit cannot be proven");
-            case ENTITLEMENT_PERSISTED, COMPLETED -> markUnknown(transaction, "journal completion has no matching entitlement");
+            case REFUND_PENDING -> recoverRefundPending(transaction);
+            case ENTITLEMENT_PERSISTED, ENTITLEMENT_SYNC_PENDING, COMPLETED ->
+                    markUnknown(transaction, "journal completion has no matching entitlement");
             case FAILED -> transaction.withdrawal() != null && transaction.withdrawal().provenSuccess()
                     ? refund(transaction, "retrying a proven failed refund")
                     : resultForState(transaction);
@@ -39,16 +43,21 @@ final class SlotPurchaseRecovery {
         if (completed != null) return completed;
         if (transaction.state() == SlotPurchaseSagaState.PREPARED) return null;
         if (transaction.state() == SlotPurchaseSagaState.ENTITLEMENT_PERSISTED
+                || transaction.state() == SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING
                 || transaction.state() == SlotPurchaseSagaState.COMPLETED) {
             return markUnknown(transaction, "journal completion has no matching entitlement");
         }
         return resultForState(transaction);
     }
 
-    SlotPurchaseResult resolveAfterStale(UUID transactionId, SlotPurchaseQuote quote) throws IOException {
+    SlotPurchaseResult resolveAfterStale(
+            UUID transactionId,
+            SlotPurchaseQuote quote) throws IOException {
         Optional<SlotPurchaseTransaction> found = support.find(transactionId);
         if (found.isEmpty()) return result(SlotPurchaseResult.Status.STALE_QUOTE, null, "quote revision is stale");
-        if (!found.get().matches(quote)) return result(SlotPurchaseResult.Status.INVALID_TRANSACTION, found.get(), "transaction payload differs");
+        if (!found.get().matches(quote)) {
+            return result(SlotPurchaseResult.Status.INVALID_TRANSACTION, found.get(), "transaction payload differs");
+        }
         SlotPurchaseResult resolved = resolveKnown(found.get());
         return resolved == null ? result(SlotPurchaseResult.Status.STALE_QUOTE, found.get(), "quote revision is stale") : resolved;
     }
@@ -71,6 +80,18 @@ final class SlotPurchaseRecovery {
                 transaction.refund(),
                 "slot entitlement persisted");
         support.save(persisted);
+        if (persisted.externalEntitlementRequired()) {
+            SlotPurchaseTransaction pending = persisted.withState(
+                    SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING,
+                    persisted.withdrawal(),
+                    persisted.refund(),
+                    "external entitlement synchronization pending");
+            support.save(pending);
+            return result(
+                    SlotPurchaseResult.Status.ENTITLEMENT_SYNC_PENDING,
+                    pending,
+                    pending.detail());
+        }
         SlotPurchaseTransaction completed = persisted.withState(
                 SlotPurchaseSagaState.COMPLETED,
                 persisted.withdrawal(),
@@ -101,7 +122,9 @@ final class SlotPurchaseRecovery {
         EconomyOperationResult refund = support.refund(pending);
         SlotPurchaseSagaState state = refund.provenSuccess()
                 ? SlotPurchaseSagaState.REFUNDED
-                : refund.ambiguous() ? SlotPurchaseSagaState.UNKNOWN_REQUIRES_RECONCILIATION : SlotPurchaseSagaState.FAILED;
+                : refund.ambiguous()
+                        ? SlotPurchaseSagaState.UNKNOWN_REQUIRES_RECONCILIATION
+                        : SlotPurchaseSagaState.REFUND_PENDING;
         SlotPurchaseTransaction updated = pending.withState(
                 state,
                 pending.withdrawal(),
@@ -115,9 +138,29 @@ final class SlotPurchaseRecovery {
 
     private SlotPurchaseResult completeIfEntitled(SlotPurchaseTransaction transaction) throws IOException {
         PlayerState state = playerStates.snapshot(transaction.playerId());
-        return SlotPurchaseSagaSupport.hasTransactionEntitlement(state, transaction.transactionId())
-                ? completePersisted(transaction)
-                : null;
+        if (!SlotPurchaseSagaSupport.hasTransactionEntitlement(state, transaction.transactionId())) return null;
+        if (transaction.state() == SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING
+                || transaction.state() == SlotPurchaseSagaState.COMPLETED) {
+            return resultForState(transaction);
+        }
+        return completePersisted(transaction);
+    }
+
+    private SlotPurchaseResult recoverRefundPending(SlotPurchaseTransaction transaction) throws IOException {
+        EconomyOperationResult refund = transaction.refund();
+        if (refund == null || refund.ambiguous()) {
+            return markUnknown(transaction, "refund commit cannot be proven");
+        }
+        if (refund.provenSuccess()) {
+            SlotPurchaseTransaction refunded = transaction.withState(
+                    SlotPurchaseSagaState.REFUNDED,
+                    transaction.withdrawal(),
+                    refund,
+                    refund.evidence());
+            support.save(refunded);
+            return result(SlotPurchaseResult.Status.PERSISTENCE_FAILED_REFUNDED, refunded, refunded.detail());
+        }
+        return refund(transaction, "retrying a proven incomplete refund");
     }
 
     private SlotPurchaseResult markUnknown(SlotPurchaseTransaction transaction, String detail) throws IOException {
@@ -134,10 +177,13 @@ final class SlotPurchaseRecovery {
         SlotPurchaseResult.Status status = switch (transaction.state()) {
             case COMPLETED -> SlotPurchaseResult.Status.COMPLETED;
             case PREPARED, ENTITLEMENT_PERSISTED -> SlotPurchaseResult.Status.IN_PROGRESS;
+            case ENTITLEMENT_SYNC_PENDING -> SlotPurchaseResult.Status.ENTITLEMENT_SYNC_PENDING;
             case EXTERNAL_PENDING -> transaction.withdrawal() == null || !transaction.withdrawal().ambiguous()
                     ? SlotPurchaseResult.Status.IN_PROGRESS
                     : SlotPurchaseResult.Status.UNKNOWN_REQUIRES_RECONCILIATION;
-            case REFUND_PENDING -> SlotPurchaseResult.Status.UNKNOWN_REQUIRES_RECONCILIATION;
+            case REFUND_PENDING -> transaction.refund() != null && !transaction.refund().ambiguous()
+                    ? SlotPurchaseResult.Status.REFUND_FAILED_REQUIRES_RECOVERY
+                    : SlotPurchaseResult.Status.UNKNOWN_REQUIRES_RECONCILIATION;
             case UNKNOWN_REQUIRES_RECONCILIATION -> SlotPurchaseResult.Status.UNKNOWN_REQUIRES_RECONCILIATION;
             case REFUNDED -> SlotPurchaseResult.Status.PERSISTENCE_FAILED_REFUNDED;
             case FAILED -> failureStatus(transaction);
@@ -162,6 +208,9 @@ final class SlotPurchaseRecovery {
 
     @FunctionalInterface
     interface PreparedPurchase {
-        SlotPurchaseResult purchase(UUID transactionId, SlotPurchaseQuote quote) throws IOException;
+        SlotPurchaseResult purchase(
+                UUID transactionId,
+                SlotPurchaseQuote quote,
+                boolean externalEntitlementRequired) throws IOException;
     }
 }

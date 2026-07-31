@@ -18,6 +18,10 @@ import io.github.salyvn.omnipet.core.persistence.PlayerStateRepository;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository;
 import io.github.salyvn.omnipet.core.persistence.PetReferenceScanner;
 import io.github.salyvn.omnipet.core.persistence.YamlPetDefinitionRepository;
+import io.github.salyvn.omnipet.core.economy.FilePurchaseJournal;
+import io.github.salyvn.omnipet.core.economy.PurchaseTransactionCoordinator;
+import io.github.salyvn.omnipet.core.economy.SlotPurchaseReconciliationService;
+import io.github.salyvn.omnipet.core.economy.SlotUnlockService;
 import io.github.salyvn.omnipet.core.storage.RepositoryPetStorageService;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrationResult;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrator;
@@ -28,9 +32,15 @@ import io.github.salyvn.omnipet.paper.catalog.ReflectiveMythicLibStatCatalogSour
 import io.github.salyvn.omnipet.paper.catalog.StatCatalogLifecycleListener;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfig;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfigLoader;
+import io.github.salyvn.omnipet.paper.economy.EconomyProviderLifecycleListener;
+import io.github.salyvn.omnipet.paper.economy.PaperEconomyProviderRegistry;
+import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
+import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegistry;
+import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
+import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
 import io.github.salyvn.omnipet.paper.player.PlayerStorageLifecycleListener;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioListener;
@@ -41,6 +51,10 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PetStudioController studio;
     private PaperStatCatalogContext statCatalog;
     private PlayerPetController playerPets;
+    private PlayerSlotPurchaseController slotPurchases;
+    private PaperEconomyProviderRegistry economyProviders;
+    private PaperLuckPermsEntitlementRegistry luckPermsEntitlements;
+    private SlotTransactionAdminController transactionAdmin;
     private Path configFile;
 
     @Override
@@ -60,6 +74,8 @@ public final class OmniPetPlugin extends JavaPlugin {
             migrateLegacyEggDefinitions(dataRoot);
             YamlPetDefinitionRepository definitions = new YamlPetDefinitionRepository(dataRoot.resolve("pets"));
             playerStates = new FilePlayerStateRepository(dataRoot.resolve("data/players"));
+            FilePurchaseJournal purchaseJournal = new FilePurchaseJournal(dataRoot.resolve("data/purchases"));
+            PurchaseTransactionCoordinator purchaseTransactions = new PurchaseTransactionCoordinator();
             registry = new InMemoryRegistrySnapshotRepository();
             var snapshot = new FoundationRegistryLoader().load(definitions, registry);
             statCatalog = new PaperStatCatalogContext(new ReflectiveMythicLibStatCatalogSource(
@@ -67,14 +83,42 @@ public final class OmniPetPlugin extends JavaPlugin {
             studio = new PetStudioController(this, definitions, registry, java.util.List.of(
                     playerStates::referenceScan,
                     PetReferenceScanner.yamlFiles(java.util.List.of(dataRoot.resolve("eggs.yml")))), statCatalog);
+            PaperStorageLimitsResolver limitsResolver = new PaperStorageLimitsResolver(phase4Config);
+            economyProviders = new PaperEconomyProviderRegistry(this);
+            luckPermsEntitlements = new PaperLuckPermsEntitlementRegistry(this);
+            economyProviders.refresh();
+            luckPermsEntitlements.refresh();
+            SlotUnlockService slotUnlocks = new SlotUnlockService(
+                    playerStates,
+                    purchaseJournal,
+                    economyProviders,
+                    purchaseTransactions);
+            SlotEntitlementSynchronizer entitlementSync = new SlotEntitlementSynchronizer(luckPermsEntitlements);
+            slotPurchases = new PlayerSlotPurchaseController(
+                    this,
+                    playerStates,
+                    slotUnlocks,
+                    economyProviders,
+                    entitlementSync,
+                    limitsResolver);
             playerPets = new PlayerPetController(
                     this,
                     new RepositoryPetStorageService(playerStates),
-                    new PaperStorageLimitsResolver(phase4Config));
+                    limitsResolver);
+            transactionAdmin = new SlotTransactionAdminController(
+                    this,
+                    new SlotPurchaseReconciliationService(playerStates, purchaseJournal, purchaseTransactions),
+                    slotUnlocks,
+                    entitlementSync,
+                    phase4Config.activeSlots());
             getServer().getPluginManager().registerEvents(new PetStudioListener(studio), this);
             getServer().getPluginManager().registerEvents(new StatCatalogLifecycleListener(statCatalog), this);
-            getServer().getPluginManager().registerEvents(new PlayerPetMenuListener(playerPets), this);
+            getServer().getPluginManager().registerEvents(new PlayerPetMenuListener(playerPets, slotPurchases), this);
             getServer().getPluginManager().registerEvents(new PlayerStorageLifecycleListener(playerPets), this);
+            getServer().getPluginManager().registerEvents(new EconomyProviderLifecycleListener(
+                    this,
+                    economyProviders,
+                    luckPermsEntitlements), this);
             registerCommands();
             getServer().getOnlinePlayers().forEach(playerPets::reconcile);
             getLogger().info("OmniPet enabled with Pet Studio and " + snapshot.definitions().size() + " definitions.");
@@ -87,6 +131,10 @@ public final class OmniPetPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (playerPets != null) playerPets.closeAll();
+        if (economyProviders != null) economyProviders.close();
+        if (slotPurchases != null) slotPurchases.close();
+        if (transactionAdmin != null) transactionAdmin.close();
+        if (luckPermsEntitlements != null) luckPermsEntitlements.invalidate();
         if (studio != null) studio.onDisable();
     }
 
@@ -108,14 +156,22 @@ public final class OmniPetPlugin extends JavaPlugin {
                 event.registrar().register(
                         FoundationCommandContract.NAME,
                         FoundationCommandContract.ALIASES,
-                        new OmniPetCommand(studio, playerPets, this::reloadRuntime)));
+                        new OmniPetCommand(
+                                studio,
+                                playerPets,
+                                transactionAdmin,
+                                slotPurchases,
+                                this::reloadRuntime)));
     }
 
     private boolean reloadRuntime() {
         try {
             Phase4PaperConfig stagedConfig = loadPhase4Config();
             if (!studio.reload()) return false;
-            playerPets.updateLimitsResolver(new PaperStorageLimitsResolver(stagedConfig));
+            PaperStorageLimitsResolver nextLimits = new PaperStorageLimitsResolver(stagedConfig);
+            playerPets.updateLimitsResolver(nextLimits);
+            slotPurchases.updateLimitsResolver(nextLimits);
+            transactionAdmin.updateActiveSlots(stagedConfig.activeSlots());
             getServer().getOnlinePlayers().forEach(playerPets::reconcile);
             return true;
         } catch (IOException | RuntimeException failure) {

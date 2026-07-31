@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 
 import io.github.salyvn.omnipet.core.domain.PlayerState;
 import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
+import io.github.salyvn.omnipet.core.storage.SlotEntitlementMode;
+import io.github.salyvn.omnipet.core.storage.SlotEntitlementPolicy;
+import io.github.salyvn.omnipet.core.storage.SlotEntitlementPrecedence;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfig;
 
 class PaperStorageLimitsResolverTest {
@@ -67,6 +70,32 @@ class PaperStorageLimitsResolverTest {
 
         assertEquals(2, limits.configuredActiveSlotFloor());
         assertEquals(2, limits.effectiveActiveSlotCount(state(0, 1)));
+    }
+
+    @Test
+    void luckPermsAuthoritativeModeUsesConsecutiveObservedNodes() {
+        Phase4PaperConfig config = new Phase4PaperConfig(
+                new Phase4PaperConfig.Vault(
+                        30,
+                        200,
+                        new Phase4PaperConfig.LegacyPermission(false, "petstorage.slot.%s", 200)),
+                new Phase4PaperConfig.ActiveSlots(
+                        true,
+                        1,
+                        5,
+                        new Phase4PaperConfig.Entitlement(
+                                new SlotEntitlementPolicy(
+                                        SlotEntitlementMode.LUCKPERMS,
+                                        SlotEntitlementPrecedence.LUCKPERMS_AUTHORITATIVE),
+                                "omnipet.slot.unlocked.%s"),
+                        Map.of()));
+
+        PetStorageLimits limits = new PaperStorageLimitsResolver(config)
+                .resolve(node -> node.endsWith(".2") || node.endsWith(".3"))
+                .limits();
+
+        assertEquals(3, limits.observedExternalActiveSlotCount());
+        assertEquals(3, limits.effectiveActiveSlotCount(state(30, 5)));
     }
 
     private static Phase4PaperConfig config(boolean legacyEnabled, boolean multiPetEnabled) {

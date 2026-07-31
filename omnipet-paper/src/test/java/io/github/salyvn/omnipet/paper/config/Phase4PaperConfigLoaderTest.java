@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
 import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
+import io.github.salyvn.omnipet.core.economy.EconomyProvider;
 
 class Phase4PaperConfigLoaderTest {
     private final Phase4PaperConfigLoader loader = new Phase4PaperConfigLoader();
@@ -72,6 +73,10 @@ class Phase4PaperConfigLoaderTest {
         assertTrue(config.activeSlots().multiPetEnabled());
         assertEquals(1, config.activeSlots().base());
         assertEquals(5, config.activeSlots().max());
+        assertEquals(4, config.activeSlots().unlocks().size());
+        assertEquals(50, config.activeSlots().unlock(2).orElseThrow()
+                .costs().get(EconomyProvider.PLAYER_POINTS).playerPointsValue());
+        assertEquals("omnipet.slot.unlocked.3", config.activeSlots().entitlement().permissionNode(3));
     }
 
     @Test
@@ -120,6 +125,36 @@ class Phase4PaperConfigLoaderTest {
         assertInvalidYaml(validYaml()
                 .replace("enabled: true", "enabled: false")
                 .replace("petstorage.slot.%s", "petstorage.slot.*"));
+    }
+
+    @Test
+    void rejectsFractionalPointsAndContradictoryEntitlementPolicy() throws IOException {
+        String defaults;
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream("config.yml")) {
+            if (input == null) throw new IOException("config.yml test resource is missing");
+            defaults = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertInvalidYaml(defaults.replace("PLAYER_POINTS: 50", "PLAYER_POINTS: 50.5"));
+        assertInvalidYaml(defaults.replace(
+                "precedence: OMNIPET_AUTHORITATIVE",
+                "precedence: LUCKPERMS_AUTHORITATIVE"));
+    }
+
+    @Test
+    void rejectsEntitlementTemplateThatExceedsNodeLimitAtConfiguredMaximum() throws IOException {
+        String defaults;
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream("config.yml")) {
+            if (input == null) throw new IOException("config.yml test resource is missing");
+            defaults = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        String boundaryTemplate = "a".repeat(127) + "%s";
+        Phase4PaperConfig singleDigitConfig = loader.parse(
+                defaults.replace("omnipet.slot.unlocked.%s", boundaryTemplate));
+
+        assertEquals(128, singleDigitConfig.activeSlots().entitlement().permissionNode(5).length());
+        assertInvalidYaml(defaults
+                .replace("max: 5", "max: 64")
+                .replace("omnipet.slot.unlocked.%s", boundaryTemplate));
     }
 
     private void assertInvalidTemplate(String template) {

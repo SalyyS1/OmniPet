@@ -36,5 +36,8 @@ class PlayerPetInventoryHolderTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new PlayerPetInventoryHolder.Action(
                         PlayerPetInventoryHolder.Type.NEXT, UUID.randomUUID(), false));
+        assertEquals(
+                PlayerPetInventoryHolder.Type.PURCHASE_SLOT,
+                PlayerPetInventoryHolder.Action.purchaseSlot().type());
     }
 }

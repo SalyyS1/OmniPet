@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -159,9 +161,15 @@ class SlotUnlockServiceTest {
 
         assertEquals(SlotPurchaseResult.Status.REFUND_FAILED_REQUIRES_RECOVERY, result.status());
         assertTrue(recorded.withdrawal().provenSuccess());
-        assertEquals(SlotPurchaseSagaState.FAILED, recorded.state());
+        assertEquals(SlotPurchaseSagaState.REFUND_PENDING, recorded.state());
         assertEquals(1, port.withdrawalCount());
         assertEquals(1, port.refundCount());
+
+        SlotPurchaseResult retried = service.recover(transactionId);
+
+        assertEquals(SlotPurchaseResult.Status.REFUND_FAILED_REQUIRES_RECOVERY, retried.status());
+        assertEquals(SlotPurchaseSagaState.REFUND_PENDING, retried.transaction().state());
+        assertEquals(2, port.refundCount());
     }
 
     @Test
@@ -180,6 +188,30 @@ class SlotUnlockServiceTest {
         assertEquals(SlotPurchaseResult.Status.NOT_NEXT_SLOT, result.status());
         assertEquals(0, port.withdrawalCount());
         assertFalse(result.succeeded());
+    }
+
+    @Test
+    void providerResolverIsEvaluatedAtQuoteAndOperationTime() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        PlayerStateRepository repository = repository();
+        EconomyTestFixtures.InMemoryPurchaseJournal journal = new EconomyTestFixtures.InMemoryPurchaseJournal();
+        EconomyTestFixtures.StubEconomyPort port = port(EconomyOperationResult.succeeded("withdrawn"));
+        AtomicReference<EconomyTestFixtures.StubEconomyPort> live = new AtomicReference<>();
+        SlotUnlockService service = new SlotUnlockService(
+                repository,
+                journal,
+                provider -> Optional.ofNullable((EconomyPort) live.get())
+                        .filter(candidate -> candidate.provider() == provider));
+
+        assertEquals(SlotQuoteResult.Status.PROVIDER_UNAVAILABLE, service.quote(playerId, vaultRule()).status());
+        live.set(port);
+        SlotPurchaseQuote quote = service.quote(playerId, vaultRule()).quote();
+        live.set(null);
+
+        SlotPurchaseResult result = service.purchase(UUID.randomUUID(), quote);
+
+        assertEquals(SlotPurchaseResult.Status.PROVIDER_UNAVAILABLE, result.status());
+        assertEquals(0, port.withdrawalCount());
     }
 
     private PlayerStateRepository repository() {

@@ -95,6 +95,7 @@ public final class PlayerPetController {
                 case PREVIOUS -> openVault(player, holder.page() - 1);
                 case NEXT -> openVault(player, holder.page() + 1);
                 case PET -> toggle(player, holder, action);
+                case PURCHASE_SLOT -> player.performCommand("pet slot " + holder.page());
             }
         });
     }

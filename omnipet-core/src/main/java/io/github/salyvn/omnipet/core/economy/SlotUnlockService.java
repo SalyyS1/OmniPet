@@ -6,30 +6,41 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 
 import io.github.salyvn.omnipet.core.domain.PlayerState;
 import io.github.salyvn.omnipet.core.persistence.PlayerStateRepository;
 import io.github.salyvn.omnipet.core.persistence.StaleRevisionException;
 
 public final class SlotUnlockService {
-    private static final int TRANSACTION_LOCK_STRIPES = 64;
-
     private final PlayerStateRepository playerStates;
     private final SlotPurchaseSagaSupport support;
     private final SlotPurchaseRecovery recovery;
-    private final ReentrantLock[] transactionLocks = new ReentrantLock[TRANSACTION_LOCK_STRIPES];
+    private final PurchaseTransactionCoordinator transactions;
 
     public SlotUnlockService(
             PlayerStateRepository playerStates,
             PurchaseJournal journal,
             Map<EconomyProvider, EconomyPort> ports) {
+        this(playerStates, journal, EconomyPortResolver.fixed(ports));
+    }
+
+    public SlotUnlockService(
+            PlayerStateRepository playerStates,
+            PurchaseJournal journal,
+            EconomyPortResolver ports) {
+        this(playerStates, journal, ports, PurchaseTransactionCoordinator.shared());
+    }
+
+    public SlotUnlockService(
+            PlayerStateRepository playerStates,
+            PurchaseJournal journal,
+            EconomyPortResolver ports,
+            PurchaseTransactionCoordinator transactions) {
         this.playerStates = Objects.requireNonNull(playerStates, "player state repository");
         this.support = new SlotPurchaseSagaSupport(journal, ports);
         this.recovery = new SlotPurchaseRecovery(playerStates, support);
-        for (int index = 0; index < transactionLocks.length; index++) {
-            transactionLocks[index] = new ReentrantLock();
-        }
+        this.transactions = Objects.requireNonNull(transactions, "purchase transaction coordinator");
     }
 
     public SlotQuoteResult quote(UUID playerId, SlotUnlockRule rule) throws IOException {
@@ -50,21 +61,29 @@ public final class SlotUnlockService {
     }
 
     public SlotPurchaseResult purchase(UUID transactionId, SlotPurchaseQuote quote) throws IOException {
+        return purchase(transactionId, quote, false);
+    }
+
+    public SlotPurchaseResult purchase(
+            UUID transactionId,
+            SlotPurchaseQuote quote,
+            boolean externalEntitlementRequired) throws IOException {
         Objects.requireNonNull(transactionId, "transaction id");
         Objects.requireNonNull(quote, "purchase quote");
-        ReentrantLock lock = transactionLock(transactionId);
-        lock.lock();
-        try {
-            return purchaseLocked(transactionId, quote);
-        } finally {
-            lock.unlock();
+        try (var ignored = transactions.acquire(transactionId)) {
+            return purchaseLocked(transactionId, quote, externalEntitlementRequired);
         }
     }
 
-    private SlotPurchaseResult purchaseLocked(UUID transactionId, SlotPurchaseQuote quote) throws IOException {
+    private SlotPurchaseResult purchaseLocked(
+            UUID transactionId,
+            SlotPurchaseQuote quote,
+            boolean externalEntitlementRequired) throws IOException {
         Optional<SlotPurchaseTransaction> known = support.find(transactionId);
         if (known.isPresent()) {
-            if (!known.get().matches(quote)) return result(SlotPurchaseResult.Status.INVALID_TRANSACTION, known.get(), "transaction payload differs");
+            if (!known.get().matches(quote)) {
+                return result(SlotPurchaseResult.Status.INVALID_TRANSACTION, known.get(), "transaction payload differs");
+            }
             SlotPurchaseResult resolved = recovery.resolveKnown(known.get());
             if (resolved != null) return resolved;
         }
@@ -73,7 +92,13 @@ public final class SlotUnlockService {
         AtomicReference<EconomyOperationResult> withdrawal = new AtomicReference<>();
         try {
             playerStates.withLocked(quote.playerId(), quote.expectedRevision(), current ->
-                    executeLocked(transactionId, quote, current, transaction, withdrawal));
+                    executeLocked(
+                            transactionId,
+                            quote,
+                            externalEntitlementRequired,
+                            current,
+                            transaction,
+                            withdrawal));
         } catch (SlotPurchaseSagaSupport.PurchaseAbort aborted) {
             return aborted.result;
         } catch (StaleRevisionException stale) {
@@ -99,26 +124,104 @@ public final class SlotUnlockService {
 
     public SlotPurchaseResult recover(UUID transactionId) throws IOException {
         Objects.requireNonNull(transactionId, "transaction id");
-        ReentrantLock lock = transactionLock(transactionId);
-        lock.lock();
-        try {
+        try (var ignored = transactions.acquire(transactionId)) {
             return recovery.recover(transactionId, this::purchase);
-        } finally {
-            lock.unlock();
+        }
+    }
+
+    public SlotPurchaseResult synchronizeExternalEntitlement(
+            UUID transactionId,
+            Function<SlotPurchaseTransaction, ExternalEntitlementResult> operation) throws IOException {
+        Objects.requireNonNull(transactionId, "transaction id");
+        Objects.requireNonNull(operation, "external entitlement operation");
+        try (var ignored = transactions.acquire(transactionId)) {
+            SlotPurchaseTransaction transaction = support.find(transactionId).orElse(null);
+            if (transaction == null) {
+                return result(SlotPurchaseResult.Status.TRANSACTION_NOT_FOUND, null, "transaction was not found");
+            }
+            if (transaction.state() == SlotPurchaseSagaState.COMPLETED) {
+                return result(SlotPurchaseResult.Status.COMPLETED, transaction, transaction.detail());
+            }
+            if (transaction.state() != SlotPurchaseSagaState.ENTITLEMENT_PERSISTED
+                    && transaction.state() != SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING) {
+                return result(
+                        SlotPurchaseResult.Status.INVALID_TRANSACTION,
+                        transaction,
+                        "transaction is not awaiting external entitlement synchronization");
+            }
+            PlayerState state = playerStates.snapshot(transaction.playerId());
+            if (!SlotPurchaseSagaSupport.hasTransactionEntitlement(state, transaction.transactionId())) {
+                SlotPurchaseTransaction unknown = transaction.withState(
+                        SlotPurchaseSagaState.UNKNOWN_REQUIRES_RECONCILIATION,
+                        transaction.withdrawal(),
+                        transaction.refund(),
+                        "external entitlement pending without the persisted OmniPet entitlement");
+                support.save(unknown);
+                return result(
+                        SlotPurchaseResult.Status.UNKNOWN_REQUIRES_RECONCILIATION,
+                        unknown,
+                        unknown.detail());
+            }
+            if (!transaction.externalEntitlementRequired()) {
+                SlotPurchaseTransaction completed = transaction.withState(
+                        SlotPurchaseSagaState.COMPLETED,
+                        transaction.withdrawal(),
+                        transaction.refund(),
+                        "OmniPet entitlement completed without an external provider");
+                support.save(completed);
+                return result(SlotPurchaseResult.Status.COMPLETED, completed, completed.detail());
+            }
+            if (transaction.state() == SlotPurchaseSagaState.ENTITLEMENT_PERSISTED) {
+                transaction = transaction.withState(
+                        SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING,
+                        transaction.withdrawal(),
+                        transaction.refund(),
+                        "external entitlement synchronization pending");
+                support.save(transaction);
+            }
+            ExternalEntitlementResult external;
+            try {
+                external = operation.apply(transaction);
+                if (external == null) external = ExternalEntitlementResult.pending("provider returned no result");
+            } catch (RuntimeException failure) {
+                String detail = failure.getMessage() == null
+                        ? "external entitlement operation threw"
+                        : "external entitlement operation threw: " + failure.getMessage();
+                external = ExternalEntitlementResult.pending(SlotPurchaseSagaSupport.limitedDetail(detail));
+            }
+            SlotPurchaseSagaState nextState = external.succeeded()
+                    ? SlotPurchaseSagaState.COMPLETED
+                    : SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING;
+            SlotPurchaseTransaction updated = transaction.withState(
+                    nextState,
+                    transaction.withdrawal(),
+                    transaction.refund(),
+                    SlotPurchaseSagaSupport.limitedDetail(external.detail()));
+            support.save(updated);
+            return result(
+                    external.succeeded()
+                            ? SlotPurchaseResult.Status.COMPLETED
+                            : SlotPurchaseResult.Status.ENTITLEMENT_SYNC_PENDING,
+                    updated,
+                    updated.detail());
         }
     }
 
     private PlayerState executeLocked(
             UUID transactionId,
             SlotPurchaseQuote quote,
+            boolean externalEntitlementRequired,
             PlayerState current,
             AtomicReference<SlotPurchaseTransaction> transaction,
             AtomicReference<EconomyOperationResult> withdrawal) {
         if (SlotPurchaseSagaSupport.hasTransactionEntitlement(current, transactionId)) {
-            SlotPurchaseTransaction completed = support.createUnchecked(SlotPurchaseTransaction.prepared(transactionId, quote))
-                    .withState(SlotPurchaseSagaState.COMPLETED, null, null, "entitlement already persisted");
-            support.saveUnchecked(completed);
-            throw SlotPurchaseSagaSupport.abort(SlotPurchaseResult.Status.COMPLETED, completed, "entitlement already persisted");
+            SlotPurchaseTransaction existing = support.createUnchecked(
+                    SlotPurchaseTransaction.prepared(transactionId, quote, externalEntitlementRequired));
+            try {
+                throw SlotPurchaseSagaSupport.abort(recovery.completePersisted(existing));
+            } catch (IOException failure) {
+                throw new SlotPurchaseSagaSupport.JournalAccessException(failure);
+            }
         }
         if (quote.rule().slot() != current.activeSlotCount() + 1) {
             throw SlotPurchaseSagaSupport.abort(
@@ -130,7 +233,8 @@ public final class SlotUnlockService {
             throw SlotPurchaseSagaSupport.abort(SlotPurchaseResult.Status.ALREADY_ENTITLED, null, "slot already has an entitlement");
         }
 
-        SlotPurchaseTransaction prepared = support.createUnchecked(SlotPurchaseTransaction.prepared(transactionId, quote));
+        SlotPurchaseTransaction prepared = support.createUnchecked(
+                SlotPurchaseTransaction.prepared(transactionId, quote, externalEntitlementRequired));
         transaction.set(prepared);
         if (!prepared.matches(quote)) {
             throw SlotPurchaseSagaSupport.abort(SlotPurchaseResult.Status.INVALID_TRANSACTION, prepared, "transaction payload differs");
@@ -182,11 +286,6 @@ public final class SlotUnlockService {
 
     private static boolean wasWithdrawn(AtomicReference<EconomyOperationResult> withdrawal) {
         return withdrawal.get() != null && withdrawal.get().provenSuccess();
-    }
-
-    private ReentrantLock transactionLock(UUID transactionId) {
-        int stripe = Math.floorMod(transactionId.hashCode(), transactionLocks.length);
-        return transactionLocks[stripe];
     }
 
     private static SlotPurchaseResult result(

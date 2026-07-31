@@ -1,9 +1,16 @@
 package io.github.salyvn.omnipet.paper.config;
 
 import java.util.Objects;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
+import io.github.salyvn.omnipet.core.economy.EconomyAmount;
+import io.github.salyvn.omnipet.core.economy.EconomyProvider;
 import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
+import io.github.salyvn.omnipet.core.storage.SlotEntitlementPolicy;
 
 /** Detached operational configuration used by the Phase 4 Paper boundary. */
 public record Phase4PaperConfig(Vault vault, ActiveSlots activeSlots) {
@@ -92,7 +99,16 @@ public record Phase4PaperConfig(Vault vault, ActiveSlots activeSlots) {
         }
     }
 
-    public record ActiveSlots(boolean multiPetEnabled, int base, int max) {
+    public record ActiveSlots(
+            boolean multiPetEnabled,
+            int base,
+            int max,
+            Entitlement entitlement,
+            Map<Integer, SlotUnlock> unlocks) {
+        public ActiveSlots(boolean multiPetEnabled, int base, int max) {
+            this(multiPetEnabled, base, max, Entitlement.omniPetDefault(), Map.of());
+        }
+
         public ActiveSlots {
             if (base < 1 || base > PetStorageLimits.MAX_ACTIVE_SLOT_COUNT) {
                 throw new IllegalArgumentException("storage.activeSlots.base is outside the supported range");
@@ -103,6 +119,89 @@ public record Phase4PaperConfig(Vault vault, ActiveSlots activeSlots) {
             if (base > max) {
                 throw new IllegalArgumentException("storage.activeSlots.base cannot exceed max");
             }
+            entitlement = Objects.requireNonNull(entitlement, "active slot entitlement config");
+            entitlement.validatePermissionNodesThrough(max);
+            LinkedHashMap<Integer, SlotUnlock> validated = new LinkedHashMap<>();
+            if (unlocks != null) {
+                unlocks.forEach((slot, unlock) -> {
+                    if (slot == null || slot < 2 || slot > max) {
+                        throw new IllegalArgumentException("active slot unlock is outside the configured range");
+                    }
+                    validated.put(slot, Objects.requireNonNull(unlock, "active slot unlock"));
+                });
+            }
+            unlocks = Map.copyOf(validated);
+        }
+
+        public Optional<SlotUnlock> unlock(int slot) {
+            return Optional.ofNullable(unlocks.get(slot));
+        }
+    }
+
+    public record Entitlement(SlotEntitlementPolicy policy, String luckPermsPermissionTemplate) {
+        private static final String DEFAULT_TEMPLATE = "omnipet.slot.unlocked.%s";
+
+        public Entitlement {
+            policy = Objects.requireNonNull(policy, "slot entitlement policy");
+            luckPermsPermissionTemplate = validatePermissionTemplate(luckPermsPermissionTemplate);
+        }
+
+        public static Entitlement omniPetDefault() {
+            return new Entitlement(SlotEntitlementPolicy.omniPet(), DEFAULT_TEMPLATE);
+        }
+
+        public String permissionNode(int slot) {
+            if (slot < 2 || slot > PetStorageLimits.MAX_ACTIVE_SLOT_COUNT) {
+                throw new IllegalArgumentException("active slot is outside the supported range");
+            }
+            String node = luckPermsPermissionTemplate.replace("%s", Integer.toString(slot));
+            validatePermissionNode(node);
+            return node;
+        }
+
+        private void validatePermissionNodesThrough(int maxSlot) {
+            for (int slot = 2; slot <= maxSlot; slot++) permissionNode(slot);
+        }
+
+        private static String validatePermissionTemplate(String value) {
+            if (value == null || value.isBlank() || value.indexOf("%s") < 0
+                    || value.indexOf("%s") != value.lastIndexOf("%s")) {
+                throw new IllegalArgumentException("LuckPerms permission template requires exactly one %s placeholder");
+            }
+            String first = value.replace("%s", "2");
+            validatePermissionNode(first);
+            return value;
+        }
+
+        private static void validatePermissionNode(String node) {
+            if (node.length() > 128 || !LegacyPermission.SAFE_PERMISSION_NODE.matcher(node).matches()) {
+                throw new IllegalArgumentException("LuckPerms permission template produces an unsafe node");
+            }
+        }
+    }
+
+    public record SlotUnlock(String permission, Map<EconomyProvider, EconomyAmount> costs) {
+        public SlotUnlock {
+            permission = permission == null ? "" : permission.trim();
+            if (!permission.isEmpty()
+                    && (permission.length() > 128 || !LegacyPermission.SAFE_PERMISSION_NODE.matcher(permission).matches())) {
+                throw new IllegalArgumentException("active slot unlock permission is unsafe");
+            }
+            EnumMap<EconomyProvider, EconomyAmount> validated = new EnumMap<>(EconomyProvider.class);
+            if (costs != null) {
+                costs.forEach((provider, amount) -> {
+                    if (provider == null || amount == null || provider != amount.provider()) {
+                        throw new IllegalArgumentException("active slot cost key must match its provider");
+                    }
+                    validated.put(provider, amount);
+                });
+            }
+            if (validated.isEmpty()) throw new IllegalArgumentException("active slot unlock requires at least one cost");
+            costs = Map.copyOf(validated);
+        }
+
+        public boolean eligible(java.util.function.Predicate<String> hasPermission) {
+            return permission.isEmpty() || hasPermission.test(permission);
         }
     }
 }

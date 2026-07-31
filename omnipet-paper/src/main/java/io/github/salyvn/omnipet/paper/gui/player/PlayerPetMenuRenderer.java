@@ -61,7 +61,14 @@ public final class PlayerPetMenuRenderer {
                 "Desired active: " + snapshot.desiredActivePetIds().size() + "/" + snapshot.effectiveActiveSlotCount(),
                 snapshot.vaultOverflow() > 0
                         ? "Overflow is read-only; no pet was deleted"
-                        : "Slot purchase providers are configured separately"));
+                        : "Active slot purchases use explicit provider choice"));
+        actions.put(50, PlayerPetInventoryHolder.Action.purchaseSlot());
+        inventory.setItem(50, item(
+                Material.EXPERIENCE_BOTTLE,
+                "Unlock active slot",
+                NamedTextColor.GOLD,
+                "Click to review configured Vault/PlayerPoints prices",
+                "OmniPet never auto-selects a currency"));
         return inventory;
     }
 

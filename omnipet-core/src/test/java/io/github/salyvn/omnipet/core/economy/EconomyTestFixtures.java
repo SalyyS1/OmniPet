@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.UnaryOperator;
@@ -31,6 +32,17 @@ final class EconomyTestFixtures {
         public synchronized void save(SlotPurchaseTransaction transaction) {
             transactions.put(transaction.transactionId(), transaction);
         }
+
+        @Override
+        public synchronized PurchaseJournalScanResult scan(Set<SlotPurchaseSagaState> states, int limit) {
+            var matches = transactions.values().stream()
+                    .filter(transaction -> states.contains(transaction.state()))
+                    .sorted(java.util.Comparator.comparing(transaction -> transaction.transactionId().toString()))
+                    .limit(limit)
+                    .toList();
+            long total = transactions.values().stream().filter(transaction -> states.contains(transaction.state())).count();
+            return new PurchaseJournalScanResult(matches, java.util.List.of(), total > matches.size());
+        }
     }
 
     static final class FailObservedWithdrawalOnceJournal implements PurchaseJournal {
@@ -57,6 +69,11 @@ final class EconomyTestFixtures {
                 throw new IOException("simulated observed-withdrawal journal failure");
             }
             delegate.save(transaction);
+        }
+
+        @Override
+        public PurchaseJournalScanResult scan(Set<SlotPurchaseSagaState> states, int limit) {
+            return delegate.scan(states, limit);
         }
     }
 

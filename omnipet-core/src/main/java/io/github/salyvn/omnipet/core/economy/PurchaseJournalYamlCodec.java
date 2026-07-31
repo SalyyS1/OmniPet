@@ -9,7 +9,7 @@ import java.util.UUID;
 import io.github.salyvn.omnipet.core.persistence.YamlDocuments;
 
 final class PurchaseJournalYamlCodec {
-    private static final int SCHEMA_VERSION = 1;
+    private static final int SCHEMA_VERSION = 2;
 
     byte[] encode(SlotPurchaseTransaction transaction) {
         LinkedHashMap<String, Object> root = new LinkedHashMap<>();
@@ -20,6 +20,7 @@ final class PurchaseJournalYamlCodec {
         root.put("slot", transaction.slot());
         root.put("provider", transaction.amount().provider().name());
         root.put("amount", transaction.amount().value().toPlainString());
+        root.put("externalEntitlementRequired", transaction.externalEntitlementRequired());
         root.put("state", transaction.state().name());
         if (transaction.withdrawal() != null) root.put("withdrawal", encodeOperation(transaction.withdrawal()));
         if (transaction.refund() != null) root.put("refund", encodeOperation(transaction.refund()));
@@ -29,8 +30,33 @@ final class PurchaseJournalYamlCodec {
 
     SlotPurchaseTransaction decode(String yaml) {
         Map<String, Object> root = YamlDocuments.readMap(yaml);
-        if (integer(root.get("schemaVersion"), "schemaVersion") != SCHEMA_VERSION) {
+        int schemaVersion = integer(root.get("schemaVersion"), "schemaVersion");
+        if (schemaVersion < 1 || schemaVersion > SCHEMA_VERSION) {
             throw new IllegalArgumentException("unsupported purchase journal schema version");
+        }
+        EconomyOperationResult withdrawal = decodeOperation(root.get("withdrawal"), "withdrawal");
+        EconomyOperationResult refund = decodeOperation(root.get("refund"), "refund");
+        SlotPurchaseSagaState state = SlotPurchaseSagaState.valueOf(text(root.get("state"), "state"));
+        boolean externalEntitlementRequired = schemaVersion >= 2
+                && bool(root.get("externalEntitlementRequired"), "externalEntitlementRequired");
+        String detail = optionalText(root.get("detail"));
+        if (schemaVersion == 1
+                && (state == SlotPurchaseSagaState.ENTITLEMENT_PERSISTED
+                        || state == SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING
+                        || state == SlotPurchaseSagaState.COMPLETED)) {
+            externalEntitlementRequired = true;
+            state = SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING;
+            detail = SlotPurchaseSagaSupport.limitedDetail(
+                    "legacy schema v1 completion requires entitlement verification"
+                            + (detail.isBlank() ? "" : ": " + detail));
+        }
+        if (state == SlotPurchaseSagaState.FAILED
+                && withdrawal != null
+                && withdrawal.provenSuccess()
+                && refund != null
+                && !refund.provenSuccess()
+                && !refund.ambiguous()) {
+            state = SlotPurchaseSagaState.REFUND_PENDING;
         }
         return new SlotPurchaseTransaction(
                 UUID.fromString(text(root.get("transactionId"), "transactionId")),
@@ -40,10 +66,11 @@ final class PurchaseJournalYamlCodec {
                 new EconomyAmount(
                         EconomyProvider.valueOf(text(root.get("provider"), "provider")),
                         new BigDecimal(text(root.get("amount"), "amount"))),
-                SlotPurchaseSagaState.valueOf(text(root.get("state"), "state")),
-                decodeOperation(root.get("withdrawal"), "withdrawal"),
-                decodeOperation(root.get("refund"), "refund"),
-                optionalText(root.get("detail")));
+                externalEntitlementRequired,
+                state,
+                withdrawal,
+                refund,
+                detail);
     }
 
     private static Map<String, Object> encodeOperation(EconomyOperationResult operation) {
@@ -79,6 +106,11 @@ final class PurchaseJournalYamlCodec {
         if (!(raw instanceof String value) || value.isBlank()) {
             throw new IllegalArgumentException(label + " is required");
         }
+        return value;
+    }
+
+    private static boolean bool(Object raw, String label) {
+        if (!(raw instanceof Boolean value)) throw new IllegalArgumentException(label + " must be true or false");
         return value;
     }
 

@@ -17,7 +17,6 @@ public final class Phase4PaperConfigLoader {
     private static final Set<String> STORAGE_KEYS = Set.of("vault", "activeSlots");
     private static final Set<String> VAULT_KEYS = Set.of("baseCapacity", "maxCapacity", "legacyPermission");
     private static final Set<String> LEGACY_KEYS = Set.of("enabled", "template", "maxScan");
-    private static final Set<String> ACTIVE_KEYS = Set.of("multiPetEnabled", "base", "max");
     private static final Set<String> LEGACY_ROOT_KEYS = Set.of("globalMaxSlots", "slotPermission");
     private static final int LEGACY_DEFAULT_MAX_SLOTS = 1000;
     private static final String LEGACY_DEFAULT_PERMISSION = "petstorage.slot.%s";
@@ -52,7 +51,6 @@ public final class Phase4PaperConfigLoader {
         Map<String, Object> vault = requiredMap(storage.get("vault"), "storage.vault");
         Map<String, Object> active = requiredMap(storage.get("activeSlots"), "storage.activeSlots");
         requireKeys(vault, VAULT_KEYS, "storage.vault");
-        requireKeys(active, ACTIVE_KEYS, "storage.activeSlots");
 
         Map<String, Object> legacy = requiredMap(
                 vault.get("legacyPermission"), "storage.vault.legacyPermission");
@@ -66,10 +64,7 @@ public final class Phase4PaperConfigLoader {
                 integer(vault.get("baseCapacity"), "storage.vault.baseCapacity"),
                 integer(vault.get("maxCapacity"), "storage.vault.maxCapacity"),
                 legacyConfig);
-        Phase4PaperConfig.ActiveSlots activeConfig = new Phase4PaperConfig.ActiveSlots(
-                bool(active.get("multiPetEnabled"), "storage.activeSlots.multiPetEnabled"),
-                integer(active.get("base"), "storage.activeSlots.base"),
-                integer(active.get("max"), "storage.activeSlots.max"));
+        Phase4PaperConfig.ActiveSlots activeConfig = new Phase4ActiveSlotConfigCodec().parse(active);
         return new LoadResult(new Phase4PaperConfig(vaultConfig, activeConfig), false);
     }
 
@@ -83,10 +78,7 @@ public final class Phase4PaperConfigLoader {
         vault.put("baseCapacity", config.vault().baseCapacity());
         vault.put("maxCapacity", config.vault().maxCapacity());
         vault.put("legacyPermission", legacy);
-        LinkedHashMap<String, Object> active = new LinkedHashMap<>();
-        active.put("multiPetEnabled", config.activeSlots().multiPetEnabled());
-        active.put("base", config.activeSlots().base());
-        active.put("max", config.activeSlots().max());
+        Map<String, Object> active = new Phase4ActiveSlotConfigCodec().encode(config.activeSlots());
         LinkedHashMap<String, Object> storage = new LinkedHashMap<>();
         storage.put("vault", vault);
         storage.put("activeSlots", active);

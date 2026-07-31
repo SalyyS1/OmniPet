@@ -10,8 +10,13 @@ public record SlotPurchaseResult(Status status, SlotPurchaseTransaction transact
         return status == Status.COMPLETED;
     }
 
+    public boolean entitlementPersisted() {
+        return status == Status.COMPLETED || status == Status.ENTITLEMENT_SYNC_PENDING;
+    }
+
     public enum Status {
         COMPLETED,
+        ENTITLEMENT_SYNC_PENDING,
         IN_PROGRESS,
         STALE_QUOTE,
         INVALID_TRANSACTION,

@@ -52,7 +52,9 @@ public final class PlayerPetInventoryHolder implements InventoryHolder {
         public static Action previous() { return new Action(Type.PREVIOUS, null, false); }
 
         public static Action next() { return new Action(Type.NEXT, null, false); }
+
+        public static Action purchaseSlot() { return new Action(Type.PURCHASE_SLOT, null, false); }
     }
 
-    public enum Type { PET, PREVIOUS, NEXT }
+    public enum Type { PET, PREVIOUS, NEXT, PURCHASE_SLOT }
 }

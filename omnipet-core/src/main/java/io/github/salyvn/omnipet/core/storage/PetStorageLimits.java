@@ -7,7 +7,9 @@ public record PetStorageLimits(
         int configuredVaultCapacity,
         int configuredActiveSlotFloor,
         int configuredActiveSlotCap,
-        boolean multiPetEnabled) {
+        boolean multiPetEnabled,
+        int observedExternalActiveSlotCount,
+        SlotEntitlementPolicy entitlementPolicy) {
     public static final int MAX_VAULT_CAPACITY = PlayerState.MAX_VAULT_CAPACITY;
     public static final int MAX_ACTIVE_SLOT_COUNT = PlayerState.MAX_ACTIVE_SLOT_COUNT;
 
@@ -24,6 +26,25 @@ public record PetStorageLimits(
         if (configuredActiveSlotFloor > configuredActiveSlotCap) {
             throw new IllegalArgumentException("configured active slot floor cannot exceed the cap");
         }
+        if (observedExternalActiveSlotCount < configuredActiveSlotFloor
+                || observedExternalActiveSlotCount > configuredActiveSlotCap) {
+            throw new IllegalArgumentException("external active slot count is outside the configured range");
+        }
+        if (entitlementPolicy == null) throw new IllegalArgumentException("slot entitlement policy is required");
+    }
+
+    public PetStorageLimits(
+            int configuredVaultCapacity,
+            int configuredActiveSlotFloor,
+            int configuredActiveSlotCap,
+            boolean multiPetEnabled) {
+        this(
+                configuredVaultCapacity,
+                configuredActiveSlotFloor,
+                configuredActiveSlotCap,
+                multiPetEnabled,
+                configuredActiveSlotFloor,
+                SlotEntitlementPolicy.omniPet());
     }
 
     public PetStorageLimits(int configuredVaultCapacity, int configuredActiveSlotCap, boolean multiPetEnabled) {
@@ -42,6 +63,17 @@ public record PetStorageLimits(
     public int effectiveActiveSlotCount(PlayerState state) {
         if (state == null) throw new IllegalArgumentException("player state is required");
         if (!multiPetEnabled) return 1;
-        return Math.min(configuredActiveSlotCap, Math.max(state.activeSlotCount(), configuredActiveSlotFloor));
+        int omniPetCount = Math.min(
+                configuredActiveSlotCap,
+                Math.max(state.activeSlotCount(), configuredActiveSlotFloor));
+        int externalCount = Math.min(
+                configuredActiveSlotCap,
+                Math.max(observedExternalActiveSlotCount, configuredActiveSlotFloor));
+        return switch (entitlementPolicy.precedence()) {
+            case OMNIPET_AUTHORITATIVE -> omniPetCount;
+            case LUCKPERMS_AUTHORITATIVE -> externalCount;
+            case REQUIRE_BOTH -> Math.min(omniPetCount, externalCount);
+            case UNION -> Math.max(omniPetCount, externalCount);
+        };
     }
 }

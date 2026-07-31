@@ -6,4 +6,8 @@ public interface EconomyPort {
     EconomyOperationResult withdraw(EconomyRequest request);
 
     EconomyOperationResult refund(EconomyRequest request);
+
+    default EconomyBalanceResult balance(java.util.UUID playerId) {
+        return EconomyBalanceResult.unavailable("provider does not expose balance lookup");
+    }
 }

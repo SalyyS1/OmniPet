@@ -54,6 +54,9 @@ public record EconomyAmount(EconomyProvider provider, BigDecimal value) {
         if (!Double.isFinite(providerValue) || (amount.signum() > 0 && providerValue == 0.0d)) {
             throw new IllegalArgumentException("Vault amount is outside the provider-safe double range");
         }
+        if (BigDecimal.valueOf(providerValue).compareTo(amount) != 0) {
+            throw new IllegalArgumentException("Vault amount cannot be represented exactly by the provider API");
+        }
         if (amount.toPlainString().length() > MAX_SERIALIZED_LENGTH) {
             throw new IllegalArgumentException("Vault amount is too large to serialize safely");
         }

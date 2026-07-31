@@ -27,6 +27,16 @@ class EconomyAmountTest {
     }
 
     @Test
+    void vaultRejectsAmountsThatChangeWhenConvertedToDouble() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> EconomyAmount.vault(new BigDecimal("9007199254740993")));
+        assertEquals(
+                new BigDecimal("9007199254740992"),
+                EconomyAmount.vault(new BigDecimal("9007199254740992")).value());
+    }
+
+    @Test
     void playerPointsRejectsFractionalNegativeAndOutOfRangeAmounts() {
         assertThrows(IllegalArgumentException.class, () -> EconomyAmount.playerPoints(new BigDecimal("1.5")));
         assertThrows(IllegalArgumentException.class, () -> EconomyAmount.playerPoints(-1));

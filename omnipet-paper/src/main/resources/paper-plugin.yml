@@ -16,6 +16,18 @@ dependencies:
       load: BEFORE
       required: false
       join-classpath: false
+    Vault:
+      load: BEFORE
+      required: false
+      join-classpath: false
+    PlayerPoints:
+      load: BEFORE
+      required: false
+      join-classpath: false
+    LuckPerms:
+      load: BEFORE
+      required: false
+      join-classpath: false
 
 permissions:
   omnipet.*:
@@ -37,9 +49,11 @@ permissions:
       omnipet.admin.managepet: true
       omnipet.admin.manageegg: true
       omnipet.admin.item: true
+      omnipet.admin.reconcile: true
   omnipet.admin.reload: { description: "Allow reloading OmniPet", default: false }
   omnipet.admin.inspect: { description: "Allow viewing player pet information", default: false }
   omnipet.admin.explore: { description: "Allow exploring player data", default: false }
   omnipet.admin.managepet: { description: "Allow managing pet definitions and storage", default: false }
   omnipet.admin.manageegg: { description: "Allow managing player eggs", default: false }
   omnipet.admin.item: { description: "Allow giving OmniPet items", default: false }
+  omnipet.admin.reconcile: { description: "Allow audited slot transaction reconciliation", default: false }

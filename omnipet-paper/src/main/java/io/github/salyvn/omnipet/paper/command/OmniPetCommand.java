@@ -11,19 +11,36 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
+import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
+import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
 
 public final class OmniPetCommand implements BasicCommand {
     private final PetStudioController studio;
     private final PlayerPetController players;
+    private final SlotTransactionAdminTarget transactions;
+    private final PlayerSlotPurchaseController slotPurchases;
     private final BooleanSupplier reloadRuntime;
 
     public OmniPetCommand(
             PetStudioController studio,
             PlayerPetController players,
+            SlotTransactionAdminController transactions,
+            PlayerSlotPurchaseController slotPurchases,
+            BooleanSupplier reloadRuntime) {
+        this(studio, players, (SlotTransactionAdminTarget) transactions, slotPurchases, reloadRuntime);
+    }
+
+    OmniPetCommand(
+            PetStudioController studio,
+            PlayerPetController players,
+            SlotTransactionAdminTarget transactions,
+            PlayerSlotPurchaseController slotPurchases,
             BooleanSupplier reloadRuntime) {
         this.studio = studio;
         this.players = players;
+        this.transactions = transactions;
+        this.slotPurchases = slotPurchases;
         this.reloadRuntime = reloadRuntime;
     }
 
@@ -32,6 +49,47 @@ public final class OmniPetCommand implements BasicCommand {
         CommandSender sender = source.getSender();
         Player player = sender instanceof Player value ? value : null;
         List<String> arguments = Arrays.asList(args == null ? new String[0] : args);
+        if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("slot")) {
+            if (player == null) {
+                sender.sendMessage("OmniPet: a player is required to buy active slots.");
+                return;
+            }
+            int returnPage = 1;
+            if (arguments.size() == 2) {
+                try {
+                    returnPage = Integer.parseInt(arguments.get(1));
+                } catch (NumberFormatException ignored) {
+                    sender.sendMessage("OmniPet: slot return page must be a positive integer.");
+                    return;
+                }
+            } else if (arguments.size() != 1) {
+                sender.sendMessage("OmniPet: use /pet slot.");
+                return;
+            }
+            if (returnPage < 1) {
+                sender.sendMessage("OmniPet: slot return page must be a positive integer.");
+                return;
+            }
+            slotPurchases.open(player, returnPage);
+            return;
+        }
+        SlotTransactionAdminCommandParser.Result transactionCommand =
+                SlotTransactionAdminCommandParser.parse(arguments);
+        if (!(transactionCommand instanceof SlotTransactionAdminCommandParser.NotMatched)) {
+            if (!sender.hasPermission(SlotTransactionAdminCommandParser.PERMISSION)) {
+                sender.sendMessage("OmniPet: you do not have permission to reconcile slot transactions.");
+                return;
+            }
+            if (transactionCommand instanceof SlotTransactionAdminCommandParser.ListPending pending) {
+                transactions.list(sender, pending.limit(), pending.cursor());
+            } else if (transactionCommand instanceof SlotTransactionAdminCommandParser.Reconcile reconcile) {
+                transactions.reconcile(sender, reconcile.transactionId(), reconcile.decision());
+            } else {
+                sender.sendMessage("OmniPet: use /pet admin transactions [limit] [cursor] or "
+                        + "/pet admin reconcile <uuid> <charge|no-charge|refund|sync>.");
+            }
+            return;
+        }
         if (arguments.size() == 2 && arguments.get(0).equalsIgnoreCase("admin")
                 && arguments.get(1).equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("omnipet.admin.reload")) {

@@ -1,11 +1,11 @@
 package io.github.salyvn.omnipet.core.economy;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -71,6 +71,19 @@ public final class FilePurchaseJournal implements PurchaseJournal {
         }
     }
 
+    @Override
+    public PurchaseJournalScanResult scan(Set<SlotPurchaseSagaState> states, int limit) throws IOException {
+        return new PurchaseJournalScanner(root, codec).scan(states, limit);
+    }
+
+    @Override
+    public PurchaseJournalScanResult scan(
+            Set<SlotPurchaseSagaState> states,
+            int limit,
+            String cursor) throws IOException {
+        return new PurchaseJournalScanner(root, codec).scan(states, limit, cursor);
+    }
+
     private Optional<SlotPurchaseTransaction> load(UUID transactionId) throws IOException {
         Path path = path(transactionId);
         rejectSymbolicLink(root);
@@ -81,7 +94,7 @@ public final class FilePurchaseJournal implements PurchaseJournal {
         }
         SlotPurchaseTransaction transaction;
         try {
-            transaction = codec.decode(Files.readString(path, StandardCharsets.UTF_8));
+            transaction = codec.decode(PurchaseJournalFileReader.readUtf8(path));
         } catch (RuntimeException failure) {
             throw new IOException("invalid purchase journal entry: " + path, failure);
         }
@@ -115,7 +128,8 @@ public final class FilePurchaseJournal implements PurchaseJournal {
                 || !existing.playerId().equals(replacement.playerId())
                 || existing.expectedRevision() != replacement.expectedRevision()
                 || existing.slot() != replacement.slot()
-                || !existing.amount().equals(replacement.amount())) {
+                || !existing.amount().equals(replacement.amount())
+                || existing.externalEntitlementRequired() != replacement.externalEntitlementRequired()) {
             throw new IOException("purchase transaction identity cannot change");
         }
     }

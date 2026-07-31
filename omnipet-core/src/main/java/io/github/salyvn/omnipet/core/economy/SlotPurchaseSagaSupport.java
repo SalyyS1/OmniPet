@@ -2,7 +2,6 @@ package io.github.salyvn.omnipet.core.economy;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,24 +13,19 @@ final class SlotPurchaseSagaSupport {
     private static final String ENTITLEMENT_SOURCE = "ECONOMY";
 
     private final PurchaseJournal journal;
-    private final Map<EconomyProvider, EconomyPort> ports;
+    private final EconomyPortResolver ports;
 
     SlotPurchaseSagaSupport(PurchaseJournal journal, Map<EconomyProvider, EconomyPort> ports) {
+        this(journal, EconomyPortResolver.fixed(ports));
+    }
+
+    SlotPurchaseSagaSupport(PurchaseJournal journal, EconomyPortResolver ports) {
         this.journal = java.util.Objects.requireNonNull(journal, "purchase journal");
-        EnumMap<EconomyProvider, EconomyPort> validated = new EnumMap<>(EconomyProvider.class);
-        if (ports != null) {
-            ports.forEach((provider, port) -> {
-                if (provider == null || port == null || provider != port.provider()) {
-                    throw new IllegalArgumentException("economy port key must match its provider");
-                }
-                validated.put(provider, port);
-            });
-        }
-        this.ports = Map.copyOf(validated);
+        this.ports = java.util.Objects.requireNonNull(ports, "economy port resolver");
     }
 
     boolean hasProvider(EconomyProvider provider) {
-        return ports.containsKey(provider);
+        return ports.find(provider).isPresent();
     }
 
     Optional<SlotPurchaseTransaction> find(UUID transactionId) throws IOException {
@@ -59,7 +53,7 @@ final class SlotPurchaseSagaSupport {
     }
 
     EconomyOperationResult withdraw(SlotPurchaseTransaction transaction) {
-        EconomyPort port = ports.get(transaction.amount().provider());
+        EconomyPort port = ports.find(transaction.amount().provider()).orElse(null);
         if (port == null) return EconomyOperationResult.unavailable("configured provider is not loaded");
         try {
             EconomyOperationResult result = port.withdraw(requestFrom(transaction));
@@ -70,7 +64,7 @@ final class SlotPurchaseSagaSupport {
     }
 
     EconomyOperationResult refund(SlotPurchaseTransaction transaction) {
-        EconomyPort port = ports.get(transaction.amount().provider());
+        EconomyPort port = ports.find(transaction.amount().provider()).orElse(null);
         if (port == null) return EconomyOperationResult.unavailable("configured provider is not loaded");
         try {
             EconomyOperationResult result = port.refund(requestFrom(transaction));

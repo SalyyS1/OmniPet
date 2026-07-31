@@ -18,3 +18,23 @@ storage:
     base: 1
     # Global clamp for purchased active-slot entitlements.
     max: 5
+    entitlement:
+      # OMNIPET is authoritative by default. LUCKPERMS and HYBRID remain explicit opt-ins.
+      mode: OMNIPET
+      precedence: OMNIPET_AUTHORITATIVE
+      luckPermsPermissionTemplate: "omnipet.slot.unlocked.%s"
+    unlocks:
+      "2":
+        # Empty means every player may buy this slot. A non-empty node is eligibility-only.
+        permission: ""
+        # Multiple available costs are shown as separate choices; OmniPet never auto-selects.
+        costs: { VAULT: 25000, PLAYER_POINTS: 50 }
+      "3":
+        permission: ""
+        costs: { VAULT: 75000, PLAYER_POINTS: 125 }
+      "4":
+        permission: "omnipet.slot.purchase.4"
+        costs: { VAULT: 175000, PLAYER_POINTS: 250 }
+      "5":
+        permission: "omnipet.slot.purchase.5"
+        costs: { VAULT: 350000, PLAYER_POINTS: 500 }
