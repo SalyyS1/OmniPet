@@ -16,7 +16,8 @@
 - Added a static GitHub Pages workflow that publishes `docs/` without repository secrets.
 - Added migration guidance for legacy `passivepet` permissions, PDC keys, MMOItems stat IDs, data folders, and stable YAML fields.
 - Added dual-read documentation for legacy item identifiers and optional MythicLib/MMOItems integrations.
-- Updated clean-build evidence to 65 suites/239 tests and the verified 930,379-byte Gradle artifact.
+- Unified vault and slot-purchase work behind one plugin-owned per-player queue, with namespaced pending-read coalescing and FIFO cross-controller serialization; hardened lifecycle shutdown ordering, accepted-mutation draining, and dispatch-rejection isolation.
+- Updated clean-build evidence to 68 suites/249 tests (core 39/157, Paper 29/92) and the verified 934,381-byte Gradle artifact with 615 entries, 542 classes, one `paper-plugin.yml`, zero forbidden bundled entries, and a zero-entry Maven build-path scan. Compatibility probes and live-server certification were not rerun for this checkpoint.
 
 ### Compatibility notes
 

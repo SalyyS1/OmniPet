@@ -27,7 +27,8 @@ For documentation-only changes, validate YAML syntax, links, and UTF-8/ASCII-saf
 ## Code and configuration guidelines
 
 - Prefer the existing component, codec, and adapter boundaries over new global state.
-- Keep Bukkit entity, inventory, and optional-plugin calls on the server thread.
+- Route vault and slot-purchase player work through the plugin-owned shared `PerPlayerTaskQueue`. Coalescible reads must use namespaced keys (`vault:view` or `slot:view`); mutations and purchases must never use `submitLatest`, and controllers must not create local per-player queues.
+- Keep Bukkit entity, inventory, permission, and provider work on the server thread; keep repository work async.
 - Keep persistence and migration changes atomic and recoverable.
 - Document user-visible behavior, compatibility claims, and migration requirements.
 - Add focused tests for parser, codec, command, migration, and optional-hook changes.
@@ -44,4 +45,3 @@ Use a concise title such as `fix: reject invalid egg duration` or `docs: publish
 - any unresolved question or follow-up.
 
 Do not include local absolute paths, screenshots containing private server data, or copied vendor code. A maintainer will decide release notes and versioning.
-

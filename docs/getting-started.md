@@ -5,7 +5,7 @@ This guide covers the verified Gradle foundation, Admin Pet Studio, player vault
 ## Requirements
 
 - JDK 21 for the normal build and release target.
-- The checked-in Gradle Wrapper; no system Gradle or Maven workflow is required.
+- The checked-in Gradle Wrapper 9.1.0; no system Gradle or Maven workflow is required.
 - Paper API compatibility should be judged by exact compile probes and live smoke tests, not a version range.
 
 ## Build from source
@@ -20,9 +20,9 @@ gradlew.bat clean build
 ./gradlew clean build
 ```
 
-`clean build` runs module tests and the branding, module-boundary, Gradle-only, compatibility-compile, and distribution checks. Do not substitute Maven commands or add a parallel Maven artifact path.
+`clean build` runs module tests and the branding, module-boundary, Gradle-only, and distribution checks. Exact compatibility probes are separate. Do not substitute Maven commands or add a parallel Maven artifact path.
 
-The 2026-07-31 clean Phase 3 landing build passed 65 suites/239 tests: 157 core and 82 Paper, with zero failures, errors, or skips.
+The 2026-07-31 Java 21 command `gradlew.bat clean build --no-daemon --console=plain` completed successfully in 39 seconds. It passed 68 suites/249 tests: core 39 suites/157 tests and Paper 29 suites/92 tests, with zero failures, errors, or skips. The Maven build-path scan found zero entries.
 
 ## Find the artifact
 
@@ -34,7 +34,7 @@ build/release/OmniPet-3.0.0-SNAPSHOT.jar
 
 The producing module also writes `omnipet-paper/build/libs/OmniPet-3.0.0-SNAPSHOT.jar`. The descriptor author is `SalyVn`.
 
-Verified release metrics: 930,379 bytes; SHA-256 `D2F14E803BF5FCCB1D6B1FCEB22130D926C76BD2AB4BCC006E5D3C3CD0EF0109`; 611 entries, 539 classes, one `paper-plugin.yml`, and zero forbidden bundled entries.
+Verified release metrics: 934,381 bytes; SHA-256 `2573ACD0FAC3BA19CBAC6397D21DC486DCE8609445821CED712BACBCBB00C9C1`; 615 entries, 542 classes, one `paper-plugin.yml`, and zero forbidden bundled entries.
 
 ## Foundation, vault, and Studio server check
 
@@ -64,7 +64,7 @@ The canonical core egg catalog is `plugins/OmniPet/eggs/*.yml`, one schema 1 fil
 
 ## Compatibility scope
 
-The build probes Paper APIs `1.21-R0.1-SNAPSHOT`, `1.21.11-R0.1-SNAPSHOT`, `26.1.1.build.29-alpha`, `26.1.2.build.74-stable`, and `26.2.build.87-stable`. The 26.x jobs use a Java 25 compiler while still producing Java 21 bytecode. These are compile checks only; no live Paper smoke test is part of this evidence.
+The build defines probes for Paper APIs `1.21-R0.1-SNAPSHOT`, `1.21.11-R0.1-SNAPSHOT`, `26.1.1.build.29-alpha`, `26.1.2.build.74-stable`, and `26.2.build.87-stable`. The 26.x jobs use a Java 25 compiler while still producing Java 21 bytecode. These are compile checks only; the shared-queue checkpoint did not rerun them or perform live Paper smoke testing.
 
 ## Next reading
 

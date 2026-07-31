@@ -11,8 +11,10 @@ The Gradle/persistence foundation, Admin Pet Studio slice, Phase 4 storage/econo
 - Legacy egg validation and idempotent semantic-hash journal at bootstrap.
 - Minimal `/pet` command with `/pets` alias and `omnipet.general` default permission.
 - Schema 4 player vault with separate owned capacity and ordered active intent, live consecutive legacy permission resolution, safe overflow behavior, coalesced reads, and serialized per-player Paper I/O.
+- One plugin-owned `PerPlayerTaskQueue` shared by the vault and slot-purchase controllers: FIFO accepted work per player, concurrent work across different players, and coalescing only for pending reads with matching `vault:view` or `slot:view` keys. Reconciliation, mutations, and purchases never coalesce.
 - Provider-neutral economy amount, reflection-safe Vault/PlayerPoints adapters, explicit provider-choice GUI, balance display, durable purchase/refund/entitlement-sync saga, LuckPerms precedence, and audited unknown-provider reconciliation.
 - Conservative schema 1 purchase-journal completion migration, local-entitlement verification, schema 2 atomic rewrite/backup, opaque cursor paging, 16 KiB entry reads, bounded issue summaries, and dependency-aware provider invalidation with coalesced next-tick refresh.
+- Race-hardened shutdown: provider schedule/register/shutdown share one lifecycle lock; controllers stop intake and close relevant UIs, bridges close/cancel, then the shared queue rejects new work and drops pending coalesced reads; accepted mutations drain for up to 10 seconds; dispatch rejection cannot remove another accepted task.
 - Compile probes for exact Paper 1.21.x and 26.x coordinates. These remain probes, not runtime certification.
 - Deterministic `splitmix64-v1` hatch outcome resolution and start/tick/reduce/set/complete/cancel/claim transitions with bounded idempotency tokens, UUID-reuse protection, atomic capacity-safe claim, and durable `READY` state when the vault is full.
 - Canonical one-file-per-egg schema 1 repository with compact/compound/ISO duration parsing, weighted candidates, 64 KiB file reads, and a 10,000-entry catalog bound.
