@@ -2,6 +2,8 @@
 
 OmniPet's shipped definition/storage features do not require another plugin. Optional integrations are capability-gated; exact artifact availability is not a live compatibility guarantee.
 
+The deterministic incubation, egg catalog, and item-escrow core are also vendor-neutral. They snapshot IDs and resolved values but do not load MythicLib, MythicMobs, MMOItems, or ModelEngine, and the current Paper plugin does not yet orchestrate hatch gameplay.
+
 ## Capability matrix
 
 | Capability | Plugin | Current status | Missing-plugin behavior |
@@ -43,7 +45,7 @@ Plugin lifecycle changes do not clear every provider:
 
 Schema 2 definitions can store provider-neutral fields such as MythicLib-oriented stat IDs, opaque skill references, progression metadata, and `display.provider: MODELENGINE`. Admin Pet Studio validates and preserves those values, but persistence does not mean runtime execution.
 
-No current code applies owner stats, casts MythicMobs skills, creates MMOItems, spawns a HEAD/Paper display renderer, or creates a ModelEngine model. Keep a valid head icon for Studio/vault presentation; treat every live gameplay adapter as roadmap work.
+No current code applies owner stats, casts MythicMobs skills, creates MMOItems, spawns a HEAD/Paper display renderer, or creates a ModelEngine model. Deterministic realized stats in a schema 4 incubation outcome are persisted values, not a live MythicLib buff. Keep a valid head icon for Studio/vault presentation; treat every live gameplay adapter as roadmap work.
 
 ## Version hazards
 

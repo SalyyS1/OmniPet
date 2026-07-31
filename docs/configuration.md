@@ -1,6 +1,6 @@
 # Configuration reference
 
-OmniPet reads current configuration and data from `plugins/OmniPet/`. Files are UTF-8 YAML; use spaces, not tabs. This page documents only contracts implemented by the Gradle-built Phase 4 checkpoint.
+OmniPet reads current configuration and data from `plugins/OmniPet/`. Files are UTF-8 YAML; use spaces, not tabs. This page separates Paper-wired configuration from verified dependency-neutral core contracts.
 
 ## Authoritative files
 
@@ -8,16 +8,17 @@ OmniPet reads current configuration and data from `plugins/OmniPet/`. Files are 
 | --- | --- |
 | `config.yml` | Vault capacity, active-slot limits, entitlement policy, and provider prices. |
 | `pets/*.yml` | Schema 2 definition metadata edited by Admin Pet Studio. |
-| `data/players/*.yml` | Schema 3 owned-pet, capacity, entitlement, and desired-active state. |
+| `eggs/*.yml` | Schema 1 canonical egg catalog consumed by the core repository; not yet wired into Paper gameplay. |
+| `data/players/*.yml` | Schema 4 owned-pet, capacity, entitlement, desired-active, and typed incubation state. |
 | `data/purchases/*.yml` | Schema 2 slot-purchase recovery journal. |
 | `migration/legacy-eggs-v1.yml` | Validation/hash journal created from a legacy `eggs.yml`; not a hatching runtime. |
 
-Legacy `eggs.yml`, `items.yml`, `gui.yml`, `lang.yml`, hatching components, triggers, expressions, and item recipes are not current gameplay configuration contracts. Their runtime systems and commands have not shipped.
+Root `eggs.yml` is migration input only; it is not the canonical schema 1 catalog. Legacy `items.yml`, `gui.yml`, `lang.yml`, hatching components, triggers, expressions, and item recipes are not current gameplay configuration contracts. Their runtime systems and commands have not shipped.
 
-## Player storage schema 3
+## Player storage schema 4
 
 ```yaml
-schemaVersion: 3
+schemaVersion: 4
 uuid: eb70fc61-28ae-4a9f-9bda-a44e4d68101c
 revision: 4
 pets: []
@@ -33,6 +34,10 @@ slotEntitlements: []
 - `slotEntitlements` records slot, source, transaction/reference ID, and preserved provider extension data.
 - A lower vault limit never deletes pets. Existing overflow is read-only until capacity is restored.
 - Unknown fields are preserved. Invalid files are quarantined and fail closed rather than becoming empty profiles.
+- `incubation` is optional and singular. When present, it stores the resolved definition revision/icon snapshot/extensions, candidate ID, rarity, quality, deterministic seed/algorithm, realized stats, total/remaining active time, status, and at most the bounded applied action-token history.
+- Schema 1-3 migration keeps raw `currentEgg` and preserves any pre-v4 top-level `incubation` value under legacy extension data. The core refuses a new incubation while unresolved legacy egg/incubation data exists.
+
+The typed incubation node is persisted by core services, but the current Paper bootstrap does not yet schedule online time, remove egg items, expose hatch commands/GUI, execute crash recovery, or orchestrate live claims.
 
 ## Purchase journal migration
 
@@ -130,11 +135,36 @@ Current required fields are `classification.tier`, `icon.head.source`, `icon.hea
 
 Admin Pet Studio can also persist bounded `stats`, `rarity.bands`, `progression`, `skills`, `behavior`, and `release` metadata. The editor validates these fields and preserves unknown raw nodes, but no hatching, progression, skill execution, release gameplay, or owner-stat application consumes them yet.
 
+## Egg definition schema 1
+
+Save one file per egg, for example `plugins/OmniPet/eggs/tier_d_egg.yml`:
+
+```yaml
+schemaVersion: 1
+eggId: tier_d_egg
+tier: D
+baseDuration: 1h30m
+candidates:
+  - definitionId: ember_fox
+    weight: 3
+  - definitionId: stone_wolf
+    weight: 1
+```
+
+- The filename ID must match `eggId`; IDs are path-safe and case-fold unique.
+- `tier` is `D`, `C`, `B`, `A`, or `S`.
+- `baseDuration` accepts compact/compound values such as `90m` or `1h30m`, and ISO-8601 values such as `PT1H30M`.
+- Candidates are unique pet definition IDs with finite non-negative weights and a positive total weight.
+- Each file is capped at 64 KiB and catalog discovery is capped at 10,000 entries.
+
+This is the canonical verified core contract, not a working Paper gameplay example. The Paper bootstrap does not yet bind the repository, item PDC/fingerprint bridge, scheduler, commands, GUI, or recovery executor. The escrow journal has a verified 16 KiB entry cap and 10,000-file scan bound, but no concrete Paper folder path is defined yet.
+
 ## Validation checklist
 
 - YAML parses with spaces and consistent indentation.
 - Definition filename/`definitionId` values are ASCII-safe and case-fold unique.
 - Required schema 2 maps and fields are present.
+- Egg filename/`eggId` values match, duration parses, and candidate weights have a positive total.
 - Numeric stat/range values are finite and ordered.
 - Slot keys such as `"2"` are quoted.
 - PlayerPoints prices are integers; Vault prices round-trip safely through the provider boundary.

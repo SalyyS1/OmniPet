@@ -1,6 +1,6 @@
 # OmniPet
 
-OmniPet is a Paper plugin rewrite. This checkout is the verified Gradle-only foundation plus Admin Pet Studio and the Phase 4 player-storage/economy slice: versioned contracts, tokenized GUIs, persisted vault/active intent, explicit-currency slot purchases, durable recovery journals, and reflection-safe optional provider adapters. Incubation and live pet entities remain phased work.
+OmniPet is a Paper plugin rewrite. This checkout contains the verified Gradle-only foundation, Admin Pet Studio, the player-storage/economy slice, and the dependency-neutral Phase 3 incubation core: schema-v4 state, deterministic hatch outcomes, canonical egg definitions, and item-escrow recovery contracts. The Paper egg-item bridge, online scheduler, hatch commands/GUI, recovery executor, and live pet entities remain phased work.
 
 ## Shipped foundation and Studio
 
@@ -10,9 +10,12 @@ OmniPet is a Paper plugin rewrite. This checkout is the verified Gradle-only fou
 - The descriptor is branded `OmniPet`, authored by `SalyVn`, and loads `io.github.salyvn.omnipet.paper.OmniPetPlugin`.
 - Paper registers `/pet` with `/pets` as its alias. Both names expose the phased player entry point and the live `/pet admin browse` Studio branch.
 - `omnipet.general` defaults to `true`; `omnipet.*` defaults to `op`; declared `omnipet.admin.*` nodes default to `false`.
-- Player envelopes use schema version 3 and pet definitions use schema version 2. The core preserves raw unknown nodes, stable IDs, canonical vault/active intent, legacy egg state, and recoverable orphan data instead of silently replacing a profile.
+- Player envelopes use schema version 4 and pet definitions use schema version 2. The typed singular incubation state snapshots the resolved pet definition/icon, rarity, quality, seed/algorithm, realized stats, active-time budget, status, and bounded idempotency tokens. Schema 1-3 migration preserves raw `currentEgg` and arbitrary legacy `incubation` nodes; unresolved legacy incubation data blocks a new core start instead of being discarded.
 - Atomic writes create `.bak` snapshots when replacing an existing file. Invalid player files are quarantined; a quarantined profile fails closed until an operator performs explicit recovery.
 - Legacy egg definitions are validated and written to `migration/legacy-eggs-v1.yml` with a semantic SHA-256 journal. The source `eggs.yml` is never overwritten by that journal.
+- Canonical egg definitions use schema 1 and one file per ID under `plugins/OmniPet/eggs/*.yml`. The core repository enforces matching filename/`eggId`, safe case-unique IDs, tier, bounded compact/compound/ISO duration, weighted candidates, a 64 KiB file limit, and a 10,000-entry catalog bound. Root `eggs.yml` remains migration input only.
+- `HatchService` provides deterministic `splitmix64-v1` start/tick/reduce/set/complete/cancel/claim transitions. Claim is atomic and vault-capacity-safe; a full vault leaves the incubation `READY` for a later claim.
+- The core item-escrow saga uses the incubation UUID as its transaction UUID and persists item hand, slot, nonce, fingerprint, and expected amount. Atomic compare-transitions cover `PREPARED -> ITEM_REMOVED -> COMMITTED`, cancellation/refund/failure paths, bounded scans, and fail-closed operator review. No concrete Paper journal location is bound yet.
 - `/pet admin browse` and `/pets admin browse` open the D/C/B/A/S Studio tier browser for `omnipet.admin.managepet` staff. The Studio supports paginated definition lists, a reflection-safe MythicLib stat picker with manual fallback, create/edit drafts, typed rarity/progression/skill/release fields, archive mode, safe inventory events, chat input expiry/cancel, optimistic conflict checks, and atomic Save/reload generation swaps.
 - `/pet [page]` and `/pets [page]` open the UUID/revision-safe player vault. View/reconcile reads are coalesced per player, one mutation is admitted at a time, and repository work is serialized off-thread; Bukkit permissions and inventory operations remain on the main thread.
 - `/pet slot` opens the next-slot purchase flow. Vault and PlayerPoints prices are separate choices with balance display and confirmation; no currency is auto-selected. Unknown provider outcomes remain reconciliation-gated.
@@ -23,7 +26,7 @@ OmniPet is a Paper plugin rewrite. This checkout is the verified Gradle-only fou
 
 ## Deferred roadmap
 
-The following remain phased work: live provider/server certification, incubation/hatching gameplay, live renderers, MythicMobs execution, ModelEngine runtime integration, and progression gameplay. See [the roadmap](docs/roadmap.md) for ownership and release gates.
+The following remain phased work: live provider/server certification, Paper egg items/PDC, online incubation checkpoints, join/quit/crash recovery execution, hatch commands/GUI, live claim orchestration, live renderers, MythicMobs execution, ModelEngine runtime integration, owner MythicLib buffs, and progression gameplay. See [the roadmap](docs/roadmap.md) for ownership and release gates.
 
 ## Compatibility
 
@@ -45,7 +48,7 @@ From this directory:
 gradlew.bat clean build
 ```
 
-The single release artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (copied from `omnipet-paper/build/libs/`). The 2026-07-31 post-fix landing build passed 54 suites/203 tests (121 core, 82 Paper) and produced an 831,926-byte JAR with SHA-256 `893C4D6C36CEBB072100B78895DB0FE9023AEA1C33D7F9BD025BE67EB3CDD970`: 557 entries, 487 classes, one descriptor, and zero forbidden bundled entries. Maven commands, `pom.xml`, Maven wrappers, and the old `passivepet2` artifact name are not part of the supported workflow.
+The single release artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (copied from `omnipet-paper/build/libs/`). The 2026-07-31 clean Phase 3 landing build passed 65 suites/239 tests (157 core, 82 Paper) with zero failures, errors, or skips. It produced a 930,379-byte JAR with SHA-256 `D2F14E803BF5FCCB1D6B1FCEB22130D926C76BD2AB4BCC006E5D3C3CD0EF0109`: 611 entries, 539 classes, one descriptor, and zero forbidden bundled entries. Maven commands, `pom.xml`, Maven wrappers, and the old `passivepet2` artifact name are not part of the supported workflow.
 
 ## Migration warning
 
@@ -61,6 +64,6 @@ Before any rebrand or data-folder move, stop the server and make a complete back
 - [Migration](docs/migration.md)
 - [Roadmap](docs/roadmap.md)
 
-Configuration and slot-provider sections identify their current authoritative contracts. Egg, renderer, trigger, and other future examples remain non-authoritative until their owning phases ship.
+Configuration and slot-provider sections identify their current authoritative contracts. The schema 1 egg example documents a verified core contract only; Paper gameplay, renderer, trigger, and other future examples remain non-authoritative until their owning phases ship.
 
 The public [GitHub Pages manual](https://salyys1.github.io/OmniPet/) is deployed from `main`. Changes in this working branch are not public until merged and deployed successfully. The repository wiki is enabled but has no initial page yet, so repository docs remain authoritative.

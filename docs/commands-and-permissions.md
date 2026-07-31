@@ -1,6 +1,6 @@
 # Commands and permissions
 
-The authoritative runtime registers the Gradle-built Paper command, player vault, and Admin Pet Studio. Hatching and live pet gameplay remain phased work.
+The authoritative runtime registers the Gradle-built Paper command, player vault, and Admin Pet Studio. Dependency-neutral incubation/catalog/escrow services exist in core, but hatch commands, GUI, scheduling, recovery execution, and live pet gameplay remain phased work.
 
 ## Command entry point
 
@@ -14,6 +14,8 @@ The authoritative runtime registers the Gradle-built Paper command, player vault
 | `/pet admin reconcile <transaction-uuid> <charge\|no-charge\|refund\|sync>` | `/pets ...` | `omnipet.admin.reconcile` | Applies explicit operator evidence without replaying ambiguous economy calls; `sync` retries only idempotent entitlement verification/grant. |
 
 Studio Save, archive, clone-only authoring, and exact-ID hard delete mutate only definition files through the shared transaction boundary. Hard delete is blocked while YAML, egg, player, or active Studio references exist. Player vault activation changes only ordered UUID intent; no renderer entity is spawned until Phase 5. Slot purchase work runs off-thread, while Vault/PlayerPoints calls are bridged to Paper's main thread and journaled around every external outcome. A required LuckPerms grant is also journaled and must finish before the purchase becomes `COMPLETED`.
+
+No egg issue, incubation, hatch, cancel, claim, or egg-recovery command is registered in this checkpoint. `omnipet.admin.manageegg` remains reserved.
 
 ## Transaction paging and bounds
 

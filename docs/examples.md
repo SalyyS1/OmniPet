@@ -1,6 +1,6 @@
 # Examples
 
-These examples match contracts accepted by the current Gradle-built JAR. They cover definition metadata and Phase 4 storage/economy configuration only. The legacy root `src/main/resources/example/` tree is not packaged by `omnipet-paper` and is not a copy-safe runtime starter.
+These examples match contracts accepted by the current Gradle-built JAR. Pet and storage examples are Paper-wired; the egg example is a verified dependency-neutral core contract only. The legacy root `src/main/resources/example/` tree is not packaged by `omnipet-paper` and is not a copy-safe runtime starter.
 
 ## Minimal schema 2 definition
 
@@ -34,6 +34,26 @@ display:
 ```
 
 This is storage/editor support only. No ModelEngine adapter or fallback Paper renderer consumes it in the current JAR, so do not advertise a visible model.
+
+## Canonical schema 1 egg definition
+
+Save as `plugins/OmniPet/eggs/tier_d_egg.yml`:
+
+```yaml
+schemaVersion: 1
+eggId: tier_d_egg
+tier: D
+baseDuration: 1h30m
+candidates:
+  - definitionId: ember_fox
+    weight: 3
+  - definitionId: stone_wolf
+    weight: 1
+```
+
+The filename must match `eggId`. `baseDuration` accepts compact/compound or ISO-8601 duration text, and candidate weights must have a positive total. The core catalog enforces a 64 KiB limit per file and a 10,000-entry discovery bound.
+
+This example does not start gameplay in the current Paper plugin. The item/PDC bridge, online scheduler, recovery executor, hatch commands/GUI, and live claim path are not wired.
 
 ## Active-slot pricing
 
@@ -89,7 +109,7 @@ After checking the external ledger, apply only the matching decision:
 
 Do not copy legacy examples that imply any of these work in the current JAR:
 
-- egg issue commands, incubation, hatching, or rarity rolls;
+- egg issue commands, Paper incubation scheduling/checkpoints, hatch GUI/commands, or live claim orchestration;
 - summoned pets, Paper display entities, ModelEngine rendering, or movement;
 - food, evolver, egg, or hatcher item commands/integrations;
 - stamina, triggers, expressions, MythicMobs execution, or MythicLib runtime buffs;

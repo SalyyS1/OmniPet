@@ -17,7 +17,7 @@ An `UnsupportedClassVersionError` usually means the Java runtime is older than t
 
 ## Current runtime boundary
 
-The current release ships definition persistence, migration journaling, `/pet [page]`, the player vault/active-intent slice, slot purchase/reconciliation logic, and Admin Pet Studio. Egg, hatching, render, trigger, and live pet-runtime sections below are future design troubleshooting notes until their roadmap phases land.
+The current release ships definition persistence, migration journaling, `/pet [page]`, the player vault/active-intent slice, slot purchase/reconciliation logic, Admin Pet Studio, and dependency-neutral incubation/catalog/escrow core contracts. Paper egg items/PDC, online timing, recovery execution, hatch commands/GUI, live claims, renderers, triggers, and live pet runtime remain future work.
 
 ## Configuration fails to load
 
@@ -28,6 +28,7 @@ The current release ships definition persistence, migration journaling, `/pet [p
 - Quote slot keys such as `"2"`; unquoted numeric YAML keys are rejected by the strict map decoder.
 - Permission templates must contain exactly one `%s` and produce safe nodes no longer than 128 characters. The LuckPerms template is checked for every slot through `storage.activeSlots.max`.
 - Definition `display.provider` accepts `HEAD` or `MODELENGINE`; ModelEngine metadata is stored but no live ModelEngine renderer ships yet.
+- Canonical egg definitions are one schema 1 file per ID under `eggs/*.yml`, with matching filename/`eggId`, a valid compact/compound/ISO `baseDuration`, and weighted candidates. The current Paper bootstrap does not load them for gameplay, so adding a valid file does not create a hatch command or scheduler.
 
 Test one pet file at a time. Preserve the failed file and log; do not replace player data with an empty profile to make an error disappear.
 
@@ -64,7 +65,7 @@ Console use must include a target when the syntax otherwise defaults to the exec
 
 ## A deferred gameplay feature does nothing
 
-Egg issuing, incubation/hatching, summoned/rendered companions, movement, item gameplay, triggers, runtime MythicLib buffs, MythicMobs execution, MMOItems item integration, and progression are not shipped. Definition metadata or legacy files may be preserved without an owning runtime. Do not troubleshoot these as active features; check [Roadmap](roadmap.md) instead.
+Egg issuing, Paper incubation timing/checkpoints, hatch commands/GUI, automated escrow recovery, live claim orchestration, summoned/rendered companions, movement, item gameplay, triggers, runtime MythicLib buffs, MythicMobs execution, MMOItems item integration, and progression are not shipped. Core state transitions and deterministic outcomes do not activate these runtime systems. Definition metadata or legacy files may be preserved without an owning runtime; check [Roadmap](roadmap.md) instead.
 
 ## Migration loaded an empty profile
 
