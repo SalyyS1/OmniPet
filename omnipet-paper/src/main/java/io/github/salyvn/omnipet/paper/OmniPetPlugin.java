@@ -40,6 +40,8 @@ import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegis
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationServices;
+import io.github.salyvn.omnipet.paper.incubation.PaperIncubationCoordinator;
+import io.github.salyvn.omnipet.paper.incubation.IncubationLifecycleListener;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
 import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
@@ -53,6 +55,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PlayerStateRepository playerStates;
     private RegistrySnapshotRepository registry;
     private PaperIncubationServices incubation;
+    private PaperIncubationCoordinator incubationCoordinator;
     private PetStudioController studio;
     private PaperStatCatalogContext statCatalog;
     private PlayerPetController playerPets;
@@ -117,6 +120,8 @@ public final class OmniPetPlugin extends JavaPlugin {
                     new RepositoryPetStorageService(playerStates),
                     limitsResolver,
                     playerTasks);
+            incubationCoordinator = new PaperIncubationCoordinator(
+                    this, incubation, registry, limitsResolver, playerTasks);
             transactionAdmin = new SlotTransactionAdminController(
                     this,
                     new SlotPurchaseReconciliationService(playerStates, purchaseJournal, purchaseTransactions),
@@ -127,12 +132,18 @@ public final class OmniPetPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new StatCatalogLifecycleListener(statCatalog), this);
             getServer().getPluginManager().registerEvents(new PlayerPetMenuListener(playerPets, slotPurchases), this);
             getServer().getPluginManager().registerEvents(new PlayerStorageLifecycleListener(playerPets), this);
+            getServer().getPluginManager().registerEvents(
+                    new IncubationLifecycleListener(incubationCoordinator), this);
             getServer().getPluginManager().registerEvents(new EconomyProviderLifecycleListener(
                     this,
                     economyProviders,
                     luckPermsEntitlements), this);
             registerCommands();
-            getServer().getOnlinePlayers().forEach(playerPets::reconcile);
+            incubationCoordinator.start();
+            getServer().getOnlinePlayers().forEach(player -> {
+                playerPets.reconcile(player);
+                incubationCoordinator.onJoin(player);
+            });
             getLogger().info("OmniPet enabled with Pet Studio, " + snapshot.definitions().size()
                     + " pet definitions, and " + incubation.eggDefinitionCount() + " egg definitions.");
         } catch (IOException | RuntimeException failure) {
@@ -146,6 +157,7 @@ public final class OmniPetPlugin extends JavaPlugin {
         try {
             boolean idle = PlayerTaskShutdown.stopAndDrain(
                     () -> {
+                        if (incubationCoordinator != null) incubationCoordinator.close();
                         if (playerPets != null) playerPets.closeAll();
                         if (slotPurchases != null) slotPurchases.close();
                     },
@@ -199,6 +211,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             PaperStorageLimitsResolver nextLimits = new PaperStorageLimitsResolver(stagedConfig);
             playerPets.updateLimitsResolver(nextLimits);
             slotPurchases.updateLimitsResolver(nextLimits);
+            incubationCoordinator.updateLimitsResolver(nextLimits);
             transactionAdmin.updateActiveSlots(stagedConfig.activeSlots());
             getServer().getOnlinePlayers().forEach(playerPets::reconcile);
             return true;
