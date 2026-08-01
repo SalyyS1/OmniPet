@@ -46,7 +46,7 @@ Do not add vendor modules until an owning phase proves a real API/classloader bo
 
 Unknown top-level fields, pet-instance fields, component maps, current egg data, pre-v4 incubation nodes, slot-entitlement fields, and definition/egg raw nodes are copied into immutable raw maps and written back. This preservation is intentional: later phases may understand data that the current checkpoint does not. Unresolved legacy egg/incubation data blocks a new core incubation start.
 
-## Paper bootstrap and Studio
+## Paper bootstrap, Studio, and incubation bridge
 
 `io.github.salyvn.omnipet.paper.OmniPetPlugin` wires the foundation and Studio:
 
@@ -54,10 +54,11 @@ Unknown top-level fields, pet-instance fields, component maps, current egg data,
 2. Create the data root.
 3. Journal legacy `eggs.yml` if present.
 4. Load or atomically migrate the bounded Phase 4 storage config.
-5. Construct pet/player repositories and load a registry snapshot.
-6. Create the shared Studio transaction, one plugin-owned `PerPlayerTaskQueue`, the player storage and slot-purchase controllers, the purchase journal, and dynamic provider registries.
-7. Register guarded Studio/player/provider lifecycle listeners and `/pet` with `/pets` as alias.
-8. Reconcile online-player storage intent asynchronously; disable the plugin on initialization failure.
+5. Construct pet/player repositories, load `plugins/OmniPet/eggs/*.yml`, bind `plugins/OmniPet/data/egg-escrow/*.yml`, and cache pet-to-egg references.
+6. Load the pet registry snapshot.
+7. Create the shared Studio transaction, one plugin-owned `PerPlayerTaskQueue`, the player storage and slot-purchase controllers, the purchase journal, and dynamic provider registries.
+8. Register guarded Studio/player/provider lifecycle listeners and `/pet` with `/pets` as alias.
+9. Reconcile online-player storage intent asynchronously; disable the plugin on initialization failure.
 
 `/pet admin browse` opens the tokenized Studio tier/list/editor flow. The stat picker reads MythicLib through its own plugin class loader, caches by registry generation, vendor fingerprint, and refresh epoch, and fails closed to manual IDs when the provider is absent, disabled, or incompatible. Save/archive, exact-ID hard delete, clone-only authoring, and `/pet admin reload` use the same staged registry generation boundary; active Studio sessions block removal references.
 
@@ -67,7 +68,13 @@ Unknown top-level fields, pet-instance fields, component maps, current egg data,
 
 Purchase journals write schema 2. On read, schema 1 `COMPLETED`, `ENTITLEMENT_PERSISTED`, and `ENTITLEMENT_SYNC_PENDING` rows normalize to `ENTITLEMENT_SYNC_PENDING` with external entitlement verification required. Financial evidence is preserved and no withdrawal/refund is replayed. The sync path verifies the local OmniPet entitlement before idempotent external sync; a successful save rewrites schema 2 atomically and retains `.bak`. Journal discovery is cursor-paged without sorting or loading the full directory, caps each file read at 16 KiB, and reports at most 20 issue details plus omission/truncation metadata.
 
-Provider disable handling is dependency-aware: Vault and its registered economy service owner invalidate only `VAULT`, PlayerPoints invalidates only `PLAYER_POINTS`, and LuckPerms invalidates only entitlement sync. Provider scheduling, registration, and shutdown share one lifecycle lock; repeated lifecycle events coalesce to one next-tick refresh that atomically republishes adapters whose plugin/service/ABI probes pass. Full OmniPet disable first stops controller intake and closes relevant UIs, then closes/cancels provider bridges. The shared queue then rejects new work, drops pending coalesced reads, and drains accepted mutations for up to 10 seconds. Dispatch rejection is isolated so it cannot erase another accepted task. The incubation/catalog/escrow core is not wired here: Paper item/PDC removal, online checkpoints, recovery execution, commands/GUI, live claim orchestration, runtime stat application, and renderers remain later slices.
+Provider disable handling is dependency-aware: Vault and its registered economy service owner invalidate only `VAULT`, PlayerPoints invalidates only `PLAYER_POINTS`, and LuckPerms invalidates only entitlement sync. Provider scheduling, registration, and shutdown share one lifecycle lock; repeated lifecycle events coalesce to one next-tick refresh that atomically republishes adapters whose plugin/service/ABI probes pass. Full OmniPet disable first stops controller intake and closes relevant UIs, then closes/cancels provider bridges. The shared queue then rejects new work, drops pending coalesced reads, and drains accepted mutations for up to 10 seconds. Dispatch rejection is isolated so it cannot erase another accepted task.
+
+The Paper incubation checkpoint now opens the canonical egg repository and escrow journal during bootstrap. `PaperIncubationServices` caches a pet-to-egg reference index for Studio deletion checks and exposes the core hatch/escrow/recovery services, but no live coordinator calls them yet. `PaperEggItemCodec` dual-reads `omnipet:egg` and legacy `passivepet:egg`, then writes `omnipet:egg`, `omnipet:item_nonce`, and schema-1 `omnipet:item_schema`. Its durable snapshot serializes an amount-one clone, stores the payload in escrow extensions, fingerprints it with SHA-256, and rejects payloads over 8 KiB.
+
+`PaperPlayerEggInventory` scans storage slots plus off-hand and permits capture/removal/refund only while the owner is online and execution is on Paper's primary thread. Recovery is conservative: malformed/unsupported identity, duplicate nonce, material or fingerprint mismatch, or an amount that cannot prove exactly one removal is ambiguous and requires operator review. The live start coordinator, scheduler/checkpoints, join/quit/crash recovery executor, commands/GUI, and live claim orchestration remain later slices; these bridge tests do not certify live Paper runtime behavior.
+
+The egg catalog/reference index is immutable for the lifetime of the current plugin instance. Manual `eggs/*.yml` changes require a stop/restart; `/pet admin reload` currently reloads pet definitions, not egg definitions.
 
 ## Compatibility probes
 
@@ -102,10 +109,10 @@ A successful compile does not prove plugin boot, command behavior, scheduler saf
 
 ## Verification evidence
 
-The 2026-07-31 Java 21 command `gradlew.bat clean build --no-daemon --console=plain` completed successfully in 39 seconds. It passed 68 suites/249 tests: core 39 suites/157 tests and Paper 29 suites/92 tests, with zero failures, errors, or skips. The single artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (934,381 bytes, SHA-256 `2573ACD0FAC3BA19CBAC6397D21DC486DCE8609445821CED712BACBCBB00C9C1`), with 615 entries, 542 classes, one `paper-plugin.yml`, and zero forbidden bundled entries. The Maven build-path scan found zero entries. Compatibility probes were not rerun for this checkpoint.
+The 2026-08-01 Java 21 command `gradlew.bat clean build --no-daemon --console=plain` completed successfully. It passed 76 suites/273 tests: core 39 suites/157 tests and Paper 37 suites/116 tests, with zero failures, errors, or skips. The single artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (956,560 bytes, SHA-256 `EF231E023A2D22F703ACBB11BFEFC8E918B2A68D66009B235504694A1136D3C6`), with 627 entries, 553 classes, one `paper-plugin.yml`, and zero Maven entries. Compatibility probes were not rerun for this checkpoint.
 
 There is no live Paper server smoke-test evidence yet. Treat runtime certification and every optional integration as later release gates.
 
 ## Deferred extension surfaces
 
-Paper incubation orchestration, live multi-pet renderers, MythicMobs skills, ModelEngine, live vendor certification, and a published addon API remain phase-owned roadmap work. Pet ownership/activation mutations must use `PetStorageService`; definition mutations must reuse `RegistrySnapshotTransaction`; economy mutations must use the durable slot saga and never call a provider before journaling external intent. Future Paper hatch start must persist escrow `PREPARED` and the resolved incubation before removing exactly one revalidated item, then advance through `ITEM_REMOVED` to `COMMITTED`.
+The live Paper hatch start coordinator, scheduler/checkpoints, recovery executor, commands/events/GUI, live multi-pet renderers, MythicMobs skills, ModelEngine, live vendor certification, and a published addon API remain phase-owned roadmap work. Pet ownership/activation mutations must use `PetStorageService`; definition mutations must reuse `RegistrySnapshotTransaction`; economy mutations must use the durable slot saga and never call a provider before journaling external intent. The future start coordinator must use the shipped Paper item/inventory seams: persist escrow `PREPARED` and the resolved incubation before removing exactly one revalidated item, then advance through `ITEM_REMOVED` to `COMMITTED`.

@@ -1,6 +1,6 @@
 # Roadmap
 
-The Gradle/persistence foundation, Admin Pet Studio slice, Phase 4 storage/economy code slice, and Phase 3 dependency-neutral incubation core are implemented and verified by automated tests. The execution plan remains in progress until later phases add the Paper hatch bridge and live gameplay evidence. Later phases must not be described as shipped until their code, tests, exact Paper matrix, migration fixtures, and live smoke evidence exist.
+The Gradle/persistence foundation, Admin Pet Studio slice, Phase 4 storage/economy code slice, Phase 3 dependency-neutral incubation core, and current Paper egg catalog/PDC/inventory/escrow bridge checkpoint are implemented and verified by automated tests. The execution plan remains in progress until later slices add the live start coordinator, scheduler/checkpoints, recovery executor, commands/GUI, and gameplay evidence. Later phases must not be described as shipped until their code, tests, exact Paper matrix, migration fixtures, and live smoke evidence exist.
 
 ## Shipped foundation
 
@@ -19,13 +19,15 @@ The Gradle/persistence foundation, Admin Pet Studio slice, Phase 4 storage/econo
 - Deterministic `splitmix64-v1` hatch outcome resolution and start/tick/reduce/set/complete/cancel/claim transitions with bounded idempotency tokens, UUID-reuse protection, atomic capacity-safe claim, and durable `READY` state when the vault is full.
 - Canonical one-file-per-egg schema 1 repository with compact/compound/ISO duration parsing, weighted candidates, 64 KiB file reads, and a 10,000-entry catalog bound.
 - Exactly-once item-escrow create/compare-transition core with stable item identity, 16 KiB entries, a 10,000-file scan bound, explicit inventory observation, and fail-closed recovery directives.
+- Paper bootstrap loading of canonical `plugins/OmniPet/eggs/*.yml`, durable `plugins/OmniPet/data/egg-escrow/*.yml`, and a cached pet-to-egg reference index used by Studio deletion checks.
+- Paper item identity using `omnipet:egg`, `omnipet:item_nonce`, and `omnipet:item_schema`, with legacy `passivepet:egg` dual-read, amount-one durable payloads capped at 8 KiB, effective item max-stack handling, and online/main-thread inventory mutation. Malformed identities, duplicate nonces, material/fingerprint mismatches, and unexpected split amounts fail closed as ambiguous.
 
 ## Deferred phases
 
 | Capability | Status | Boundary/acceptance note |
 | --- | --- | --- |
 | Admin Pet Studio GUI and Studio Save | Shipped Phase 2 slice | D/C/B/A/S browser, dynamic MythicLib stat picker/manual fallback, draft editor, archive, exact-ID hard delete with reference blocking, clone-only authoring, guarded inventory/chat input, and shared atomic generation transaction. Full reference migration and live server UX smoke remain gates. |
-| Incubation/hatching and rarity rolls | Core contract shipped; Paper bridge deferred | Deterministic outcomes, schema 4 state, catalog, escrow, idempotence, migration, and atomic claim exist. Paper item/PDC removal, online checkpoints, join/quit/crash recovery execution, commands/GUI, and live claim orchestration remain gates. |
+| Incubation/hatching and rarity rolls | Core plus Paper bridge checkpoint shipped; live orchestration deferred | Deterministic outcomes, schema 4 state, catalog/journal binding, PDC identity codec, guarded inventory removal/refund seams, escrow, idempotence, migration, cached egg references, and atomic claim exist. The live start coordinator, scheduler/checkpoints, join/quit/crash recovery executor, commands/GUI, and live claim orchestration remain gates. |
 | Canonical multi-pet active intent and vault admission | Shipped Phase 4 slice | Core schema/storage invariants and Paper player vault are present; live renderer reconciliation belongs to Phase 5. |
 | Economy-backed slot purchases | Shipped Phase 4 code slice | Vault/PlayerPoints choices, LuckPerms policy, journal discovery, and audited reconciliation are implemented. Exact provider boot/disable and live inventory smoke remain release gates. |
 | Paper/ModelEngine renderers and smooth movement | Deferred to Phase 5 | ModelEngine class loading, cleanup, fallback, and exact-version tests required. |
@@ -37,7 +39,7 @@ The Gradle/persistence foundation, Admin Pet Studio slice, Phase 4 storage/econo
 
 ## Non-claims
 
-The current JAR ships the definition Studio, player vault/active-intent slice, slot purchase/recovery code, and dependency-neutral incubation/catalog/escrow core. It does not ship the Paper hatching loop, egg item/PDC bridge, hatch GUI/commands, recovery executor, live claim orchestration, live multi-pet renderer, MythicMobs skill execution, ModelEngine adapter, or full gameplay API. Provider runtime compatibility remains unclaimed until live smoke evidence exists.
+The current JAR ships the definition Studio, player vault/active-intent slice, slot purchase/recovery code, dependency-neutral incubation/catalog/escrow core, and the bounded Paper egg catalog/PDC/inventory/escrow bridge seams. It does not ship the live hatch start coordinator, online scheduler/checkpoints, hatch GUI/commands, recovery executor, live claim orchestration, live multi-pet renderer, MythicMobs skill execution, ModelEngine adapter, or full gameplay API. Provider and Paper runtime compatibility remain unclaimed until live smoke evidence exists.
 
 ## Release gates
 

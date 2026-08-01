@@ -1,6 +1,6 @@
 # OmniPet
 
-OmniPet is a Paper plugin rewrite. This checkout contains the verified Gradle-only foundation, Admin Pet Studio, the player-storage/economy slice, and the dependency-neutral Phase 3 incubation core: schema-v4 state, deterministic hatch outcomes, canonical egg definitions, and item-escrow recovery contracts. The Paper egg-item bridge, online scheduler, hatch commands/GUI, recovery executor, and live pet entities remain phased work.
+OmniPet is a Paper plugin rewrite. This checkout contains the verified Gradle-only foundation, Admin Pet Studio, the player-storage/economy slice, the dependency-neutral Phase 3 incubation core, and the current Paper egg catalog/PDC/inventory/escrow bridge checkpoint. The live start coordinator, online scheduler, hatch commands/GUI, recovery executor, and live pet entities remain phased work.
 
 ## Shipped foundation and Studio
 
@@ -15,7 +15,8 @@ OmniPet is a Paper plugin rewrite. This checkout contains the verified Gradle-on
 - Legacy egg definitions are validated and written to `migration/legacy-eggs-v1.yml` with a semantic SHA-256 journal. The source `eggs.yml` is never overwritten by that journal.
 - Canonical egg definitions use schema 1 and one file per ID under `plugins/OmniPet/eggs/*.yml`. The core repository enforces matching filename/`eggId`, safe case-unique IDs, tier, bounded compact/compound/ISO duration, weighted candidates, a 64 KiB file limit, and a 10,000-entry catalog bound. Root `eggs.yml` remains migration input only.
 - `HatchService` provides deterministic `splitmix64-v1` start/tick/reduce/set/complete/cancel/claim transitions. Claim is atomic and vault-capacity-safe; a full vault leaves the incubation `READY` for a later claim.
-- The core item-escrow saga uses the incubation UUID as its transaction UUID and persists item hand, slot, nonce, fingerprint, and expected amount. Atomic compare-transitions cover `PREPARED -> ITEM_REMOVED -> COMMITTED`, cancellation/refund/failure paths, bounded scans, and fail-closed operator review. No concrete Paper journal location is bound yet.
+- The core item-escrow saga uses the incubation UUID as its transaction UUID and persists item hand, slot, nonce, fingerprint, and expected amount. Atomic compare-transitions cover `PREPARED -> ITEM_REMOVED -> COMMITTED`, cancellation/refund/failure paths, bounded scans, and fail-closed operator review. Paper loads canonical definitions from `plugins/OmniPet/eggs/*.yml`, binds the durable journal at `plugins/OmniPet/data/egg-escrow/*.yml`, and caches pet-to-egg references for Studio deletion checks.
+- Paper egg items use `omnipet:egg`, `omnipet:item_nonce`, and `omnipet:item_schema`, with dual-read support for legacy `passivepet:egg`. The durable snapshot normalizes the serialized payload to amount one and rejects payloads over 8 KiB. Inventory mutation requires an online player on the Paper main thread; malformed identities, duplicate nonces, mismatched fingerprints/materials, and unexpected split amounts fail closed as ambiguous. These are verified bridge seams, not a live hatch start or recovery executor.
 - `/pet admin browse` and `/pets admin browse` open the D/C/B/A/S Studio tier browser for `omnipet.admin.managepet` staff. The Studio supports paginated definition lists, a reflection-safe MythicLib stat picker with manual fallback, create/edit drafts, typed rarity/progression/skill/release fields, archive mode, safe inventory events, chat input expiry/cancel, optimistic conflict checks, and atomic Save/reload generation swaps.
 - `/pet [page]` and `/pets [page]` open the UUID/revision-safe player vault. One plugin-owned `PerPlayerTaskQueue` is injected into the vault and slot-purchase controllers: accepted work runs FIFO per player across both controllers, while different players may run concurrently. Only pending reads with the matching namespaced key (`vault:view` or `slot:view`) coalesce; reconciliation, mutations, and purchases never coalesce. Repository work stays async; Bukkit inventory, permission, and provider work stays on the main thread.
 - `/pet slot` opens the next-slot purchase flow. Vault and PlayerPoints prices are separate choices with balance display and confirmation; no currency is auto-selected. Unknown provider outcomes remain reconciliation-gated.
@@ -27,7 +28,7 @@ OmniPet is a Paper plugin rewrite. This checkout contains the verified Gradle-on
 
 ## Deferred roadmap
 
-The following remain phased work: live provider/server certification, Paper egg items/PDC, online incubation checkpoints, join/quit/crash recovery execution, hatch commands/GUI, live claim orchestration, live renderers, MythicMobs execution, ModelEngine runtime integration, owner MythicLib buffs, and progression gameplay. See [the roadmap](docs/roadmap.md) for ownership and release gates.
+The following remain phased work: live provider/server certification, the Paper hatch start coordinator, online incubation checkpoints/scheduler, join/quit/crash recovery execution, hatch commands/GUI, live claim orchestration, live renderers, MythicMobs execution, ModelEngine runtime integration, owner MythicLib buffs, and progression gameplay. See [the roadmap](docs/roadmap.md) for ownership and release gates.
 
 ## Compatibility
 
@@ -49,7 +50,7 @@ From this directory:
 gradlew.bat clean build --no-daemon --console=plain
 ```
 
-The single release artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (copied from `omnipet-paper/build/libs/`). The 2026-07-31 clean shared-queue checkpoint passed 68 suites/249 tests: core 39 suites/157 tests and Paper 29 suites/92 tests, with zero failures, errors, or skips. It produced a 934,381-byte JAR with SHA-256 `2573ACD0FAC3BA19CBAC6397D21DC486DCE8609445821CED712BACBCBB00C9C1`: 615 entries, 542 classes, one `paper-plugin.yml`, and zero forbidden bundled entries. The Maven build-path scan found zero entries. This checkpoint did not rerun compatibility probes or live-server certification. Maven commands, `pom.xml`, Maven wrappers, and the old `passivepet2` artifact name are not part of the supported workflow.
+The single release artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (copied from `omnipet-paper/build/libs/`). The 2026-08-01 clean Paper egg/PDC/escrow bridge checkpoint passed 76 suites/273 tests: core 39 suites/157 tests and Paper 37 suites/116 tests, with zero failures, errors, or skips. It produced a 956,560-byte JAR with SHA-256 `EF231E023A2D22F703ACBB11BFEFC8E918B2A68D66009B235504694A1136D3C6`: 627 entries, 553 classes, one `paper-plugin.yml`, and zero Maven entries. This checkpoint did not rerun compatibility probes or live-server certification. Maven commands, `pom.xml`, Maven wrappers, and the old `passivepet2` artifact name are not part of the supported workflow.
 
 ## Migration warning
 
