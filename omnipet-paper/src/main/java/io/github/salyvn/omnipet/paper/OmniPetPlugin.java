@@ -39,6 +39,7 @@ import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
 import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegistry;
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
+import io.github.salyvn.omnipet.paper.incubation.PaperIncubationServices;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
 import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
@@ -51,6 +52,7 @@ import io.github.salyvn.omnipet.paper.task.PlayerTaskShutdown;
 public final class OmniPetPlugin extends JavaPlugin {
     private PlayerStateRepository playerStates;
     private RegistrySnapshotRepository registry;
+    private PaperIncubationServices incubation;
     private PetStudioController studio;
     private PaperStatCatalogContext statCatalog;
     private PlayerPetController playerPets;
@@ -78,6 +80,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             migrateLegacyEggDefinitions(dataRoot);
             YamlPetDefinitionRepository definitions = new YamlPetDefinitionRepository(dataRoot.resolve("pets"));
             playerStates = new FilePlayerStateRepository(dataRoot.resolve("data/players"));
+            incubation = PaperIncubationServices.open(dataRoot, playerStates);
             FilePurchaseJournal purchaseJournal = new FilePurchaseJournal(dataRoot.resolve("data/purchases"));
             PurchaseTransactionCoordinator purchaseTransactions = new PurchaseTransactionCoordinator();
             registry = new InMemoryRegistrySnapshotRepository();
@@ -86,6 +89,7 @@ public final class OmniPetPlugin extends JavaPlugin {
                     getServer().getPluginManager()));
             studio = new PetStudioController(this, definitions, registry, java.util.List.of(
                     playerStates::referenceScan,
+                    incubation.petReferences(),
                     PetReferenceScanner.yamlFiles(java.util.List.of(dataRoot.resolve("eggs.yml")))), statCatalog);
             PaperStorageLimitsResolver limitsResolver = new PaperStorageLimitsResolver(phase4Config);
             playerTasks = new PerPlayerTaskQueue(task ->
@@ -129,7 +133,8 @@ public final class OmniPetPlugin extends JavaPlugin {
                     luckPermsEntitlements), this);
             registerCommands();
             getServer().getOnlinePlayers().forEach(playerPets::reconcile);
-            getLogger().info("OmniPet enabled with Pet Studio and " + snapshot.definitions().size() + " definitions.");
+            getLogger().info("OmniPet enabled with Pet Studio, " + snapshot.definitions().size()
+                    + " pet definitions, and " + incubation.eggDefinitionCount() + " egg definitions.");
         } catch (IOException | RuntimeException failure) {
             getLogger().severe("OmniPet foundation failed to initialize: " + failure.getMessage());
             getServer().getPluginManager().disablePlugin(this);
