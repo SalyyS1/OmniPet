@@ -8,6 +8,8 @@
 - Added schema 1 egg-definition codecs/repository for one-file-per-egg catalogs with duration parsing, weighted candidates, case-safe IDs, and bounded file/catalog reads.
 - Added the dependency-neutral item-escrow saga with atomic exactly-once create/compare-transition behavior, stable item identity, bounded journal reads/scans, and conservative recovery directives.
 - Added the Paper paid-start saga, UUID-safe join recovery executor, stable cancellation tokens, and a shared-queue monotonic online checkpoint coordinator.
+- Added player-facing `/pet hatch` commands and a durable hatch GUI with exact main/off-hand capture, countdown refresh, escrow-committed gating, and capacity-safe READY claim presentation.
+- Added the in-repo `HatchEvent`/`HatchEventListener` seam for successful persisted core state changes. Events carry `DeliveryStage.STATE_PERSISTED`; unchanged mutations emit no notification, observer failures are isolated, and a `STARTED` notification is not egg escrow/payment proof.
 
 ### Changed
 
@@ -18,7 +20,8 @@
 - Added migration guidance for legacy `passivepet` permissions, PDC keys, MMOItems stat IDs, data folders, and stable YAML fields.
 - Added dual-read documentation for legacy item identifiers and optional MythicLib/MMOItems integrations.
 - Unified vault and slot-purchase work behind one plugin-owned per-player queue, with namespaced pending-read coalescing and FIFO cross-controller serialization; hardened lifecycle shutdown ordering, accepted-mutation draining, and dispatch-rejection isolation.
-- Updated clean-build evidence to the current Gradle verification checkpoint: 79 suites/276 tests (core 39/157, Paper 40/119), zero failures/errors/skips, a 977,517-byte artifact, and zero Maven entries. Compatibility probes, crash-injection proof, and live-server certification were not rerun for this checkpoint.
+- Hardened hatch timing and recovery: the monotonic baseline begins only when committed escrow is observed, failed persisted ticks accumulate elapsed online time, and start-failure/tick/join recovery uses bounded pending scans with explicit operator-review warnings.
+- Updated clean-build evidence to the current JDK 21 Gradle verification checkpoint: 18/18 tasks, 83 suites/290 tests (core 40/164, Paper 43/126), zero failures/errors/skips, a 1,010,248-byte artifact, and zero Maven entries. Compatibility probes, crash-injection proof, and live-server certification were not rerun for this checkpoint.
 
 ### Compatibility notes
 
@@ -26,7 +29,8 @@
 - Paper 26.1.1 artifacts observed during research were alpha builds; no blanket `26.1.1+` support claim is made.
 - Paper 26.1+ requires Java 25. MythicLib, MMOItems, MythicMobs, and ModelEngine vendor support must be verified separately.
 - ModelEngine and Paper display-entity rendering remain roadmap adapter boundaries; no live renderer is shipped in this checkpoint.
-- Paper incubation now includes the paid-start saga, monotonic online checkpoints, and conservative join recovery. Hatch commands, GUI/claim presentation, crash-injection proof, and live claim orchestration remain deferred.
+- Paper incubation now includes the paid-start saga, monotonic online checkpoints, conservative join recovery, hatch commands, and escrow-gated GUI claim presentation. Crash-injection proof and live-server certification remain deferred.
+- Reducer/instant-hatch items, native item distribution, hard MMOItems integration, and a separately versioned public addon API remain deferred. Any consumable hatch item must add durable redemption/escrow; an action token or core state notification alone is insufficient settlement proof.
 
 ### Migration notes
 

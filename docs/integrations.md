@@ -2,7 +2,9 @@
 
 OmniPet's shipped definition/storage features do not require another plugin. Optional integrations are capability-gated; exact artifact availability is not a live compatibility guarantee.
 
-The deterministic incubation, egg catalog, and item-escrow core are also vendor-neutral. They snapshot IDs and resolved values but do not load MythicLib, MythicMobs, MMOItems, or ModelEngine, and the current Paper plugin does not yet orchestrate hatch gameplay.
+The deterministic incubation, egg catalog, item escrow, and structured core hatch-event seam are vendor-neutral. Paper now orchestrates the 27-slot hatch GUI, exact-hand paid start, commit-gated online ticks, bounded recovery, and capacity-safe claim. Live entities, vendor execution, native item distribution, and reducer/instant-hatch item redemption remain deferred.
+
+`HatchEvent`/`HatchEventListener` is an in-repo, low-level persisted-state notification seam: events carry `DeliveryStage.STATE_PERSISTED`, run only after changed player state is saved, emit nothing for unchanged mutations, and isolate observer failures. It is not a separately versioned addon API, and a `STARTED` event does not prove egg escrow/payment commit.
 
 ## Capability matrix
 
@@ -10,7 +12,7 @@ The deterministic incubation, egg catalog, and item-escrow core are also vendor-
 | --- | --- | --- | --- |
 | Studio stat catalog | MythicLib | Reflection-safe picker with manual fallback | Picker unavailable; manual IDs remain supported. |
 | Owner stat application | MythicLib | Deferred | No runtime buff is applied. |
-| Item stats/expressions | MMOItems | Deferred | No OmniPet item integration is active. |
+| Item stats/expressions | MMOItems | Deferred | No hard MMOItems integration, item distribution, reducer, or instant-hatch redemption is active. |
 | Direct skill execution | MythicMobs | Deferred | No direct adapter is loaded. |
 | Live rendering | ModelEngine | Deferred | Definition metadata remains stored; no pet entity is rendered. |
 | Decimal economy | Vault + economy service | Reflection-safe balance/withdraw/refund adapter implemented | Vault choice is unavailable; other storage features remain usable. |
@@ -45,7 +47,7 @@ Plugin lifecycle changes do not clear every provider:
 
 Schema 2 definitions can store provider-neutral fields such as MythicLib-oriented stat IDs, opaque skill references, progression metadata, and `display.provider: MODELENGINE`. Admin Pet Studio validates and preserves those values, but persistence does not mean runtime execution.
 
-No current code applies owner stats, casts MythicMobs skills, creates MMOItems, spawns a HEAD/Paper display renderer, or creates a ModelEngine model. Deterministic realized stats in a schema 4 incubation outcome are persisted values, not a live MythicLib buff. Keep a valid head icon for Studio/vault presentation; treat every live gameplay adapter as roadmap work.
+No current code applies owner stats, casts MythicMobs skills, creates MMOItems, distributes hatch items, spawns a HEAD/Paper display renderer, or creates a ModelEngine model. Deterministic realized stats in a schema 4 incubation outcome are persisted values, not a live MythicLib buff. Future reducer/instant-hatch consumables require durable redemption/escrow; core action-token idempotency and persisted-state events are not settlement. Keep a valid head icon for Studio/vault presentation; treat every live gameplay adapter as roadmap work.
 
 ## Version hazards
 

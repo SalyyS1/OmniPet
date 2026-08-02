@@ -1,6 +1,6 @@
 # Commands and permissions
 
-The authoritative runtime registers the Gradle-built Paper command, player vault, and Admin Pet Studio. Dependency-neutral incubation/catalog/escrow services exist in core, but hatch commands, GUI, scheduling, recovery execution, and live pet gameplay remain phased work.
+The authoritative runtime registers the Gradle-built Paper command, player vault, Admin Pet Studio, and the durable hatch view. Dependency-neutral incubation/catalog/escrow services back the Paper start/recovery coordinator; live pet entities and skill execution remain phased work.
 
 ## Command entry point
 
@@ -8,6 +8,7 @@ The authoritative runtime registers the Gradle-built Paper command, player vault
 | --- | --- | --- | --- |
 | `/pet [page]` | `/pets [page]` | `omnipet.general` | Opens the paginated player vault and toggles persisted desired-active intent. |
 | `/pet slot` | `/pets slot` | `omnipet.general` | Opens explicit Vault/PlayerPoints choices for the next configured active slot. |
+| `/pet hatch [main\|off\|claim\|refresh]` | `/pets hatch ...` | `omnipet.general` | Opens the hatch GUI, captures an exact main/off-hand egg, claims a committed READY hatch, or refreshes the durable view. |
 | `/pet admin browse` | `/pets admin browse` | `omnipet.general` + `omnipet.admin.managepet` | Opens the D/C/B/A/S definition browser and editor. |
 | `/pet admin reload` | `/pets admin reload` | `omnipet.admin.reload` | Stages config/definitions, swaps the live generation, then queues online-player limit reconciliation. |
 | `/pet admin transactions [limit] [cursor]` | `/pets ...` | `omnipet.admin.reconcile` | Lists a bounded page of pending/ambiguous slot transactions and unreadable journal entries. |
@@ -15,7 +16,9 @@ The authoritative runtime registers the Gradle-built Paper command, player vault
 
 Studio Save, archive, clone-only authoring, and exact-ID hard delete mutate only definition files through the shared transaction boundary. Hard delete is blocked while YAML, egg, player, or active Studio references exist. Player vault activation changes only ordered UUID intent; no renderer entity is spawned until Phase 5. Slot purchase work runs off-thread, while Vault/PlayerPoints calls are bridged to Paper's main thread and journaled around every external outcome. A required LuckPerms grant is also journaled and must finish before the purchase becomes `COMPLETED`.
 
-No egg issue, incubation, hatch, cancel, claim, or egg-recovery command is registered in this checkpoint. `omnipet.admin.manageegg` remains reserved.
+The hatch flow does not expose an egg-give, distribution, reducer, or instant-hatch item command. Its 27-slot GUI has four durable presentations: no active incubation offers exact main-hand/off-hand starts in slots 11/15; `INCUBATING` shows the resolved snapshot and countdown in slot 13; `READY` makes slot 13 claimable; terminal history permits another start. Slot 22 always refreshes persisted state.
+
+Starting an egg persists `PREPARED` escrow and the resolved incubation before exact-hand removal, then advances through `ITEM_REMOVED` to `COMMITTED`. Countdown and claim stay locked until `COMMITTED`; a visible `STARTED` state or core `HatchEvent` is not proof of payment settlement. Online time begins from commit observation, and a failed persisted tick retains elapsed online time for a later retry. Start failures, ticks that encounter pending escrow, and joins request conservative bounded recovery; older records beyond the scan bound require operator review. `omnipet.admin.manageegg` remains reserved for future catalog administration.
 
 ## Transaction paging and bounds
 

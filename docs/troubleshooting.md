@@ -17,7 +17,7 @@ An `UnsupportedClassVersionError` usually means the Java runtime is older than t
 
 ## Current runtime boundary
 
-The current release ships definition persistence, migration journaling, `/pet [page]`, the player vault/active-intent slice, slot purchase/reconciliation logic, Admin Pet Studio, and dependency-neutral incubation/catalog/escrow core contracts. Paper egg items/PDC, online timing, recovery execution, hatch commands/GUI, live claims, renderers, triggers, and live pet runtime remain future work.
+The current release ships definition persistence, migration journaling, `/pet [page]`, the player vault/active-intent slice, slot purchase/reconciliation logic, Admin Pet Studio, Paper egg items/PDC, online incubation timing, conservative recovery, hatch commands/GUI, and escrow-gated claims. Renderers, triggers, and live pet runtime remain future work.
 
 ## Configuration fails to load
 
@@ -28,7 +28,7 @@ The current release ships definition persistence, migration journaling, `/pet [p
 - Quote slot keys such as `"2"`; unquoted numeric YAML keys are rejected by the strict map decoder.
 - Permission templates must contain exactly one `%s` and produce safe nodes no longer than 128 characters. The LuckPerms template is checked for every slot through `storage.activeSlots.max`.
 - Definition `display.provider` accepts `HEAD` or `MODELENGINE`; ModelEngine metadata is stored but no live ModelEngine renderer ships yet.
-- Canonical egg definitions are one schema 1 file per ID under `eggs/*.yml`, with matching filename/`eggId`, a valid compact/compound/ISO `baseDuration`, and weighted candidates. The current Paper bootstrap does not load them for gameplay, so adding a valid file does not create a hatch command or scheduler.
+- Canonical egg definitions are one schema 1 file per ID under `eggs/*.yml`, with matching filename/`eggId`, a valid compact/compound/ISO `baseDuration`, and weighted candidates. The Paper bootstrap loads this catalog at startup; restart OmniPet after editing because `/pet admin reload` does not refresh eggs yet.
 
 Test one pet file at a time. Preserve the failed file and log; do not replace player data with an empty profile to make an error disappear.
 
@@ -65,7 +65,15 @@ Console use must include a target when the syntax otherwise defaults to the exec
 
 ## A deferred gameplay feature does nothing
 
-Egg issuing, Paper incubation timing/checkpoints, hatch commands/GUI, automated escrow recovery, live claim orchestration, summoned/rendered companions, movement, item gameplay, triggers, runtime MythicLib buffs, MythicMobs execution, MMOItems item integration, and progression are not shipped. Core state transitions and deterministic outcomes do not activate these runtime systems. Definition metadata or legacy files may be preserved without an owning runtime; check [Roadmap](roadmap.md) instead.
+Egg/item distribution, reducer/instant-hatch item gameplay, a separately versioned public hatch API, summoned/rendered companions, movement, triggers, runtime MythicLib buffs, MythicMobs execution, hard MMOItems integration, and progression are not shipped. The in-repo core hatch listener reports persisted state only; it is not payment settlement or a public vendor event bus. The current hatch command/GUI does not activate those later runtime systems. Definition metadata or legacy files may be preserved without an owning runtime; check [Roadmap](roadmap.md) instead.
+
+## Hatch is locked or not advancing
+
+- Claim and countdown intentionally remain locked until the matching egg escrow row is `COMMITTED`; a persisted `STARTED` incubation or core event is not commit proof.
+- Online time begins when commit is observed. Failed persisted ticks retain their elapsed time and retry later rather than silently losing the interval.
+- Start failures, pending tick observations, and joins request conservative recovery. Keep the player online when exact inventory observation/removal/refund is required.
+- Recovery scans are bounded. If the log says the bound was reached, inspect older pending files in `data/egg-escrow/` manually; do not delete or bulk-edit them.
+- Malformed PDC, duplicate nonces, fingerprint/material mismatches, or ambiguous stack amounts require operator review. Preserve the player file, escrow row, item, and first relevant log message.
 
 ## Migration loaded an empty profile
 

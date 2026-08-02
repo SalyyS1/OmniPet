@@ -62,9 +62,9 @@ plugins/OmniPet/migration/legacy-eggs-v1.yml
 
 The journal includes `schemaVersion`, `kind: legacy-egg-definitions`, a SHA-256 semantic hash of the source, and canonical raw definitions. Repeating the migration with the same content is idempotent. The source `eggs.yml` is never overwritten by the journal, and source/journal identity is rejected.
 
-The canonical new catalog is separate: one schema 1 file per egg under `plugins/OmniPet/eggs/*.yml`, with filename equal to `eggId`, tier, base duration, and weighted pet candidates. Root `eggs.yml` remains migration input only; the current Paper bootstrap does not convert it into or consume the new catalog for gameplay.
+The canonical new catalog is separate: one schema 1 file per egg under `plugins/OmniPet/eggs/*.yml`, with filename equal to `eggId`, tier, base duration, and weighted pet candidates. Root `eggs.yml` remains migration input only; the Paper bootstrap does not convert it automatically, while the hatch flow consumes only the canonical per-file catalog.
 
-The item-escrow core uses the incubation UUID as its transaction UUID and preserves item hand, inventory slot, nonce, SHA-256 fingerprint, and expected amount across `PREPARED`, `ITEM_REMOVED`, `COMMITTED`, cancellation, refund, and failure states. Its recovery directives require explicit inventory observation and send ambiguous failures to operator review. No Paper escrow folder or automated recovery executor is bound yet.
+The item-escrow core uses the incubation UUID as its transaction UUID and preserves item hand, inventory slot, nonce, SHA-256 fingerprint, and expected amount across `PREPARED`, `ITEM_REMOVED`, `COMMITTED`, cancellation, refund, and failure states. Its recovery directives require explicit inventory observation and send ambiguous failures to operator review. Paper requests recovery after start failures, pending online ticks, and joins. Each player scan prioritizes actionable non-terminal stages and stops at a bounded limit; a bound warning means older pending records need manual operator review, not that recovery completed. Crash-injection and live certification remain release gates.
 
 ## Purchase journal schema 1
 
@@ -82,7 +82,7 @@ Schema 1 `FAILED` rows with a proven withdrawal and proven refund failure enter 
 
 ## IDs, items, and permissions
 
-Keep pet filenames, egg map keys, item IDs, component IDs, and expression references byte-for-byte stable. The migration boundary recognizes legacy item namespace `passivepet` for `pet`, `egg`, `food`, `hatcher`, and `evolver` keys. The current Gradle-built JAR does not ship item gameplay or an item conversion command.
+Keep pet filenames, egg map keys, item IDs, component IDs, and expression references byte-for-byte stable. The migration boundary recognizes legacy item namespace `passivepet` for `pet`, `egg`, `food`, `hatcher`, and `evolver` keys. The current JAR consumes supported egg PDC for exact-hand hatch start but does not provide item conversion/distribution commands, reducer/instant-hatch items, or hard MMOItems integration. Future consumables require a durable redemption/escrow contract; copied action tokens or state events alone cannot prove settlement.
 
 The command entry point checks `omnipet.general`, while Studio branches additionally check their declared admin permission. Move permission grants to `omnipet.*` names; the rewritten runtime does not provide the old runtime's legacy permission fallback.
 
@@ -95,7 +95,7 @@ The command entry point checks `omnipet.general`, while Studio branches addition
 5. Verify migrated `config.yml`, vault/active limits, `/pet`, `/pet slot`, and `/pet admin transactions` only after successful initialization.
 6. Test Vault/PlayerPoints-disabled fallbacks and LuckPerms entitlement policy without claiming live provider certification.
 7. Resolve schema 1 purchase rows by transaction UUID; prove no economy replay and confirm the schema 2 rewrite/backup.
-8. Keep Paper egg items/PDC, online incubation timing, recovery execution, hatch commands/GUI, live claims, renderers, skills, movement, and progression migration deferred until those runtime phases ship.
+8. Stage-test Paper egg/PDC migration, online incubation timing, recovery, hatch GUI, and claims before production; keep renderers, skills, movement, and progression migration deferred until those runtime phases ship.
 
 ## Rollback
 

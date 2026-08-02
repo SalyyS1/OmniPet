@@ -1,6 +1,6 @@
 # Examples
 
-These examples match contracts accepted by the current Gradle-built JAR. Pet and storage examples are Paper-wired; the egg example is a verified dependency-neutral core contract only. The legacy root `src/main/resources/example/` tree is not packaged by `omnipet-paper` and is not a copy-safe runtime starter.
+These examples match contracts accepted by the current Gradle-built JAR. Pet, storage, and canonical egg examples are Paper-wired; egg catalog edits require restart. The legacy root `src/main/resources/example/` tree is not packaged by `omnipet-paper` and is not a copy-safe runtime starter.
 
 ## Minimal schema 2 definition
 
@@ -53,7 +53,7 @@ candidates:
 
 The filename must match `eggId`. `baseDuration` accepts compact/compound or ISO-8601 duration text, and candidate weights must have a positive total. The core catalog enforces a 64 KiB limit per file and a 10,000-entry discovery bound.
 
-This example does not start gameplay in the current Paper plugin. The item/PDC bridge, online scheduler, recovery executor, hatch commands/GUI, and live claim path are not wired.
+After restart, a valid item carrying the canonical egg PDC can enter this definition through `/pet hatch main` or `/pet hatch off`. The online scheduler, conservative recovery executor, GUI countdown, and capacity-safe claim path are wired, but still require live Paper certification.
 
 ## Active-slot pricing
 
@@ -109,7 +109,7 @@ After checking the external ledger, apply only the matching decision:
 
 Do not copy legacy examples that imply any of these work in the current JAR:
 
-- egg issue commands, Paper incubation scheduling/checkpoints, hatch GUI/commands, or live claim orchestration;
+- egg/item distribution commands, reducer/instant-hatch item integrations, or a separately versioned public hatch API (the core listener is only an in-repo persisted-state seam);
 - summoned pets, Paper display entities, ModelEngine rendering, or movement;
 - food, evolver, egg, or hatcher item commands/integrations;
 - stamina, triggers, expressions, MythicMobs execution, or MythicLib runtime buffs;

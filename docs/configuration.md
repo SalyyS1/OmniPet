@@ -8,13 +8,13 @@ OmniPet reads current configuration and data from `plugins/OmniPet/`. Files are 
 | --- | --- |
 | `config.yml` | Vault capacity, active-slot limits, entitlement policy, and provider prices. |
 | `pets/*.yml` | Schema 2 definition metadata edited by Admin Pet Studio. |
-| `eggs/*.yml` | Schema 1 canonical egg catalog loaded by the Paper bootstrap for validation, hatch services, and cached Studio reference checks; not yet driven by live hatch gameplay. |
+| `eggs/*.yml` | Schema 1 canonical egg catalog consumed by Paper hatch start and cached Studio reference checks; restart required after edits. |
 | `data/players/*.yml` | Schema 4 owned-pet, capacity, entitlement, desired-active, and typed incubation state. |
 | `data/purchases/*.yml` | Schema 2 slot-purchase recovery journal. |
-| `data/egg-escrow/*.yml` | Durable egg-item escrow journal bound by the Paper bootstrap; live recovery execution remains deferred. |
+| `data/egg-escrow/*.yml` | Durable egg-item escrow journal used by Paper exact-hand start, commit gating, bounded recovery, and refund/cancellation decisions. |
 | `migration/legacy-eggs-v1.yml` | Validation/hash journal created from a legacy `eggs.yml`; not a hatching runtime. |
 
-Root `eggs.yml` is migration input only; it is not the canonical schema 1 catalog. Legacy `items.yml`, `gui.yml`, `lang.yml`, hatching components, triggers, expressions, and item recipes are not current gameplay configuration contracts. Their runtime systems and commands have not shipped.
+Root `eggs.yml` is migration input only; it is not the canonical schema 1 catalog. Legacy `items.yml`, `gui.yml`, `lang.yml`, hatching components, triggers, expressions, and item recipes are not current gameplay configuration contracts. Paper owns the hatch GUI/start/tick/recovery/claim path, but native item distribution, reducer/instant-hatch items, and their durable redemption contracts have not shipped.
 
 ## Player storage schema 4
 
@@ -38,7 +38,7 @@ slotEntitlements: []
 - `incubation` is optional and singular. When present, it stores the resolved definition revision/icon snapshot/extensions, candidate ID, rarity, quality, deterministic seed/algorithm, realized stats, total/remaining active time, status, and at most the bounded applied action-token history.
 - Schema 1-3 migration keeps raw `currentEgg` and preserves any pre-v4 top-level `incubation` value under legacy extension data. The core refuses a new incubation while unresolved legacy egg/incubation data exists.
 
-The typed incubation node is persisted by core services. Paper now binds the canonical egg repository, PDC/item codec, guarded inventory mutation seam, and durable escrow folder, but no live start coordinator invokes the full transaction. Online timing, scheduler/checkpoints, hatch commands/GUI, crash-recovery execution, and live claims remain deferred.
+The typed incubation node is persisted by core services. Paper binds the canonical egg repository, PDC/item codec, guarded inventory mutation seam, durable escrow folder, online checkpoint coordinator, conservative recovery executor, and hatch GUI/claim flow. Crash-injection proof and live Paper certification remain deferred.
 
 ## Purchase journal migration
 
@@ -158,11 +158,11 @@ candidates:
 - Candidates are unique pet definition IDs with finite non-negative weights and a positive total weight.
 - Each file is capped at 64 KiB and catalog discovery is capped at 10,000 entries.
 
-This is the canonical verified definition contract, not a working Paper gameplay example. The Paper bootstrap loads it from `plugins/OmniPet/eggs/*.yml`, binds escrow entries at `plugins/OmniPet/data/egg-escrow/*.yml`, and caches a pet-to-egg reference index used by Studio deletion checks.
+This is the canonical verified definition contract used by the Paper hatch flow. The Paper bootstrap loads it from `plugins/OmniPet/eggs/*.yml`, binds escrow entries at `plugins/OmniPet/data/egg-escrow/*.yml`, and caches a pet-to-egg reference index used by Studio deletion checks.
 
 Paper egg identity uses `omnipet:egg`, `omnipet:item_nonce`, and schema-1 `omnipet:item_schema`; reads also accept legacy `passivepet:egg`. Capture serializes an amount-one clone as the durable payload, fingerprints it with SHA-256, and rejects payloads over 8 KiB. Inventory capture/removal/refund requires the player to remain online and must run on Paper's main thread. Malformed or unsupported identity, duplicate nonce, material/fingerprint mismatch, or an unexpected split amount fails closed as ambiguous instead of guessing whether the paid egg is present. Escrow entries retain the core 16 KiB file cap and 10,000-file scan bound.
 
-The live start coordinator, scheduler/checkpoints, recovery executor, commands/GUI, and live claim orchestration are still deferred. The current unit-tested bridge does not certify live Paper/server behavior. Bootstrap creates and validates the escrow directory, rejecting a regular file or symbolic-link path before the plugin exposes incubation services.
+The live start coordinator, scheduler/checkpoints, recovery executor, commands/GUI, and claim orchestration are wired and unit/compile tested. This evidence does not certify live Paper/server behavior. Bootstrap creates and validates the escrow directory, rejecting a regular file or symbolic-link path before the plugin exposes incubation services.
 
 The egg catalog and pet-reference index are snapshots loaded during plugin bootstrap. Until an atomic egg reload path ships, stop/restart OmniPet after editing `eggs/*.yml`; `/pet admin reload` does not refresh the egg catalog in this checkpoint.
 

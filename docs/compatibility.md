@@ -2,7 +2,7 @@
 
 Current compatibility evidence consists of Java/Gradle tests and Paper API compile probes. It does not include a live Paper server smoke test, gameplay certification, or vendor-plugin certification.
 
-Verification snapshot: 2026-07-31.
+Verification snapshot: 2026-08-02. The clean JDK 21 Gradle build passed all 18 tasks and 83 suites/290 tests with zero failures, errors, or skips. Compatibility probes were not rerun for this checkpoint.
 
 ## Java baseline
 
@@ -22,13 +22,13 @@ Do not convert these rows into `1.21.x supported`, `26.1.1+ supported`, or `late
 
 ## Current runtime scope
 
-The current Paper code loads repositories, migrates bounded storage config, journals legacy eggs, builds a definition snapshot, registers `/pet` with `/pets` alias, and exercises Admin Pet Studio, the player vault, provider-choice slot menus, and transaction reconciliation. Purchase-journal schema 1 completion states are conservatively reopened for entitlement verification without replaying economy calls. Provider disable events invalidate only the affected Vault/service-owner, PlayerPoints, or LuckPerms adapter; refresh is coalesced to the next tick. The JAR also contains dependency-neutral schema 4 incubation, deterministic hatch, schema 1 egg catalog, and item-escrow core contracts. These paths have compile/unit evidence but no live-server smoke certification. Paper egg items/PDC, scheduler/checkpoints, recovery execution, hatch commands/GUI, live claims, entities, renderers, skills, and progression remain deferred.
+The current Paper code loads repositories, migrates bounded storage config, journals legacy eggs, builds a definition snapshot, registers `/pet` with `/pets` alias, and exercises Admin Pet Studio, the player vault, provider-choice slot menus, transaction reconciliation, and the escrow-gated 27-slot hatch GUI/start/tick/recovery/claim flow. Hatch timing begins only after committed escrow is observed; failed persisted ticks retain elapsed online time, and bounded pending recovery runs after start failures, pending ticks, and joins. Purchase-journal schema 1 completion states are conservatively reopened for entitlement verification without replaying economy calls. Provider disable events invalidate only the affected Vault/service-owner, PlayerPoints, or LuckPerms adapter; refresh is coalesced to the next tick. The JAR also contains dependency-neutral schema 4 incubation, deterministic hatch, schema 1 egg catalog, item-escrow contracts, and an in-repo persisted-state listener seam. These paths have compile/unit evidence but no live-server smoke certification. Live entities, renderers, skills, reducer/instant items, hard MMOItems integration, and a separately versioned public API remain deferred.
 
 ## Optional integrations
 
 | Integration | Current state | Compatibility position |
 | --- | --- | --- |
-| MythicLib/MMOItems | Reflection-safe MythicLib Studio catalog; MMOItems affects provider fingerprint but item stats stay separate | GUI/catalog compile-tested only; hatch outcomes remain provider-neutral snapshots, while live vendor smoke and runtime buff application remain deferred. |
+| MythicLib/MMOItems | Reflection-safe MythicLib Studio catalog; MMOItems only affects optional capability fingerprinting and has no item creation/redemption bridge | GUI/catalog compile-tested only; hatch outcomes remain provider-neutral snapshots, while live vendor smoke, hard MMOItems integration, and runtime buff application remain deferred. |
 | MythicMobs skills | Not implemented | Deferred to the skill phase. |
 | ModelEngine | Domain provider value exists; no renderer adapter | Deferred; no runtime or 26.x claim. |
 | Vault/PlayerPoints/LuckPerms | Reflection-safe adapters, balances, explicit selection/confirm, dynamic lifecycle, entitlement precedence, and audited recovery implemented | Unit/compile evidence only; no exact provider or live runtime compatibility claim. |
@@ -45,6 +45,6 @@ Before advertising an exact Paper build, run at least:
 4. Player migration, `.bak`, quarantine, restart, and explicit recovery.
 5. Every shipped gameplay system once its phase exists.
 6. Every optional integration permutation advertised by the release.
-7. Paper hatch item removal, online-time checkpoints, restart recovery, and capacity-safe claim after their bridge ships.
+7. Paper hatch exact-hand removal, commit-gated online-time checkpoints, bounded restart recovery, and capacity-safe claim.
 
 Record exact build strings and test dates. Passing compilation remains necessary but insufficient.
