@@ -2,7 +2,7 @@
 
 Current compatibility evidence consists of Java/Gradle tests and Paper API compile probes. It does not include a live Paper server smoke test, gameplay certification, or vendor-plugin certification.
 
-Verification snapshot: 2026-08-02. The clean JDK 21 Gradle build passed all 18 tasks and 83 suites/290 tests with zero failures, errors, or skips. Compatibility probes were not rerun for this checkpoint.
+Verification snapshot: 2026-08-02. The clean JDK 21 Gradle build passed all 18 tasks and 132 suites/460 tests with zero failures, errors, or skips. Compatibility probes were not rerun for this checkpoint.
 
 ## Java baseline
 

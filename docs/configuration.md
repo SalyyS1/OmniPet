@@ -6,15 +6,19 @@ OmniPet reads current configuration and data from `plugins/OmniPet/`. Files are 
 
 | Path | Current purpose |
 | --- | --- |
-| `config.yml` | Vault capacity, active-slot limits, entitlement policy, and provider prices. |
+| `config.yml` | Vault capacity, active-slot limits, entitlement policy, provider prices, runtime coordinator bounds, progression defaults, and cultivation item identities. |
 | `pets/*.yml` | Schema 2 definition metadata edited by Admin Pet Studio. |
 | `eggs/*.yml` | Schema 1 canonical egg catalog consumed by Paper hatch start and cached Studio reference checks; restart required after edits. |
-| `data/players/*.yml` | Schema 4 owned-pet, capacity, entitlement, desired-active, and typed incubation state. |
+| `data/players/*.yml` | Schema 4 owned-pet, capacity, entitlement, desired-active, typed incubation, progression, skill, and release-outbox state. |
 | `data/purchases/*.yml` | Schema 2 slot-purchase recovery journal. |
 | `data/egg-escrow/*.yml` | Durable egg-item escrow journal used by Paper exact-hand start, commit gating, bounded recovery, and refund/cancellation decisions. |
+| `data/incubation-actions/*.yml` | Durable reducer/instant-hatch item redemption journal. |
+| `data/cultivation-actions/*.yml` | Durable EXP candy and breakthrough item redemption journal. |
+| `data/release-mailbox/*.mailbox` | Durable release reward entitlements awaiting inventory claim or reconciliation. |
+| `data/audit/studio/*.yml` | One durable audit record per accepted Studio save, archive, or hard delete. |
 | `migration/legacy-eggs-v1.yml` | Validation/hash journal created from a legacy `eggs.yml`; not a hatching runtime. |
 
-Root `eggs.yml` is migration input only; it is not the canonical schema 1 catalog. Legacy `items.yml`, `gui.yml`, `lang.yml`, hatching components, triggers, expressions, and item recipes are not current gameplay configuration contracts. Paper owns the hatch GUI/start/tick/recovery/claim path, but native item distribution, reducer/instant-hatch items, and their durable redemption contracts have not shipped.
+Root `eggs.yml` is migration input only; it is not the canonical schema 1 catalog. Legacy `items.yml`, `gui.yml`, `lang.yml`, hatching components, triggers, expressions, and item recipes are not current gameplay configuration contracts.
 
 ## Player storage schema 4
 
@@ -98,6 +102,47 @@ storage:
 - Unknown keys, unsafe templates, inconsistent mode/precedence pairs, inverted limits, and unsupported values fail closed before the live snapshot changes.
 
 Old files containing `globalMaxSlots` and/or `slotPermission` are accepted once and rewritten atomically. Missing old keys use the legacy defaults (`1000` and `petstorage.slot.%s`); `globalMaxSlots: 0` becomes zero capacity with legacy scanning disabled. The original file remains `config.yml.bak`.
+
+### Runtime, progression, and item sections
+
+A storage-only `config.yml` still loads; these sections use documented defaults when absent.
+
+```yaml
+runtime:
+  initialDelayTicks: 1
+  periodTicks: 1
+  maximumOwnersPerTick: 64
+  maximumPetsPerOwner: 10
+
+progression:
+  maxLevel: 100
+  maxStamina: 100.0
+  staminaRegenPerSecond: 1.0
+  defaultExperienceFormula: "100 + level * 25 + evolution * 100"
+  formulaSamples: { level: 1.0, rarity: 1.0, quality: 0.5, evolution: 0.0 }
+  overflowPolicy: CARRY
+
+items:
+  experienceCandy:
+    material: EXPERIENCE_BOTTLE
+    experience: 100.0
+  breakthroughStone:
+    material: NETHER_STAR
+    requiredLevel: 10
+    requiredEvolution: 0
+
+integrations:
+  mythicLib: "1.7.1-SNAPSHOT build 106"
+  mythicMobs: "5.9.0"
+  modelEngine: "R4.0.9"
+```
+
+- `runtime` bounds the single pet coordinator. `maximumOwnersPerTick` and `maximumPetsPerOwner` cap work per tick; owners are visited round-robin so a large fleet degrades update rate instead of tick time. Scheduler values are read at enable; changing them logs a warning and requires a restart.
+- `progression.defaultExperienceFormula` is compiled and evaluated against `formulaSamples` before activation. A non-finite or non-positive sample rejects the config. A pet definition may override the formula; an invalid override falls back to this validated global one.
+- `overflowPolicy` is `CARRY` or `DISCARD` and decides what happens to experience granted at `maxLevel`.
+- `items` defines the standalone material identities for EXP candy and breakthrough stones. MMOItems identities are not supported yet.
+- `integrations` records the vendor builds the linkage-safe adapters target. These values are documentation only; they do not gate loading.
+- Unknown root or section keys fail closed before the live snapshot changes.
 
 ## Provider lifecycle
 

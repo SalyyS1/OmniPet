@@ -22,7 +22,7 @@ gradlew.bat clean build
 
 `clean build` runs module tests and the branding, module-boundary, Gradle-only, and distribution checks. Exact compatibility probes are separate. Do not substitute Maven commands or add a parallel Maven artifact path.
 
-The 2026-08-02 clean JDK 21 Gradle build completed successfully with all 18 tasks. It passed 83 suites/290 tests: core 40 suites/164 tests and Paper 43 suites/126 tests, with zero failures, errors, or skips. The Gradle-only build-path scan found zero Maven entries.
+The 2026-08-02 clean JDK 21 Gradle build completed successfully with all 18 tasks. It passed 132 suites/460 tests: core 62 suites/237 tests and Paper 70 suites/223 tests, with zero failures, errors, or skips. The Gradle-only build-path scan found zero Maven entries.
 
 ## Find the artifact
 
@@ -34,7 +34,7 @@ build/release/OmniPet-3.0.0-SNAPSHOT.jar
 
 The producing module also writes `omnipet-paper/build/libs/OmniPet-3.0.0-SNAPSHOT.jar`. The descriptor author is `SalyVn`.
 
-Verified release metrics: 1,010,248 bytes; SHA-256 `71F381BF1BFBA125CDE35D8883734F8CC09BAAF559680D0DB2AB52588F3325B7`; 650 entries, 575 classes, one `paper-plugin.yml`, and zero Maven entries.
+Verified release metrics: 1,589,438 bytes; SHA-256 `199E919F7123074A67EE5F4BF913AFF9CBCE86C28B9D281D14A07810D4E81584`; 976 entries, 888 classes, one `paper-plugin.yml`, and zero Maven entries.
 
 ## Foundation, vault, and Studio server check
 
