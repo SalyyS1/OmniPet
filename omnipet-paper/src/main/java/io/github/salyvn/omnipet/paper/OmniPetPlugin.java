@@ -24,15 +24,20 @@ import io.github.salyvn.omnipet.core.economy.PurchaseTransactionCoordinator;
 import io.github.salyvn.omnipet.core.economy.SlotPurchaseReconciliationService;
 import io.github.salyvn.omnipet.core.economy.SlotUnlockService;
 import io.github.salyvn.omnipet.core.storage.RepositoryPetStorageService;
+import io.github.salyvn.omnipet.core.incubation.IncubationItemActionFileJournal;
+import io.github.salyvn.omnipet.core.incubation.IncubationItemActionService;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrationResult;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrator;
 import io.github.salyvn.omnipet.paper.command.FoundationCommandContract;
 import io.github.salyvn.omnipet.paper.command.OmniPetCommand;
+import io.github.salyvn.omnipet.paper.buff.MythicLibBuffLifecycleListener;
+import io.github.salyvn.omnipet.paper.buff.PaperOwnerBuffCoordinator;
 import io.github.salyvn.omnipet.paper.catalog.PaperStatCatalogContext;
 import io.github.salyvn.omnipet.paper.catalog.ReflectiveMythicLibStatCatalogSource;
 import io.github.salyvn.omnipet.paper.catalog.StatCatalogLifecycleListener;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfig;
-import io.github.salyvn.omnipet.paper.config.Phase4PaperConfigLoader;
+import io.github.salyvn.omnipet.paper.config.OmniPetConfig;
+import io.github.salyvn.omnipet.paper.config.OmniPetConfigLoader;
 import io.github.salyvn.omnipet.paper.economy.EconomyProviderLifecycleListener;
 import io.github.salyvn.omnipet.paper.economy.PaperEconomyProviderRegistry;
 import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
@@ -42,16 +47,30 @@ import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuListener;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationServices;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationCoordinator;
+import io.github.salyvn.omnipet.paper.incubation.HatchAdminController;
 import io.github.salyvn.omnipet.paper.incubation.IncubationLifecycleListener;
+import io.github.salyvn.omnipet.paper.incubation.action.IncubationActionItemController;
+import io.github.salyvn.omnipet.paper.incubation.action.IncubationItemActionCoordinator;
+import io.github.salyvn.omnipet.paper.incubation.action.PaperIncubationItemActionCodec;
+import io.github.salyvn.omnipet.paper.incubation.action.PaperIncubationItemActionInventory;
+import io.github.salyvn.omnipet.paper.incubation.action.RepositoryIncubationItemActionHatchPort;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
 import io.github.salyvn.omnipet.paper.player.PlayerHatchController;
 import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
 import io.github.salyvn.omnipet.paper.player.PlayerStorageLifecycleListener;
+import io.github.salyvn.omnipet.paper.runtime.PaperPetRuntimeCoordinator;
+import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeBootstrap;
+import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeSnapshotPublisher;
+import io.github.salyvn.omnipet.paper.render.RendererProviderLifecycleListener;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioListener;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerTaskShutdown;
+import io.github.salyvn.omnipet.paper.skill.MythicMobsSkillLifecycleListener;
+import io.github.salyvn.omnipet.paper.skill.PaperActiveSkillController;
+import io.github.salyvn.omnipet.paper.skill.PaperMythicMobsSkillContext;
+import io.github.salyvn.omnipet.paper.management.OmniPetManagementServices;
 
 public final class OmniPetPlugin extends JavaPlugin {
     private PlayerStateRepository playerStates;
@@ -59,15 +78,23 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PaperIncubationServices incubation;
     private PaperIncubationCoordinator incubationCoordinator;
     private PlayerHatchController hatchController;
+    private HatchAdminController hatchAdmin;
+    private IncubationActionItemController actionItems;
     private PetStudioController studio;
     private PaperStatCatalogContext statCatalog;
     private PlayerPetController playerPets;
+    private PaperPetRuntimeCoordinator petRuntime;
+    private PaperOwnerBuffCoordinator ownerBuffs;
     private PlayerSlotPurchaseController slotPurchases;
     private PerPlayerTaskQueue playerTasks;
     private PaperEconomyProviderRegistry economyProviders;
     private PaperLuckPermsEntitlementRegistry luckPermsEntitlements;
     private SlotTransactionAdminController transactionAdmin;
     private Path configFile;
+    private OmniPetConfig activeConfig;
+    private PaperMythicMobsSkillContext skillProviders;
+    private PaperActiveSkillController activeSkills;
+    private OmniPetManagementServices managementServices;
 
     @Override
     public void onEnable() {
@@ -82,7 +109,8 @@ public final class OmniPetPlugin extends JavaPlugin {
                 throw new IOException("OmniPet config.yml cannot be a symbolic link");
             }
             if (!Files.exists(configFile, LinkOption.NOFOLLOW_LINKS)) saveResource("config.yml", false);
-            Phase4PaperConfig phase4Config = loadPhase4Config();
+            activeConfig = loadConfig();
+            Phase4PaperConfig phase4Config = activeConfig.storage();
             migrateLegacyEggDefinitions(dataRoot);
             YamlPetDefinitionRepository definitions = new YamlPetDefinitionRepository(dataRoot.resolve("pets"));
             playerStates = new FilePlayerStateRepository(dataRoot.resolve("data/players"));
@@ -91,6 +119,11 @@ public final class OmniPetPlugin extends JavaPlugin {
             PurchaseTransactionCoordinator purchaseTransactions = new PurchaseTransactionCoordinator();
             registry = new InMemoryRegistrySnapshotRepository();
             var snapshot = new FoundationRegistryLoader().load(definitions, registry);
+            petRuntime = PaperRuntimeBootstrap.create(this, activeConfig.runtime());
+            ownerBuffs = new PaperOwnerBuffCoordinator(this);
+            ownerBuffs.refreshProvider();
+            skillProviders = new PaperMythicMobsSkillContext(this);
+            skillProviders.refresh();
             statCatalog = new PaperStatCatalogContext(new ReflectiveMythicLibStatCatalogSource(
                     getServer().getPluginManager()));
             studio = new PetStudioController(this, definitions, registry, java.util.List.of(
@@ -100,6 +133,8 @@ public final class OmniPetPlugin extends JavaPlugin {
             PaperStorageLimitsResolver limitsResolver = new PaperStorageLimitsResolver(phase4Config);
             playerTasks = new PerPlayerTaskQueue(task ->
                     getServer().getScheduler().runTaskAsynchronously(this, task));
+            activeSkills = new PaperActiveSkillController(
+                    this, playerStates, registry, skillProviders, playerTasks, activeConfig.progression());
             economyProviders = new PaperEconomyProviderRegistry(this);
             luckPermsEntitlements = new PaperLuckPermsEntitlementRegistry(this);
             economyProviders.refresh();
@@ -118,15 +153,33 @@ public final class OmniPetPlugin extends JavaPlugin {
                     entitlementSync,
                     limitsResolver,
                     playerTasks);
+            PaperRuntimeSnapshotPublisher runtimeSnapshots = new PaperRuntimeSnapshotPublisher(petRuntime, registry);
             playerPets = new PlayerPetController(
                     this,
                     new RepositoryPetStorageService(playerStates),
                     limitsResolver,
-                    playerTasks);
+                    playerTasks,
+                    snapshotUpdate -> {
+                        runtimeSnapshots.accept(snapshotUpdate);
+                        ownerBuffs.accept(snapshotUpdate);
+                    });
+            managementServices = OmniPetManagementServices.open(
+                    this, dataRoot, playerStates, registry, activeConfig, economyProviders, playerPets);
             incubationCoordinator = new PaperIncubationCoordinator(
                     this, incubation, registry, limitsResolver, playerTasks);
             hatchController = new PlayerHatchController(
                     this, incubation, incubationCoordinator, limitsResolver, playerTasks);
+            PaperIncubationItemActionCodec actionCodec = new PaperIncubationItemActionCodec(this);
+            PaperIncubationItemActionInventory actionInventory = new PaperIncubationItemActionInventory(actionCodec);
+            IncubationItemActionCoordinator actionCoordinator = new IncubationItemActionCoordinator(
+                    new IncubationItemActionService(new IncubationItemActionFileJournal(
+                            dataRoot.resolve("data/incubation-actions"))),
+                    new RepositoryIncubationItemActionHatchPort(incubation.hatches()),
+                    actionInventory);
+            actionItems = new IncubationActionItemController(
+                    incubation.hatches(), actionCodec, actionInventory, actionCoordinator);
+            hatchController.setActionItems(actionItems);
+            hatchAdmin = new HatchAdminController(this, incubation.hatches(), playerTasks);
             incubationCoordinator.setRefreshListener(hatchController::refresh);
             transactionAdmin = new SlotTransactionAdminController(
                     this,
@@ -136,8 +189,15 @@ public final class OmniPetPlugin extends JavaPlugin {
                     phase4Config.activeSlots());
             getServer().getPluginManager().registerEvents(new PetStudioListener(studio), this);
             getServer().getPluginManager().registerEvents(new StatCatalogLifecycleListener(statCatalog), this);
-            getServer().getPluginManager().registerEvents(new PlayerPetMenuListener(playerPets, slotPurchases), this);
-            getServer().getPluginManager().registerEvents(new PlayerStorageLifecycleListener(playerPets), this);
+            getServer().getPluginManager().registerEvents(new MythicLibBuffLifecycleListener(ownerBuffs), this);
+            getServer().getPluginManager().registerEvents(new RendererProviderLifecycleListener(petRuntime), this);
+            getServer().getPluginManager().registerEvents(new MythicMobsSkillLifecycleListener(skillProviders), this);
+            getServer().getPluginManager().registerEvents(
+                    new PlayerPetMenuListener(playerPets, slotPurchases, managementServices.menu()), this);
+            getServer().getPluginManager().registerEvents(managementServices.listener(), this);
+            getServer().getPluginManager().registerEvents(
+                    new PlayerStorageLifecycleListener(
+                            playerPets, petRuntime, ownerBuffs::ownerQuit, managementServices::onJoin), this);
             getServer().getPluginManager().registerEvents(
                     new IncubationLifecycleListener(incubationCoordinator, hatchController), this);
             getServer().getPluginManager().registerEvents(new HatchMenuListener(hatchController), this);
@@ -146,10 +206,12 @@ public final class OmniPetPlugin extends JavaPlugin {
                     economyProviders,
                     luckPermsEntitlements), this);
             registerCommands();
+            petRuntime.start();
             incubationCoordinator.start();
             getServer().getOnlinePlayers().forEach(player -> {
                 playerPets.reconcile(player);
                 incubationCoordinator.onJoin(player);
+                managementServices.onJoin(player);
             });
             getLogger().info("OmniPet enabled with Pet Studio, " + snapshot.definitions().size()
                     + " pet definitions, and " + incubation.eggDefinitionCount() + " egg definitions.");
@@ -166,7 +228,10 @@ public final class OmniPetPlugin extends JavaPlugin {
                     () -> {
                         if (hatchController != null) hatchController.close();
                         if (incubationCoordinator != null) incubationCoordinator.close();
+                        if (managementServices != null) managementServices.close();
                         if (playerPets != null) playerPets.closeAll();
+                        if (ownerBuffs != null) ownerBuffs.close();
+                        if (petRuntime != null) petRuntime.disable();
                         if (slotPurchases != null) slotPurchases.close();
                     },
                     () -> {
@@ -208,6 +273,12 @@ public final class OmniPetPlugin extends JavaPlugin {
                                 studio,
                                 playerPets,
                                 hatchController,
+                                hatchAdmin,
+                                actionItems,
+                                managementServices.cultivationItems(),
+                                activeSkills,
+                                managementServices.releaseAdmin(),
+                                managementServices.cultivationAdmin(),
                                 transactionAdmin,
                                 slotPurchases,
                                 this::reloadRuntime)));
@@ -215,7 +286,8 @@ public final class OmniPetPlugin extends JavaPlugin {
 
     private boolean reloadRuntime() {
         try {
-            Phase4PaperConfig stagedConfig = loadPhase4Config();
+            OmniPetConfig staged = loadConfig();
+            Phase4PaperConfig stagedConfig = staged.storage();
             if (!studio.reload()) return false;
             PaperStorageLimitsResolver nextLimits = new PaperStorageLimitsResolver(stagedConfig);
             playerPets.updateLimitsResolver(nextLimits);
@@ -223,6 +295,15 @@ public final class OmniPetPlugin extends JavaPlugin {
             incubationCoordinator.updateLimitsResolver(nextLimits);
             hatchController.updateLimitsResolver(nextLimits);
             transactionAdmin.updateActiveSlots(stagedConfig.activeSlots());
+            ownerBuffs.refreshProvider();
+            skillProviders.refresh();
+            activeSkills.updateProgression(staged.progression());
+            managementServices.updateConfig(staged);
+            if (!activeConfig.runtime().equals(staged.runtime())) {
+                getLogger().warning("Runtime scheduler settings changed; restart the server to activate them safely.");
+            }
+            activeConfig = staged;
+            petRuntime.reload(registry.current());
             getServer().getOnlinePlayers().forEach(playerPets::reconcile);
             return true;
         } catch (IOException | RuntimeException failure) {
@@ -231,13 +312,13 @@ public final class OmniPetPlugin extends JavaPlugin {
         }
     }
 
-    private Phase4PaperConfig loadPhase4Config() throws IOException {
+    private OmniPetConfig loadConfig() throws IOException {
         if (Files.isSymbolicLink(configFile)) throw new IOException("OmniPet config.yml cannot be a symbolic link");
-        Phase4PaperConfigLoader loader = new Phase4PaperConfigLoader();
-        Phase4PaperConfigLoader.LoadResult result = loader.loadWithReport(configFile);
+        OmniPetConfigLoader loader = new OmniPetConfigLoader();
+        OmniPetConfigLoader.LoadResult result = loader.load(configFile);
         if (result.migratedLegacy()) {
             new AtomicFileStore().write(configFile, loader.encode(result.config()).getBytes(StandardCharsets.UTF_8));
-            getLogger().info("Migrated legacy slot config to the Phase 4 storage schema; original kept as config.yml.bak.");
+            getLogger().info("Migrated legacy config to the OmniPet aggregate schema; original kept as config.yml.bak.");
         }
         return result.config();
     }

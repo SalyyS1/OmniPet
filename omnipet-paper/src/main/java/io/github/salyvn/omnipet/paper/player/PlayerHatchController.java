@@ -22,6 +22,7 @@ import io.github.salyvn.omnipet.paper.gui.hatch.HatchInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuRenderer;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationCoordinator;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationServices;
+import io.github.salyvn.omnipet.paper.incubation.action.IncubationActionItemController;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
@@ -38,6 +39,7 @@ public final class PlayerHatchController {
     private final PlayerRequestTracker mutationRequests = new PlayerRequestTracker();
     private final Set<UUID> mutations = ConcurrentHashMap.newKeySet();
     private volatile PaperStorageLimitsResolver limitsResolver;
+    private volatile IncubationActionItemController actionItems;
     private volatile boolean shuttingDown;
 
     public PlayerHatchController(
@@ -55,6 +57,10 @@ public final class PlayerHatchController {
 
     public void updateLimitsResolver(PaperStorageLimitsResolver next) {
         limitsResolver = Objects.requireNonNull(next, "storage limits resolver");
+    }
+
+    public void setActionItems(IncubationActionItemController next) {
+        actionItems = Objects.requireNonNull(next, "incubation action item controller");
     }
 
     public void open(Player player) {
@@ -91,8 +97,21 @@ public final class PlayerHatchController {
             case "off", "offhand" -> start(player, EggInventoryHand.OFF_HAND);
             case "claim" -> claimCurrent(player);
             case "refresh" -> open(player);
-            default -> message(player, "Use /pet hatch [main|off|claim|refresh].", NamedTextColor.YELLOW);
+            case "use-main" -> redeemItem(player, EggInventoryHand.MAIN_HAND);
+            case "use-off", "use-offhand" -> redeemItem(player, EggInventoryHand.OFF_HAND);
+            default -> message(player,
+                    "Use /pet hatch [main|off|claim|refresh|use-main|use-off].", NamedTextColor.YELLOW);
         }
+    }
+
+    private void redeemItem(Player player, EggInventoryHand hand) {
+        IncubationActionItemController controller = actionItems;
+        if (controller == null) {
+            message(player, "Incubation action items are unavailable.", NamedTextColor.RED);
+            return;
+        }
+        controller.redeem(player, hand);
+        open(player);
     }
 
     public void click(

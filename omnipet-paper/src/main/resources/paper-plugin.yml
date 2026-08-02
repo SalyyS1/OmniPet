@@ -12,6 +12,14 @@ dependencies:
       load: BEFORE
       required: false
       join-classpath: false
+    MythicMobs:
+      load: BEFORE
+      required: false
+      join-classpath: false
+    ModelEngine:
+      load: BEFORE
+      required: false
+      join-classpath: false
     MMOItems:
       load: BEFORE
       required: false
@@ -49,6 +57,9 @@ permissions:
       omnipet.admin.managepet: true
       omnipet.admin.manageegg: true
       omnipet.admin.item: true
+      omnipet.admin.cultivation: true
+      omnipet.admin.skill: true
+      omnipet.admin.release: true
       omnipet.admin.reconcile: true
   omnipet.admin.reload: { description: "Allow reloading OmniPet", default: false }
   omnipet.admin.inspect: { description: "Allow viewing player pet information", default: false }
@@ -56,4 +67,7 @@ permissions:
   omnipet.admin.managepet: { description: "Allow managing pet definitions and storage", default: false }
   omnipet.admin.manageegg: { description: "Allow managing player eggs", default: false }
   omnipet.admin.item: { description: "Allow giving OmniPet items", default: false }
+  omnipet.admin.cultivation: { description: "Allow giving EXP candy and breakthrough stones", default: false }
+  omnipet.admin.skill: { description: "Allow inspecting and reconciling pending pet skill actions", default: false }
+  omnipet.admin.release: { description: "Allow inspecting and reconciling pet release rewards", default: false }
   omnipet.admin.reconcile: { description: "Allow audited slot transaction reconciliation", default: false }

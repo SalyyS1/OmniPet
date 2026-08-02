@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -17,6 +18,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import io.github.salyvn.omnipet.core.persistence.StaleRevisionException;
 import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
 import io.github.salyvn.omnipet.core.storage.PetStorageResult;
+import io.github.salyvn.omnipet.core.storage.PetStorageSnapshot;
 import io.github.salyvn.omnipet.core.storage.RepositoryPetStorageService;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuRenderer;
@@ -33,6 +35,7 @@ public final class PlayerPetController {
     private final PerPlayerTaskQueue taskQueue;
     private final PlayerRequestTracker requests;
     private final Set<UUID> mutationsInFlight;
+    private final Consumer<PetStorageSnapshot> runtimeSnapshots;
     private volatile PaperStorageLimitsResolver limitsResolver;
     private volatile boolean shuttingDown;
 
@@ -41,6 +44,15 @@ public final class PlayerPetController {
             RepositoryPetStorageService storage,
             PaperStorageLimitsResolver limitsResolver,
             PerPlayerTaskQueue taskQueue) {
+        this(plugin, storage, limitsResolver, taskQueue, ignored -> {});
+    }
+
+    public PlayerPetController(
+            JavaPlugin plugin,
+            RepositoryPetStorageService storage,
+            PaperStorageLimitsResolver limitsResolver,
+            PerPlayerTaskQueue taskQueue,
+            Consumer<PetStorageSnapshot> runtimeSnapshots) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.storage = Objects.requireNonNull(storage, "storage");
         this.limitsResolver = Objects.requireNonNull(limitsResolver, "storage limits resolver");
@@ -48,6 +60,7 @@ public final class PlayerPetController {
         this.taskQueue = Objects.requireNonNull(taskQueue, "player task queue");
         this.requests = new PlayerRequestTracker();
         this.mutationsInFlight = ConcurrentHashMap.newKeySet();
+        this.runtimeSnapshots = Objects.requireNonNull(runtimeSnapshots, "runtime snapshot listener");
     }
 
     public void updateLimitsResolver(PaperStorageLimitsResolver next) {
@@ -72,6 +85,7 @@ public final class PlayerPetController {
                 if (shuttingDown || !requests.isCurrent(playerId, request)) return;
                 try {
                     var snapshot = storage.snapshot(playerId, limits);
+                    publishSnapshot(snapshot);
                     completeUi(player, playerId, request, expectedTop, false, () ->
                             player.openInventory(renderer.render(player, snapshot, page)));
                 } catch (IOException | RuntimeException failure) {
@@ -165,6 +179,7 @@ public final class PlayerPetController {
                     PetStorageResult result = action.active()
                             ? storage.deactivate(playerId, holder.expectedRevision(), action.petId(), limits)
                             : storage.activate(playerId, holder.expectedRevision(), action.petId(), limits);
+                    publishSnapshot(result.snapshot());
                     completeUi(player, playerId, request, expectedTop, true,
                             () -> showMutationResult(player, holder.page(), result));
                 } catch (StaleRevisionException stale) {
@@ -202,6 +217,7 @@ public final class PlayerPetController {
                 }
             }
             PetStorageResult completed = result;
+            if (completed != null) publishSnapshot(completed.snapshot());
             runMain(() -> {
                 if (!isAvailable(player, playerId) || completed == null) return;
                 if (!completed.recalledPetIds().isEmpty()) {
@@ -294,5 +310,14 @@ public final class PlayerPetController {
     private void reportFailure(Player player, String message, Throwable failure) {
         player.sendMessage(Component.text("OmniPet: " + message + ".", NamedTextColor.RED));
         plugin.getLogger().warning(message + " for " + player.getUniqueId() + ": " + failure.getMessage());
+    }
+
+    private void publishSnapshot(PetStorageSnapshot snapshot) {
+        try {
+            runtimeSnapshots.accept(snapshot);
+        } catch (RuntimeException | LinkageError failure) {
+            plugin.getLogger().warning("OmniPet runtime snapshot refresh failed for "
+                    + snapshot.playerId() + ": " + failure.getMessage());
+        }
     }
 }
