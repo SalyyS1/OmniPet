@@ -8,9 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.salyvn.omnipet.core.persistence.YamlDocuments;
 import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
 import io.github.salyvn.omnipet.core.economy.EconomyProvider;
 
@@ -59,11 +61,7 @@ class Phase4PaperConfigLoaderTest {
 
     @Test
     void loadsAuthoritativeDefaultsIntoDetachedValidatedSnapshot() throws IOException {
-        Phase4PaperConfig config;
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream("config.yml")) {
-            if (input == null) throw new IOException("config.yml test resource is missing");
-            config = loader.parse(new String(input.readAllBytes(), StandardCharsets.UTF_8));
-        }
+        Phase4PaperConfig config = loader.parse(shippedStorageSection());
 
         assertEquals(30, config.vault().baseCapacity());
         assertEquals(200, config.vault().maxCapacity());
@@ -129,11 +127,7 @@ class Phase4PaperConfigLoaderTest {
 
     @Test
     void rejectsFractionalPointsAndContradictoryEntitlementPolicy() throws IOException {
-        String defaults;
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream("config.yml")) {
-            if (input == null) throw new IOException("config.yml test resource is missing");
-            defaults = new String(input.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        String defaults = shippedStorageSection();
         assertInvalidYaml(defaults.replace("PLAYER_POINTS: 50", "PLAYER_POINTS: 50.5"));
         assertInvalidYaml(defaults.replace(
                 "precedence: OMNIPET_AUTHORITATIVE",
@@ -142,11 +136,7 @@ class Phase4PaperConfigLoaderTest {
 
     @Test
     void rejectsEntitlementTemplateThatExceedsNodeLimitAtConfiguredMaximum() throws IOException {
-        String defaults;
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream("config.yml")) {
-            if (input == null) throw new IOException("config.yml test resource is missing");
-            defaults = new String(input.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        String defaults = shippedStorageSection();
         String boundaryTemplate = "a".repeat(127) + "%s";
         Phase4PaperConfig singleDigitConfig = loader.parse(
                 defaults.replace("omnipet.slot.unlocked.%s", boundaryTemplate));
@@ -155,6 +145,23 @@ class Phase4PaperConfigLoaderTest {
         assertInvalidYaml(defaults
                 .replace("max: 5", "max: 64")
                 .replace("omnipet.slot.unlocked.%s", boundaryTemplate));
+    }
+
+    /**
+     * Returns only the storage subtree of the shipped config. The strict Phase 4 loader owns storage
+     * alone; the aggregate loader owns runtime, progression, item, and integration sections.
+     */
+    private static String shippedStorageSection() throws IOException {
+        String shipped;
+        try (InputStream input = Phase4PaperConfigLoaderTest.class.getClassLoader()
+                .getResourceAsStream("config.yml")) {
+            if (input == null) throw new IOException("config.yml test resource is missing");
+            shipped = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        Map<String, Object> root = YamlDocuments.readMap(shipped);
+        Object storage = root.get("storage");
+        if (!(storage instanceof Map<?, ?>)) throw new IOException("shipped config.yml has no storage section");
+        return YamlDocuments.writeMap(Map.of("storage", storage));
     }
 
     private void assertInvalidTemplate(String template) {

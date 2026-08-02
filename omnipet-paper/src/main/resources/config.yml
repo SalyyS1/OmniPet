@@ -38,3 +38,35 @@ storage:
       "5":
         permission: "omnipet.slot.purchase.5"
         costs: { VAULT: 350000, PLAYER_POINTS: 500 }
+
+# One bounded coordinator updates every active pet. Scheduler changes require a restart.
+runtime:
+  initialDelayTicks: 1
+  periodTicks: 1
+  maximumOwnersPerTick: 64
+  maximumPetsPerOwner: 10
+
+# Global cultivation fallback. A validated pet definition may override the EXP formula.
+progression:
+  maxLevel: 100
+  maxStamina: 100.0
+  staminaRegenPerSecond: 1.0
+  defaultExperienceFormula: "100 + level * 25 + evolution * 100"
+  formulaSamples: { level: 1.0, rarity: 1.0, quality: 0.5, evolution: 0.0 }
+  overflowPolicy: CARRY
+
+# Standalone material defaults. MMOItems identities can be added through the item adapter.
+items:
+  experienceCandy:
+    material: EXPERIENCE_BOTTLE
+    experience: 100.0
+  breakthroughStone:
+    material: NETHER_STAR
+    requiredLevel: 10
+    requiredEvolution: 0
+
+# Compatibility targets used by linkage-safe adapters. These values are documentation only.
+integrations:
+  mythicLib: "1.7.1-SNAPSHOT build 106"
+  mythicMobs: "5.9.0"
+  modelEngine: "R4.0.9"
