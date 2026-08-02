@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
@@ -93,6 +94,11 @@ class HatchServiceTest {
         assertEquals(claimed.incubation().outcome().petInstanceId(), claimed.state().pets().getFirst().id());
         assertTrue(claimed.state().pets().getFirst().rawComponents().containsKey("hatching"));
         assertTrue(claimed.state().pets().getFirst().rawComponents().containsKey("stats"));
+        assertEquals(Map.of(
+                        "provider", "HEAD",
+                        "fallbackHeadSource", claimed.incubation().outcome().icon().source(),
+                        "fallbackHeadValue", claimed.incubation().outcome().icon().value()),
+                claimed.state().pets().getFirst().rawComponents().get("appearance"));
         assertEquals(HatchResult.Status.ALREADY_CLAIMED, repeated.status());
         assertEquals(1, repeated.state().pets().size());
     }
