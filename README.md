@@ -65,7 +65,7 @@ From this directory:
 gradlew.bat clean build --no-daemon --console=plain
 ```
 
-The single release artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (copied from `omnipet-paper/build/libs/`). The 2026-08-02 clean JDK 21 Gradle hatch checkpoint passed all 18 tasks and 132 suites/460 tests: core 62 suites/237 tests and Paper 70 suites/223 tests, with zero failures, errors, or skips. It produced a 1,589,438-byte JAR with SHA-256 `199E919F7123074A67EE5F4BF913AFF9CBCE86C28B9D281D14A07810D4E81584`: 976 entries, 888 classes, one `paper-plugin.yml`, and zero Maven entries. This checkpoint did not rerun compatibility probes, crash-injection tests, or live-server certification. Maven commands, `pom.xml`, Maven wrappers, and the old `passivepet2` artifact name are not part of the supported workflow.
+The single release artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (copied from `omnipet-paper/build/libs/`). The 2026-08-02 clean JDK 21 Gradle hatch checkpoint passed all 18 tasks and 132 suites/461 tests: core 62 suites/238 tests and Paper 70 suites/223 tests, with zero failures, errors, or skips. It produced a 1,589,478-byte JAR with SHA-256 `0DC987AED51CD28775627DE7491850AB5FF1684D5C1ACE83A33746BE19B92386`: 976 entries, 888 classes, one `paper-plugin.yml`, and zero Maven entries. This checkpoint did not rerun compatibility probes, crash-injection tests, or live-server certification. Maven commands, `pom.xml`, Maven wrappers, and the old `passivepet2` artifact name are not part of the supported workflow.
 
 ## Migration warning
 

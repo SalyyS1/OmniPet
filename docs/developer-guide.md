@@ -110,7 +110,7 @@ A successful compile does not prove plugin boot, command behavior, scheduler saf
 
 ## Verification evidence
 
-The 2026-08-02 clean JDK 21 Gradle build completed successfully with all 18 tasks. It passed 132 suites/460 tests: core 62 suites/237 tests and Paper 70 suites/223 tests, with zero failures, errors, or skips. The single artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (1,589,438 bytes, SHA-256 `199E919F7123074A67EE5F4BF913AFF9CBCE86C28B9D281D14A07810D4E81584`), with 976 entries, 888 classes, one `paper-plugin.yml`, and zero Maven entries. Compatibility probes, crash-injection tests, and live-server smoke were not rerun for this checkpoint.
+The 2026-08-02 clean JDK 21 Gradle build completed successfully with all 18 tasks. It passed 132 suites/461 tests: core 62 suites/238 tests and Paper 70 suites/223 tests, with zero failures, errors, or skips. The single artifact is `build/release/OmniPet-3.0.0-SNAPSHOT.jar` (1,589,478 bytes, SHA-256 `0DC987AED51CD28775627DE7491850AB5FF1684D5C1ACE83A33746BE19B92386`), with 976 entries, 888 classes, one `paper-plugin.yml`, and zero Maven entries. Compatibility probes, crash-injection tests, and live-server smoke were not rerun for this checkpoint.
 
 There is no live Paper server smoke-test evidence yet. Treat runtime certification and every optional integration as later release gates.
 
