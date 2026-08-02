@@ -158,4 +158,22 @@ class FilePlayerStateRepositoryTest {
         assertEquals(List.of(), state.desiredActivePetIds());
         assertEquals(List.of(), state.slotEntitlements());
     }
+
+    @Test
+    void playerIdsAreSortedBoundedAndRejectInvalidLimits() throws Exception {
+        Path root = temporary.resolve("player-id-scan");
+        FilePlayerStateRepository repository = new FilePlayerStateRepository(root);
+        UUID first = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID second = UUID.fromString("00000000-0000-0000-0000-000000000010");
+        UUID third = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
+        repository.withLocked(third, 0, current -> current);
+        repository.withLocked(first, 0, current -> current);
+        repository.withLocked(second, 0, current -> current);
+
+        assertEquals(List.of(first, second), repository.playerIds(2));
+        assertEquals(List.of(first, second, third), repository.playerIds(3));
+        assertThrows(IllegalArgumentException.class, () -> repository.playerIds(0));
+        assertThrows(IllegalArgumentException.class, () -> repository.playerIds(10_001));
+    }
 }

@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.function.UnaryOperator;
 
 import io.github.salyvn.omnipet.core.domain.PlayerState;
@@ -86,6 +88,32 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
             }
         }
         return Set.copyOf(references);
+    }
+
+    @Override
+    public List<UUID> playerIds(int limit) throws IOException {
+        if (limit < 1 || limit > 10_000) {
+            throw new IllegalArgumentException("player scan limit must be 1..10000");
+        }
+        if (!Files.isDirectory(paths.root(), LinkOption.NOFOLLOW_LINKS)) return List.of();
+        ArrayList<Path> files = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(paths.root(), "*.yml")) {
+            for (Path file : stream) {
+                if (Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) files.add(file);
+            }
+        }
+        files.sort(Comparator.comparing(path -> path.getFileName().toString()));
+        ArrayList<UUID> ids = new ArrayList<>();
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            try {
+                ids.add(UUID.fromString(name.substring(0, name.length() - 4)));
+            } catch (IllegalArgumentException invalid) {
+                throw new IOException("invalid player state filename: " + name, invalid);
+            }
+            if (ids.size() == limit) break;
+        }
+        return List.copyOf(ids);
     }
 
     private PlayerState load(UUID playerId) throws IOException {
