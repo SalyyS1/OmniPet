@@ -34,6 +34,12 @@ final class IncubationPetFactory {
         Map<String, Object> components = new LinkedHashMap<>();
         components.put("hatching", hatching);
         components.put("stats", stats);
+        components.put("appearance", Map.of(
+                "provider", "HEAD",
+                "fallbackHeadSource", outcome.icon().source(),
+                "fallbackHeadValue", outcome.icon().value()));
+        Object release = outcome.extensions().get("release");
+        if (release != null) components.put("release", io.github.salyvn.omnipet.core.domain.RawNodeValues.mutableCopy(release));
         return new PetInstance(
                 outcome.petInstanceId(),
                 outcome.definitionId(),

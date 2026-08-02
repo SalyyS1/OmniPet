@@ -5,9 +5,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.UUID;
 
 import io.github.salyvn.omnipet.core.domain.PetDefinition;
+import io.github.salyvn.omnipet.core.domain.RawNodeValues;
 import io.github.salyvn.omnipet.core.domain.incubation.EggDefinition;
 import io.github.salyvn.omnipet.core.domain.incubation.HatchCandidate;
 import io.github.salyvn.omnipet.core.domain.incubation.HatchRarityBand;
@@ -35,6 +37,10 @@ public final class DeterministicHatchRollService {
         long duration = duration(egg.baseActiveMillis(), rarity.hatchMultiplier());
         UUID petInstanceId = petInstanceId(incubationId);
         PetDefinition definition = selected.profile().definition();
+        Map<String, Object> extensions = new LinkedHashMap<>();
+        extensions.put("registryGeneration", registry.generation());
+        Object release = definition.rawNode().get("release");
+        if (release != null) extensions.put("release", RawNodeValues.mutableCopy(release));
         return new HatchRollResult(new IncubationOutcome(
                 petInstanceId,
                 definition.id(),
@@ -48,7 +54,7 @@ public final class DeterministicHatchRollService {
                 ALGORITHM_ID,
                 stats,
                 duration,
-                Map.of("registryGeneration", registry.generation())));
+                extensions));
     }
 
     public static UUID petInstanceId(UUID incubationId) {

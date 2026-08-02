@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -54,6 +55,23 @@ class DeterministicHatchRollServiceTest {
                     .filter(stat -> stat.id().equals("movement_speed"))
                     .allMatch(stat -> stat.value() >= 0.05 && stat.value() <= 0.25));
         }
+    }
+
+    @Test
+    void snapshotsReleasePolicyIntoTheDeterministicOutcome() {
+        RegistrySnapshot base = IncubationTestFixtures.registry();
+        PetDefinition source = base.definitions().get("ember_fox");
+        Map<String, Object> raw = new LinkedHashMap<>(source.rawNode());
+        raw.put("release", Map.of("mode", "RECYCLE", "rewards", Map.of(
+                "materials", Map.of("BONE", 3))));
+        PetDefinition definition = new PetDefinition(
+                source.id(), source.revision(), source.tier(), source.icon(), source.display(), raw);
+
+        var outcome = rolls.roll(
+                UUID.randomUUID(), IncubationTestFixtures.egg(10_000),
+                new RegistrySnapshot(base.generation(), Map.of(definition.id(), definition)), 42).outcome();
+
+        assertEquals(raw.get("release"), outcome.extensions().get("release"));
     }
 
     @Test
