@@ -1,0 +1,64 @@
+package io.github.salyvn.omnipet.paper.render;
+
+import java.util.Objects;
+import java.util.UUID;
+
+import io.github.salyvn.omnipet.core.runtime.RendererAppearance;
+import io.github.salyvn.omnipet.core.runtime.RuntimeTransform;
+
+interface PaperHeadRendererBackend {
+    boolean isMainThread();
+
+    WorldRef ownerWorld(UUID ownerId);
+
+    boolean targetChunkLoaded(WorldRef world, RuntimeTransform transform);
+
+    EntityRef spawnCarrier(WorldRef world, RuntimeTransform transform);
+
+    EntityRef spawnVisual(WorldRef world, RuntimeTransform transform);
+
+    EntityRef spawnInteraction(WorldRef world, RuntimeTransform transform);
+
+    void attach(EntityRef carrier, EntityRef passenger);
+
+    boolean valid(EntityRef entity);
+
+    UUID worldId(EntityRef entity);
+
+    boolean currentChunkLoaded(EntityRef entity);
+
+    double distanceSquared(EntityRef entity, RuntimeTransform transform);
+
+    void smoothMove(EntityRef carrier, RuntimeTransform transform, PaperHeadRendererSettings settings);
+
+    void hardTeleport(
+            EntityRef carrier,
+            EntityRef visual,
+            EntityRef interaction,
+            WorldRef world,
+            RuntimeTransform transform);
+
+    void updateAppearance(EntityRef visual, RendererAppearance appearance);
+
+    void updateScale(
+            EntityRef visual,
+            EntityRef interaction,
+            RuntimeTransform transform,
+            PaperHeadRendererSettings settings);
+
+    void remove(EntityRef entity);
+
+    record WorldRef(UUID id, Object nativeWorld) {
+        public WorldRef {
+            Objects.requireNonNull(id, "world ID");
+            Objects.requireNonNull(nativeWorld, "native world");
+        }
+    }
+
+    record EntityRef(UUID id, Object nativeEntity) {
+        public EntityRef {
+            Objects.requireNonNull(id, "entity ID");
+            Objects.requireNonNull(nativeEntity, "native entity");
+        }
+    }
+}

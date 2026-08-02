@@ -1,0 +1,233 @@
+package io.github.salyvn.omnipet.paper.render;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Interaction;
+import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
+
+import io.github.salyvn.omnipet.core.runtime.PetRendererPort;
+import io.github.salyvn.omnipet.core.runtime.RendererAppearance;
+import io.github.salyvn.omnipet.core.runtime.RendererHandle;
+import io.github.salyvn.omnipet.core.runtime.RendererHealth;
+import io.github.salyvn.omnipet.core.runtime.RendererSpawnRequest;
+import io.github.salyvn.omnipet.core.runtime.RuntimeTransform;
+
+/** ModelEngine R4.0.9 renderer with disposable Bukkit carrier and HEAD fallback upstream. */
+public final class PaperModelEngineRenderer implements PetRendererPort {
+    private static final double SAFETY_DISTANCE_SQUARED = 32 * 32;
+    private final ReflectiveModelEngineBindings bindings;
+    private final Map<UUID, ModelEngineRendererHandle> handles = new LinkedHashMap<>();
+    private String unhealthy;
+
+    public PaperModelEngineRenderer(ClassLoader providerLoader) {
+        ReflectiveModelEngineBindings resolved = null;
+        try {
+            resolved = new ReflectiveModelEngineBindings(providerLoader);
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
+            unhealthy = detail(failure);
+        }
+        bindings = resolved;
+    }
+
+    @Override
+    public RendererHealth health() {
+        return unhealthy == null && bindings != null
+                ? new RendererHealth(RendererHealth.Status.AVAILABLE, "ModelEngine R4.0.9 adapter")
+                : new RendererHealth(RendererHealth.Status.QUARANTINED,
+                        unhealthy == null ? "ModelEngine API is unavailable" : unhealthy);
+    }
+
+    @Override
+    public RendererHandle spawn(RendererSpawnRequest request) {
+        requireMainThread();
+        requireHealthy();
+        if (!request.appearance().provider().equals("MODELENGINE")) {
+            throw new IllegalArgumentException("ModelEngine renderer requires MODELENGINE appearance");
+        }
+        ModelEngineRendererHandle existing = handles.get(request.petInstanceId());
+        if (existing != null && !existing.removed()) return existing;
+        Player owner = requireOwner(request.ownerId());
+        Location target = location(owner.getWorld(), request.transform());
+        requireLoaded(target);
+        ArmorStand carrier = null;
+        Interaction interaction = null;
+        Object modeled = null;
+        Object active = null;
+        try {
+            if (!bindings.hasBlueprint(request.appearance().assetId())) {
+                throw new IllegalStateException("ModelEngine model is not loaded: " + request.appearance().assetId());
+            }
+            carrier = owner.getWorld().spawn(target, ArmorStand.class, stand -> {
+                stand.setInvisible(true);
+                stand.setMarker(true);
+                stand.setGravity(false);
+                stand.setInvulnerable(true);
+                stand.setCollidable(false);
+                stand.setSilent(true);
+                stand.setPersistent(false);
+            });
+            interaction = owner.getWorld().spawn(target, Interaction.class, entity -> {
+                entity.setResponsive(true);
+                entity.setPersistent(false);
+                setInteractionScale(entity, request.transform().scale());
+            });
+            if (!carrier.addPassenger(interaction)) throw new IllegalStateException("could not attach model interaction");
+            modeled = bindings.createModeled(carrier);
+            active = bindings.createActive(request.appearance().assetId());
+            bindings.scale(active, request.transform().scale());
+            bindings.attach(modeled, active);
+            ModelEngineRendererHandle handle = new ModelEngineRendererHandle(
+                    request.ownerId(), request.petInstanceId(), request.rendererGeneration(),
+                    carrier, interaction, modeled, active, request.appearance().assetId(), request.transform());
+            handles.put(request.petInstanceId(), handle);
+            return handle;
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
+            cleanup(modeled, active, interaction, carrier, failure);
+            quarantine(failure);
+            throw wrap(failure);
+        }
+    }
+
+    @Override
+    public void update(RendererHandle raw, RuntimeTransform transform) {
+        requireMainThread();
+        ModelEngineRendererHandle handle = requireHandle(raw);
+        Player owner = requireOwner(handle.ownerId());
+        Location target = location(owner.getWorld(), transform);
+        requireLoaded(target);
+        ArmorStand carrier = handle.carrier();
+        if (!carrier.isValid() || !handle.interaction().isValid()) {
+            retire(handle);
+            throw new IllegalStateException("ModelEngine renderer entities became invalid");
+        }
+        if (!carrier.getWorld().equals(owner.getWorld())
+                || carrier.getLocation().distanceSquared(target) > SAFETY_DISTANCE_SQUARED) {
+            carrier.eject();
+            if (!carrier.teleport(target) || !handle.interaction().teleport(target)) {
+                throw new IllegalStateException("ModelEngine renderer safety teleport failed");
+            }
+            if (!carrier.addPassenger(handle.interaction())) {
+                throw new IllegalStateException("could not reattach model interaction");
+            }
+        } else {
+            Vector velocity = target.toVector().subtract(carrier.getLocation().toVector()).multiply(0.35);
+            if (velocity.lengthSquared() > 1.44) velocity.normalize().multiply(1.2);
+            carrier.setVelocity(velocity);
+            carrier.setRotation(transform.yaw(), transform.pitch());
+        }
+        try {
+            bindings.scale(handle.activeModel(), transform.scale());
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
+            quarantine(failure);
+            throw wrap(failure);
+        }
+        setInteractionScale(handle.interaction(), transform.scale());
+        handle.transform(transform);
+    }
+
+    @Override
+    public void updateAppearance(RendererHandle raw, RendererAppearance appearance) {
+        requireMainThread();
+        ModelEngineRendererHandle handle = requireHandle(raw);
+        if (handle.assetId().equals(appearance.assetId())) return;
+        try {
+            if (!bindings.hasBlueprint(appearance.assetId())) {
+                throw new IllegalStateException("ModelEngine model is not loaded: " + appearance.assetId());
+            }
+            Object next = bindings.createActive(appearance.assetId());
+            bindings.scale(next, handle.transform().scale());
+            bindings.replace(handle.modeledEntity(), handle.activeModel(), handle.assetId(), next);
+            handle.activeModel(next);
+            handle.assetId(appearance.assetId());
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
+            quarantine(failure);
+            throw wrap(failure);
+        }
+    }
+
+    @Override
+    public void remove(RendererHandle raw) {
+        requireMainThread();
+        ModelEngineRendererHandle handle = requireHandle(raw);
+        retire(handle);
+    }
+
+    private void retire(ModelEngineRendererHandle handle) {
+        Throwable failure = null;
+        try {
+            bindings.destroy(handle.modeledEntity(), handle.activeModel());
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+            failure = error;
+        }
+        handle.interaction().remove();
+        handle.carrier().remove();
+        handle.markRemoved();
+        handles.remove(handle.petInstanceId(), handle);
+        if (failure != null) throw wrap(failure);
+    }
+
+    private ModelEngineRendererHandle requireHandle(RendererHandle raw) {
+        if (!(raw instanceof ModelEngineRendererHandle handle) || handle.removed()
+                || handles.get(handle.petInstanceId()) != handle) {
+            throw new IllegalArgumentException("ModelEngine renderer handle is invalid or removed");
+        }
+        return handle;
+    }
+
+    private static Player requireOwner(UUID ownerId) {
+        Player owner = Bukkit.getPlayer(ownerId);
+        if (owner == null || !owner.isOnline() || !owner.isValid()) {
+            throw new IllegalStateException("ModelEngine owner is unavailable");
+        }
+        return owner;
+    }
+
+    private static Location location(World world, RuntimeTransform transform) {
+        return new Location(world, transform.position().x(), transform.position().y(), transform.position().z(),
+                transform.yaw(), transform.pitch());
+    }
+
+    private static void requireLoaded(Location target) {
+        if (!target.getWorld().isChunkLoaded(target.getBlockX() >> 4, target.getBlockZ() >> 4)) {
+            throw new IllegalStateException("ModelEngine target chunk is not loaded");
+        }
+    }
+
+    private static void setInteractionScale(Interaction interaction, double scale) {
+        interaction.setInteractionWidth((float) Math.max(0.25, Math.min(8, scale)));
+        interaction.setInteractionHeight((float) Math.max(0.25, Math.min(8, scale * 1.25)));
+    }
+
+    private void cleanup(Object modeled, Object active, Interaction interaction, ArmorStand carrier, Throwable primary) {
+        if (modeled != null && active != null) {
+            try { bindings.destroy(modeled, active); }
+            catch (ReflectiveOperationException | RuntimeException | LinkageError cleanup) { primary.addSuppressed(cleanup); }
+        }
+        if (interaction != null) interaction.remove();
+        if (carrier != null) carrier.remove();
+    }
+
+    private void requireHealthy() {
+        if (unhealthy != null || bindings == null) throw new IllegalStateException(health().detail());
+    }
+
+    private void quarantine(Throwable failure) { unhealthy = "adapter quarantined: " + detail(failure); }
+    private static void requireMainThread() {
+        if (!Bukkit.isPrimaryThread()) throw new IllegalStateException("ModelEngine renderer requires the Paper main thread");
+    }
+    private static RuntimeException wrap(Throwable failure) {
+        return failure instanceof RuntimeException runtime ? runtime : new IllegalStateException(detail(failure), failure);
+    }
+    private static String detail(Throwable failure) {
+        String message = failure.getMessage();
+        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+    }
+}
