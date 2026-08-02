@@ -36,6 +36,18 @@ final class IncubationTickBaselines {
     }
 
     synchronized void commit(UUID playerId, UUID incubationId, long sampledNanos) {
+        advance(playerId, incubationId, sampledNanos);
+    }
+
+    /**
+     * Drops an interval that could not be persisted. This deliberately pauses
+     * incubation during storage failure instead of crediting unbounded time only in memory.
+     */
+    synchronized void discard(UUID playerId, UUID incubationId, long sampledNanos) {
+        advance(playerId, incubationId, sampledNanos);
+    }
+
+    private void advance(UUID playerId, UUID incubationId, long sampledNanos) {
         UUID player = Objects.requireNonNull(playerId, "player id");
         UUID incubation = Objects.requireNonNull(incubationId, "incubation id");
         Baseline current = baselines.get(player);

@@ -23,7 +23,7 @@ class IncubationTickBaselinesTest {
     }
 
     @Test
-    void failedTicksAccumulateUntilCommittedAndNewIncubationsResetTheBaseline() {
+    void failedTicksAreDiscardedSoProcessKillCannotRollBackUnboundedTime() {
         IncubationTickBaselines baselines = new IncubationTickBaselines();
         UUID playerId = UUID.randomUUID();
         UUID first = UUID.randomUUID();
@@ -31,7 +31,8 @@ class IncubationTickBaselinesTest {
 
         assertEquals(0, baselines.elapsedMillis(playerId, first, 100_000_000L, 100_000_000L));
         assertEquals(50, baselines.elapsedMillis(playerId, first, 150_000_000L, 150_000_000L));
-        assertEquals(100, baselines.elapsedMillis(playerId, first, 200_000_000L, 200_000_000L));
+        baselines.discard(playerId, first, 150_000_000L);
+        assertEquals(50, baselines.elapsedMillis(playerId, first, 200_000_000L, 200_000_000L));
         assertEquals(0, baselines.elapsedMillis(playerId, second, 250_000_000L, 250_000_000L));
 
         baselines.reset(playerId);

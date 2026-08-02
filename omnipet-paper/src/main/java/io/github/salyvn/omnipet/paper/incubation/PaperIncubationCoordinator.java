@@ -110,6 +110,7 @@ public final class PaperIncubationCoordinator {
         try {
             tasks.submit(playerId, () -> {
                 if (closed || !isCurrentEpoch(playerId, epoch)) return;
+                UUID attemptedIncubation = null;
                 try {
                     var snapshot = services.hatches().snapshot(playerId);
                     if (!isCurrentEpoch(playerId, epoch)
@@ -129,6 +130,7 @@ public final class PaperIncubationCoordinator {
                         return;
                     }
                     UUID incubationId = snapshot.incubation().id();
+                    attemptedIncubation = incubationId;
                     long elapsedMillis = tickBaselines.elapsedMillis(
                             playerId, incubationId, sampledNanos, System.nanoTime());
                     if (elapsedMillis < 1L) return;
@@ -144,10 +146,16 @@ public final class PaperIncubationCoordinator {
                             tickBaselines.reset(playerId);
                         }
                         refreshListener.accept(playerId);
+                    } else {
+                        tickBaselines.reset(playerId);
                     }
                 } catch (java.io.IOException | RuntimeException failure) {
+                    if (attemptedIncubation != null) {
+                        tickBaselines.discard(playerId, attemptedIncubation, sampledNanos);
+                    }
                     plugin.getLogger().warning("OmniPet incubation tick deferred for " + playerId
-                            + ": " + failure.getMessage());
+                            + "; unpersisted online time was paused to preserve the rollback bound: "
+                            + failure.getMessage());
                 }
             });
         } catch (RuntimeException failure) {
