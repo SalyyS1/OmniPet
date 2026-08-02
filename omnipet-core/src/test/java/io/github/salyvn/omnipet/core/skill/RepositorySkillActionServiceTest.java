@@ -1,6 +1,7 @@
 package io.github.salyvn.omnipet.core.skill;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.persistence.FilePlayerStateRepository;
+import io.github.salyvn.omnipet.core.persistence.StaleRevisionException;
 import io.github.salyvn.omnipet.core.progression.PetProgressionProjection;
 
 class RepositorySkillActionServiceTest {
@@ -91,6 +93,26 @@ class RepositorySkillActionServiceTest {
                 fixture.playerId, completed.state().revision(), fixture.petId, cosmetic,
                 UUID.randomUUID(), 2_000, 100);
         assertEquals(RepositorySkillActionResult.Status.PREPARED, afterRestart.status());
+    }
+
+    @Test
+    void failedCompleteWriteDoesNotStrandACosmeticCooldown() throws Exception {
+        Fixture fixture = fixture();
+        SkillBinding cosmetic = new SkillBinding(
+                "cosmetic_two", "MYTHICMOBS", "sparkle", SkillTrigger.ACTIVE,
+                Duration.ofSeconds(5), 1.0, 10.0, SkillTargetPolicy.OWNER, false);
+        UUID action = UUID.randomUUID();
+        var prepared = fixture.service.prepare(
+                fixture.playerId, fixture.revision(), fixture.petId, cosmetic, action, 1_000, 100);
+
+        // A stale expected revision makes the durable write fail, so the player is never charged.
+        assertThrows(StaleRevisionException.class, () -> fixture.service.complete(
+                fixture.playerId, prepared.state().revision() + 5, fixture.petId, action, 1_100, 100));
+
+        var retried = fixture.service.complete(
+                fixture.playerId, prepared.state().revision(), fixture.petId, action, 1_200, 100);
+        assertEquals(RepositorySkillActionResult.Status.COMPLETED, retried.status());
+        assertEquals(90.0, PetProgressionProjection.read(retried.pet(), 100, 1_200).stamina());
     }
 
     private Fixture fixture() throws Exception {

@@ -84,7 +84,7 @@ public final class RepositorySkillActionService {
             UUID actionId,
             long nowEpochMillis,
             double initialStamina) throws IOException {
-        return mutate(playerId, expectedRevision, petId, (current, pet) -> {
+        RepositorySkillActionResult result = mutate(playerId, expectedRevision, petId, (current, pet) -> {
             PetSkillState skill = PetSkillStateProjection.read(pet);
             SkillActionReservation reservation = skill.pendingActions().get(actionId);
             if (reservation == null) return rejected(RepositorySkillActionResult.Status.ACTION_NOT_FOUND, current, pet,
@@ -99,12 +99,8 @@ public final class RepositorySkillActionService {
                     progression.stamina() - reservation.staminaCost(),
                     progression.lastStaminaEpochMillis(), progression.extensions());
             Map<String, Long> cooldowns = new LinkedHashMap<>(skill.cooldownDeadlines());
-            if (reservation.cooldownDeadline() > nowEpochMillis) {
-                if (reservation.persistCooldown()) {
-                    cooldowns.put(reservation.bindingId(), reservation.cooldownDeadline());
-                } else {
-                    rememberTransient(playerId, petId, reservation, nowEpochMillis);
-                }
+            if (reservation.persistCooldown() && reservation.cooldownDeadline() > nowEpochMillis) {
+                cooldowns.put(reservation.bindingId(), reservation.cooldownDeadline());
             }
             Map<UUID, SkillActionReservation> pending = new LinkedHashMap<>(skill.pendingActions());
             pending.remove(actionId);
@@ -113,6 +109,16 @@ public final class RepositorySkillActionService {
             return accepted(RepositorySkillActionResult.Status.COMPLETED, current, updated, reservation,
                     "skill stamina and cooldown committed");
         });
+        // Recorded only after the durable write succeeds; a failed save must not leave a
+        // cooldown that blocks a cast the player was never charged for.
+        SkillActionReservation committed = result.reservation();
+        if (result.status() == RepositorySkillActionResult.Status.COMPLETED
+                && committed != null
+                && !committed.persistCooldown()
+                && committed.cooldownDeadline() > nowEpochMillis) {
+            rememberTransient(playerId, petId, committed, nowEpochMillis);
+        }
+        return result;
     }
 
     public RepositorySkillActionResult rollback(
