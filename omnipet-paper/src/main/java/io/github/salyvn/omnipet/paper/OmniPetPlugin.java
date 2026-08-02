@@ -39,11 +39,13 @@ import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
 import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegistry;
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
+import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuListener;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationServices;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationCoordinator;
 import io.github.salyvn.omnipet.paper.incubation.IncubationLifecycleListener;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
+import io.github.salyvn.omnipet.paper.player.PlayerHatchController;
 import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
 import io.github.salyvn.omnipet.paper.player.PlayerStorageLifecycleListener;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
@@ -56,6 +58,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private RegistrySnapshotRepository registry;
     private PaperIncubationServices incubation;
     private PaperIncubationCoordinator incubationCoordinator;
+    private PlayerHatchController hatchController;
     private PetStudioController studio;
     private PaperStatCatalogContext statCatalog;
     private PlayerPetController playerPets;
@@ -122,6 +125,9 @@ public final class OmniPetPlugin extends JavaPlugin {
                     playerTasks);
             incubationCoordinator = new PaperIncubationCoordinator(
                     this, incubation, registry, limitsResolver, playerTasks);
+            hatchController = new PlayerHatchController(
+                    this, incubation, incubationCoordinator, limitsResolver, playerTasks);
+            incubationCoordinator.setRefreshListener(hatchController::refresh);
             transactionAdmin = new SlotTransactionAdminController(
                     this,
                     new SlotPurchaseReconciliationService(playerStates, purchaseJournal, purchaseTransactions),
@@ -133,7 +139,8 @@ public final class OmniPetPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new PlayerPetMenuListener(playerPets, slotPurchases), this);
             getServer().getPluginManager().registerEvents(new PlayerStorageLifecycleListener(playerPets), this);
             getServer().getPluginManager().registerEvents(
-                    new IncubationLifecycleListener(incubationCoordinator), this);
+                    new IncubationLifecycleListener(incubationCoordinator, hatchController), this);
+            getServer().getPluginManager().registerEvents(new HatchMenuListener(hatchController), this);
             getServer().getPluginManager().registerEvents(new EconomyProviderLifecycleListener(
                     this,
                     economyProviders,
@@ -157,6 +164,7 @@ public final class OmniPetPlugin extends JavaPlugin {
         try {
             boolean idle = PlayerTaskShutdown.stopAndDrain(
                     () -> {
+                        if (hatchController != null) hatchController.close();
                         if (incubationCoordinator != null) incubationCoordinator.close();
                         if (playerPets != null) playerPets.closeAll();
                         if (slotPurchases != null) slotPurchases.close();
@@ -199,6 +207,7 @@ public final class OmniPetPlugin extends JavaPlugin {
                         new OmniPetCommand(
                                 studio,
                                 playerPets,
+                                hatchController,
                                 transactionAdmin,
                                 slotPurchases,
                                 this::reloadRuntime)));
@@ -212,6 +221,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             playerPets.updateLimitsResolver(nextLimits);
             slotPurchases.updateLimitsResolver(nextLimits);
             incubationCoordinator.updateLimitsResolver(nextLimits);
+            hatchController.updateLimitsResolver(nextLimits);
             transactionAdmin.updateActiveSlots(stagedConfig.activeSlots());
             getServer().getOnlinePlayers().forEach(playerPets::reconcile);
             return true;

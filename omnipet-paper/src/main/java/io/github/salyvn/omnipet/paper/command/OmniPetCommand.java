@@ -13,11 +13,13 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
 import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
+import io.github.salyvn.omnipet.paper.player.PlayerHatchController;
 import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
 
 public final class OmniPetCommand implements BasicCommand {
     private final PetStudioController studio;
     private final PlayerPetController players;
+    private final PlayerHatchCommandTarget hatches;
     private final SlotTransactionAdminTarget transactions;
     private final PlayerSlotPurchaseController slotPurchases;
     private final BooleanSupplier reloadRuntime;
@@ -28,7 +30,23 @@ public final class OmniPetCommand implements BasicCommand {
             SlotTransactionAdminController transactions,
             PlayerSlotPurchaseController slotPurchases,
             BooleanSupplier reloadRuntime) {
-        this(studio, players, (SlotTransactionAdminTarget) transactions, slotPurchases, reloadRuntime);
+        this(studio, players, null, (SlotTransactionAdminTarget) transactions, slotPurchases, reloadRuntime);
+    }
+
+    public OmniPetCommand(
+            PetStudioController studio,
+            PlayerPetController players,
+            PlayerHatchController hatches,
+            SlotTransactionAdminController transactions,
+            PlayerSlotPurchaseController slotPurchases,
+            BooleanSupplier reloadRuntime) {
+        this(
+                studio,
+                players,
+                hatches == null ? null : hatches::command,
+                (SlotTransactionAdminTarget) transactions,
+                slotPurchases,
+                reloadRuntime);
     }
 
     OmniPetCommand(
@@ -37,8 +55,19 @@ public final class OmniPetCommand implements BasicCommand {
             SlotTransactionAdminTarget transactions,
             PlayerSlotPurchaseController slotPurchases,
             BooleanSupplier reloadRuntime) {
+        this(studio, players, null, transactions, slotPurchases, reloadRuntime);
+    }
+
+    OmniPetCommand(
+            PetStudioController studio,
+            PlayerPetController players,
+            PlayerHatchCommandTarget hatches,
+            SlotTransactionAdminTarget transactions,
+            PlayerSlotPurchaseController slotPurchases,
+            BooleanSupplier reloadRuntime) {
         this.studio = studio;
         this.players = players;
+        this.hatches = hatches;
         this.transactions = transactions;
         this.slotPurchases = slotPurchases;
         this.reloadRuntime = reloadRuntime;
@@ -49,6 +78,22 @@ public final class OmniPetCommand implements BasicCommand {
         CommandSender sender = source.getSender();
         Player player = sender instanceof Player value ? value : null;
         List<String> arguments = Arrays.asList(args == null ? new String[0] : args);
+        if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("hatch")) {
+            if (player == null) {
+                sender.sendMessage("OmniPet: a player is required to hatch an egg.");
+                return;
+            }
+            if (hatches == null) {
+                sender.sendMessage("OmniPet: hatch flow is not available yet.");
+                return;
+            }
+            if (arguments.size() > 2) {
+                sender.sendMessage("OmniPet: use /pet hatch [main|off|claim|refresh].");
+                return;
+            }
+            hatches.command(player, arguments.size() == 1 ? null : arguments.get(1));
+            return;
+        }
         if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("slot")) {
             if (player == null) {
                 sender.sendMessage("OmniPet: a player is required to buy active slots.");
@@ -121,4 +166,9 @@ public final class OmniPetCommand implements BasicCommand {
 
     @Override
     public String permission() { return AdminPetCommandParser.GENERAL_PERMISSION; }
+}
+
+@FunctionalInterface
+interface PlayerHatchCommandTarget {
+    void command(Player player, String action);
 }

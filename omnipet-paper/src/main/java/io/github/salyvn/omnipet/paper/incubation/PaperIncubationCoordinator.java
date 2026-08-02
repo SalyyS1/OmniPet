@@ -1,9 +1,7 @@
 package io.github.salyvn.omnipet.paper.incubation;
 
-import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -11,6 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import io.github.salyvn.omnipet.core.domain.incubation.IncubationStatus;
+import io.github.salyvn.omnipet.core.incubation.EggEscrowStage;
 import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
@@ -26,7 +25,8 @@ public final class PaperIncubationCoordinator {
     private final PaperIncubationStartSaga starts;
     private final PaperIncubationRecoveryExecutor recovery;
     private final IncubationOnlineEpochs onlineEpochs = new IncubationOnlineEpochs();
-    private final java.util.Map<UUID, Long> lastTickNanos = new ConcurrentHashMap<>();
+    private final IncubationTickBaselines tickBaselines = new IncubationTickBaselines();
+    private volatile java.util.function.Consumer<UUID> refreshListener = ignored -> { };
     private volatile BukkitTask ticker;
     private volatile boolean closed;
 
@@ -40,8 +40,11 @@ public final class PaperIncubationCoordinator {
         this.services = Objects.requireNonNull(services, "incubation services");
         this.tasks = Objects.requireNonNull(tasks, "player task queue");
         Objects.requireNonNull(limitsResolver, "limits resolver");
-        this.starts = new PaperIncubationStartSaga(plugin, services, registry, limitsResolver, tasks);
-        this.recovery = new PaperIncubationRecoveryExecutor(plugin, services, tasks);
+        this.recovery = new PaperIncubationRecoveryExecutor(
+                plugin, services, tasks, this::observeCommitted);
+        this.starts = new PaperIncubationStartSaga(
+                plugin, services, registry, limitsResolver, tasks, recovery::recover,
+                this::observeCommitted);
     }
 
     public void start() {
@@ -59,7 +62,7 @@ public final class PaperIncubationCoordinator {
         if (closed || !player.isOnline()) return;
         UUID playerId = player.getUniqueId();
         onlineEpochs.join(playerId);
-        lastTickNanos.put(playerId, System.nanoTime());
+        tickBaselines.reset(playerId);
         recovery.recover(player);
     }
 
@@ -67,11 +70,15 @@ public final class PaperIncubationCoordinator {
         if (playerId == null) return;
         onlineEpochs.quit(playerId);
         starts.onQuit(playerId);
-        lastTickNanos.remove(playerId);
+        tickBaselines.reset(playerId);
     }
 
-    public void start(Player player, EggInventoryHand hand) {
-        starts.start(player, hand);
+    public boolean start(Player player, EggInventoryHand hand) {
+        return starts.start(player, hand);
+    }
+
+    public void setRefreshListener(java.util.function.Consumer<UUID> listener) {
+        refreshListener = Objects.requireNonNull(listener, "refresh listener");
     }
 
     public void close() {
@@ -82,7 +89,7 @@ public final class PaperIncubationCoordinator {
         starts.close();
         recovery.close();
         onlineEpochs.clear();
-        lastTickNanos.clear();
+        tickBaselines.clear();
     }
 
     private void tickOnlinePlayers() {
@@ -91,15 +98,15 @@ public final class PaperIncubationCoordinator {
         for (Player player : Bukkit.getOnlinePlayers()) {
             UUID playerId = player.getUniqueId();
             long epoch = onlineEpochs.currentOrJoin(playerId);
-            long previous = lastTickNanos.put(playerId, now);
-            if (previous == 0L || now <= previous) continue;
-            long elapsedMillis = Duration.ofNanos(now - previous).toMillis();
-            if (elapsedMillis < 1L) continue;
-            submitTick(playerId, epoch, elapsedMillis);
+            submitTick(playerId, epoch, now);
         }
     }
 
-    private void submitTick(UUID playerId, long epoch, long elapsedMillis) {
+    private void observeCommitted(UUID playerId, UUID incubationId) {
+        tickBaselines.observeCommitted(playerId, incubationId, System.nanoTime());
+    }
+
+    private void submitTick(UUID playerId, long epoch, long sampledNanos) {
         try {
             tasks.submit(playerId, () -> {
                 if (closed || !isCurrentEpoch(playerId, epoch)) return;
@@ -107,12 +114,37 @@ public final class PaperIncubationCoordinator {
                     var snapshot = services.hatches().snapshot(playerId);
                     if (!isCurrentEpoch(playerId, epoch)
                             || snapshot.incubation() == null
-                            || snapshot.incubation().status() != IncubationStatus.INCUBATING) return;
-                    services.hatches().tick(
+                            || snapshot.incubation().status() != IncubationStatus.INCUBATING) {
+                        tickBaselines.reset(playerId);
+                        return;
+                    }
+                    var transaction = services.eggEscrowJournal().find(snapshot.incubation().id()).orElse(null);
+                    if (transaction == null || transaction.stage() != EggEscrowStage.COMMITTED) {
+                        tickBaselines.reset(playerId);
+                        if (transaction != null && (transaction.stage() == EggEscrowStage.PREPARED
+                                || transaction.stage() == EggEscrowStage.ITEM_REMOVED
+                                || transaction.stage() == EggEscrowStage.REFUND_PENDING)) {
+                            recovery.recover(playerId);
+                        }
+                        return;
+                    }
+                    UUID incubationId = snapshot.incubation().id();
+                    long elapsedMillis = tickBaselines.elapsedMillis(
+                            playerId, incubationId, sampledNanos, System.nanoTime());
+                    if (elapsedMillis < 1L) return;
+                    var result = services.hatches().tick(
                             playerId,
                             snapshot.revision(),
-                            snapshot.incubation().id(),
+                            incubationId,
                             elapsedMillis);
+                    if (result.status() == io.github.salyvn.omnipet.core.incubation.HatchResult.Status.TICKED) {
+                        tickBaselines.commit(playerId, incubationId, sampledNanos);
+                        if (result.incubation() == null
+                                || result.incubation().status() != IncubationStatus.INCUBATING) {
+                            tickBaselines.reset(playerId);
+                        }
+                        refreshListener.accept(playerId);
+                    }
                 } catch (java.io.IOException | RuntimeException failure) {
                     plugin.getLogger().warning("OmniPet incubation tick deferred for " + playerId
                             + ": " + failure.getMessage());

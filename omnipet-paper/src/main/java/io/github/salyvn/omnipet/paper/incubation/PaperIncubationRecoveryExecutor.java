@@ -2,15 +2,18 @@ package io.github.salyvn.omnipet.paper.incubation;
 
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import io.github.salyvn.omnipet.core.domain.PlayerState;
+import io.github.salyvn.omnipet.core.domain.incubation.IncubationStatus;
 import io.github.salyvn.omnipet.core.incubation.EggEscrowRecovery;
 import io.github.salyvn.omnipet.core.incubation.EggEscrowRecoveryDirective;
 import io.github.salyvn.omnipet.core.incubation.EggEscrowItemObservation;
@@ -31,17 +34,21 @@ final class PaperIncubationRecoveryExecutor {
     private final JavaPlugin plugin;
     private final PaperIncubationServices services;
     private final PerPlayerTaskQueue tasks;
+    private final java.util.function.BiConsumer<UUID, UUID> committedObserver;
     private final PaperEggItemCodec codec;
     private final EggInventoryEscrowService inventoryEscrow;
+    private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
 
     PaperIncubationRecoveryExecutor(
             JavaPlugin plugin,
             PaperIncubationServices services,
-            PerPlayerTaskQueue tasks) {
+            PerPlayerTaskQueue tasks,
+            java.util.function.BiConsumer<UUID, UUID> committedObserver) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.services = Objects.requireNonNull(services, "incubation services");
         this.tasks = Objects.requireNonNull(tasks, "player task queue");
+        this.committedObserver = Objects.requireNonNull(committedObserver, "committed observer");
         this.codec = new PaperEggItemCodec(plugin);
         this.inventoryEscrow = new EggInventoryEscrowService();
     }
@@ -49,12 +56,17 @@ final class PaperIncubationRecoveryExecutor {
     void recover(Player player) {
         Objects.requireNonNull(player, "player");
         if (closed || !player.isOnline()) return;
-        UUID playerId = player.getUniqueId();
-        submit(playerId, () -> loadTransactions(playerId));
+        recover(player.getUniqueId());
+    }
+
+    void recover(UUID playerId) {
+        if (closed || playerId == null || !inFlight.add(playerId)) return;
+        if (!submit(playerId, () -> loadTransactions(playerId))) inFlight.remove(playerId);
     }
 
     void close() {
         closed = true;
+        inFlight.clear();
     }
 
     private void loadTransactions(UUID playerId) {
@@ -66,18 +78,26 @@ final class PaperIncubationRecoveryExecutor {
                 plugin.getLogger().warning("OmniPet escrow recovery reached its bounded scan for "
                         + playerId + "; inspect older pending records manually.");
             }
+            Set<UUID> scheduled = new HashSet<>();
             for (EggEscrowTransaction transaction : transactions) {
-                recoverTransaction(transaction);
+                if (scheduled.add(transaction.transactionId())) recoverTransaction(transaction);
             }
             if (player.incubation() != null) {
                 services.eggEscrowJournal().find(player.incubation().id())
-                        .filter(transaction -> transaction.stage() == EggEscrowStage.COMMITTED
-                                || transaction.stage() == EggEscrowStage.FAILED)
+                        .filter(transaction -> {
+                            if (transaction.stage() == EggEscrowStage.COMMITTED
+                                    && player.incubation().status() == IncubationStatus.INCUBATING) {
+                                committedObserver.accept(playerId, transaction.transactionId());
+                            }
+                            return scheduled.add(transaction.transactionId());
+                        })
                         .ifPresent(this::recoverTransaction);
             }
         } catch (IOException | RuntimeException failure) {
             plugin.getLogger().warning("OmniPet incubation recovery scan failed for " + playerId
                     + ": " + failure.getMessage());
+        } finally {
+            inFlight.remove(playerId);
         }
     }
 
@@ -141,7 +161,10 @@ final class PaperIncubationRecoveryExecutor {
         try {
             ItemEscrowResult removed = services.itemEscrow().markItemRemoved(transaction.transactionId());
             if (removed.status() == ItemEscrowResult.Status.ITEM_REMOVED) {
-                services.itemEscrow().commit(transaction.transactionId());
+                ItemEscrowResult committed = services.itemEscrow().commit(transaction.transactionId());
+                if (committed.status() == ItemEscrowResult.Status.COMMITTED) {
+                    committedObserver.accept(transaction.playerId(), transaction.transactionId());
+                }
             }
         } catch (IOException | RuntimeException failure) {
             plugin.getLogger().warning("OmniPet escrow commit deferred for "
@@ -154,7 +177,10 @@ final class PaperIncubationRecoveryExecutor {
     }
 
     private void commitTransaction(EggEscrowTransaction transaction) throws IOException {
-        services.itemEscrow().commit(transaction.transactionId());
+        ItemEscrowResult committed = services.itemEscrow().commit(transaction.transactionId());
+        if (committed.status() == ItemEscrowResult.Status.COMMITTED) {
+            committedObserver.accept(transaction.playerId(), transaction.transactionId());
+        }
     }
 
     private void refundItem(EggEscrowTransaction transaction) throws IOException {
@@ -215,14 +241,17 @@ final class PaperIncubationRecoveryExecutor {
         }
     }
 
-    private void submit(UUID playerId, Runnable task) {
+    private boolean submit(UUID playerId, Runnable task) {
         try {
-            if (!tasks.submit(playerId, task) && !closed) {
+            boolean accepted = tasks.submit(playerId, task);
+            if (!accepted && !closed) {
                 plugin.getLogger().warning("OmniPet recovery work was rejected for " + playerId);
             }
+            return accepted;
         } catch (RuntimeException failure) {
             if (!closed) plugin.getLogger().warning("OmniPet recovery queue failed for " + playerId
                     + ": " + failure.getMessage());
+            return false;
         }
     }
 }

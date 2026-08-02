@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.junit.jupiter.api.Test;
 
 import io.github.salyvn.omnipet.core.economy.SlotReconciliationDecision;
@@ -50,8 +51,32 @@ class OmniPetCommandDispatchTest {
         }
     }
 
+    @Test
+    void executeDispatchesHatchActionOnlyForValidPlayerSyntax() {
+        RecordingHatches hatches = new RecordingHatches();
+        RecordingTransactions transactions = new RecordingTransactions();
+        OmniPetCommand command = command(hatches, transactions);
+
+        command.execute(source(playerSender()), new String[] {"hatch", "off"});
+
+        assertEquals("off", hatches.action);
+
+        hatches.action = null;
+        command.execute(source(playerSender()), new String[] {"hatch", "main", "extra"});
+        assertNull(hatches.action);
+
+        command.execute(source(permittedSender()), new String[] {"hatch", "main"});
+        assertNull(hatches.action);
+    }
+
     private static OmniPetCommand command(SlotTransactionAdminTarget transactions) {
         return new OmniPetCommand(null, null, transactions, null, () -> false);
+    }
+
+    private static OmniPetCommand command(
+            PlayerHatchCommandTarget hatches,
+            SlotTransactionAdminTarget transactions) {
+        return new OmniPetCommand(null, null, hatches, transactions, null, () -> false);
     }
 
     private static CommandSourceStack source(CommandSender sender) {
@@ -72,7 +97,21 @@ class OmniPetCommandDispatchTest {
                 });
     }
 
+    private static Player playerSender() {
+        UUID playerId = UUID.randomUUID();
+        return (Player) Proxy.newProxyInstance(
+                OmniPetCommandDispatchTest.class.getClassLoader(),
+                new Class<?>[] {Player.class},
+                (proxy, method, arguments) -> switch (method.getName()) {
+                    case "hasPermission", "isPermissionSet", "isOnline" -> true;
+                    case "getName" -> "Player";
+                    case "getUniqueId" -> playerId;
+                    default -> defaultValue(method.getReturnType());
+                });
+    }
+
     private static Object defaultValue(Class<?> type) {
+        if (type == void.class) return null;
         if (!type.isPrimitive()) return null;
         if (type == boolean.class) return false;
         if (type == byte.class) return (byte) 0;
@@ -104,6 +143,15 @@ class OmniPetCommandDispatchTest {
                 SlotReconciliationDecision requestedDecision) {
             transactionId = requestedTransactionId;
             decision = requestedDecision;
+        }
+    }
+
+    private static final class RecordingHatches implements PlayerHatchCommandTarget {
+        private String action;
+
+        @Override
+        public void command(Player player, String requestedAction) {
+            action = requestedAction;
         }
     }
 }

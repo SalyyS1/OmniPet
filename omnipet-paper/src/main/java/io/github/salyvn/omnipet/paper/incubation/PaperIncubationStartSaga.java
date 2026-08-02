@@ -28,6 +28,8 @@ final class PaperIncubationStartSaga {
     private final io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository registry;
     private volatile PaperStorageLimitsResolver limitsResolver;
     private final PerPlayerTaskQueue tasks;
+    private final java.util.function.Consumer<UUID> recoveryRequest;
+    private final java.util.function.BiConsumer<UUID, UUID> committedObserver;
     private final PaperEggItemCodec codec;
     private final EggInventoryEscrowService inventoryEscrow;
     private final ConcurrentMap<UUID, Boolean> inFlight = new ConcurrentHashMap<>();
@@ -38,12 +40,16 @@ final class PaperIncubationStartSaga {
             PaperIncubationServices services,
             io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository registry,
             PaperStorageLimitsResolver limitsResolver,
-            PerPlayerTaskQueue tasks) {
+            PerPlayerTaskQueue tasks,
+            java.util.function.Consumer<UUID> recoveryRequest,
+            java.util.function.BiConsumer<UUID, UUID> committedObserver) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.services = Objects.requireNonNull(services, "incubation services");
         this.registry = Objects.requireNonNull(registry, "registry");
         this.limitsResolver = Objects.requireNonNull(limitsResolver, "limits resolver");
         this.tasks = Objects.requireNonNull(tasks, "player task queue");
+        this.recoveryRequest = Objects.requireNonNull(recoveryRequest, "recovery request");
+        this.committedObserver = Objects.requireNonNull(committedObserver, "committed observer");
         this.codec = new PaperEggItemCodec(plugin);
         this.inventoryEscrow = new EggInventoryEscrowService();
     }
@@ -52,22 +58,25 @@ final class PaperIncubationStartSaga {
         limitsResolver = Objects.requireNonNull(next, "limits resolver");
     }
 
-    void start(Player player, EggInventoryHand hand) {
+    boolean start(Player player, EggInventoryHand hand) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(hand, "egg hand");
-        if (closed || !player.isOnline() || !Bukkit.isPrimaryThread()) return;
+        if (closed || !player.isOnline() || !Bukkit.isPrimaryThread()) return false;
         UUID playerId = player.getUniqueId();
-        if (inFlight.putIfAbsent(playerId, Boolean.TRUE) != null) return;
+        if (inFlight.putIfAbsent(playerId, Boolean.TRUE) != null) return false;
         try {
             PetStorageLimits limits = limitsResolver.resolve(player::hasPermission).limits();
             CapturedEggItem captured = new PaperPlayerEggInventory(player, codec).capture(hand);
             if (!submit(playerId, () -> prepareAndStart(playerId, captured, limits))) {
                 finish(playerId, "start queue rejected");
+                return false;
             }
+            return true;
         } catch (RuntimeException failure) {
             inFlight.remove(playerId);
             plugin.getLogger().warning("OmniPet incubation capture failed for " + playerId + ": "
                     + failure.getMessage());
+            return false;
         }
     }
 
@@ -119,7 +128,17 @@ final class PaperIncubationStartSaga {
         } catch (IOException | RuntimeException failure) {
             plugin.getLogger().warning("OmniPet incubation start is pending for " + playerId + ": "
                     + failure.getMessage());
+            requestRecovery(playerId);
             finish(playerId, "incubation start deferred");
+        }
+    }
+
+    private void requestRecovery(UUID playerId) {
+        try {
+            recoveryRequest.accept(playerId);
+        } catch (RuntimeException recoveryFailure) {
+            plugin.getLogger().warning("OmniPet could not queue incubation recovery for "
+                    + playerId + ": " + recoveryFailure.getMessage());
         }
     }
 
@@ -152,7 +171,10 @@ final class PaperIncubationStartSaga {
         try {
             ItemEscrowResult removed = services.itemEscrow().markItemRemoved(transactionId);
             if (removed.status() == ItemEscrowResult.Status.ITEM_REMOVED) {
-                services.itemEscrow().commit(transactionId);
+                ItemEscrowResult committed = services.itemEscrow().commit(transactionId);
+                if (committed.status() == ItemEscrowResult.Status.COMMITTED) {
+                    committedObserver.accept(playerId, transactionId);
+                }
             }
         } catch (IOException | RuntimeException failure) {
             plugin.getLogger().warning("OmniPet incubation escrow remains recoverable for " + playerId

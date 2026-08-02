@@ -24,6 +24,13 @@ class PaperIncubationSourceContractTest {
         assertTrue(recovery.contains("PENDING_STAGES"));
         assertTrue(recovery.contains("eggEscrowJournal().find(player.incubation().id())"));
         assertTrue(!recovery.contains("EnumSet.allOf"));
+        assertTrue(coordinator.contains("transaction.stage() != EggEscrowStage.COMMITTED"));
+        assertTrue(coordinator.contains("recovery.recover(playerId)"));
+        assertTrue(start.contains("recoveryRequest.accept(playerId)"));
+        assertTrue(!start.contains("cancelPreparedEscrow"));
+        assertTrue(recovery.contains("scheduled.add(transaction.transactionId())"));
+        assertTrue(coordinator.contains("tickBaselines.elapsedMillis"));
+        assertTrue(coordinator.contains("tickBaselines.commit"));
     }
 
     private static Path source(String file) {
