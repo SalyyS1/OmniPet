@@ -32,7 +32,8 @@ public final class PetSkillStateProjection {
                 "bindingId", reservation.bindingId(),
                 "staminaCost", reservation.staminaCost(),
                 "cooldownDeadline", reservation.cooldownDeadline(),
-                "createdAt", reservation.createdAtEpochMillis())));
+                "createdAt", reservation.createdAtEpochMillis(),
+                "persistCooldown", reservation.persistCooldown())));
         node.put("pending", pending);
         LinkedHashMap<String, Object> components = new LinkedHashMap<>(pet.rawComponents());
         components.put(COMPONENT_KEY, node);
@@ -67,7 +68,8 @@ public final class PetSkillStateProjection {
                     text(node.get("bindingId")),
                     decimal(node.get("staminaCost")),
                     integer(node.get("cooldownDeadline")),
-                    integer(node.get("createdAt"))));
+                    integer(node.get("createdAt")),
+                    Boolean.TRUE.equals(node.get("persistCooldown"))));
         });
         return Map.copyOf(result);
     }

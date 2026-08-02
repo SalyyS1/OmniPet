@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.domain.PlayerState;
@@ -16,7 +17,11 @@ import io.github.salyvn.omnipet.core.progression.ProgressionState;
 
 /** Durable prepare/cast/complete boundary; restart recovery never blindly recasts pending actions. */
 public final class RepositorySkillActionService {
+    /** Bounds the runtime-only cooldown table so a long uptime cannot grow it without limit. */
+    static final int MAX_TRANSIENT_COOLDOWNS = 4096;
+
     private final PlayerStateRepository players;
+    private final Map<String, Long> transientCooldowns = new ConcurrentHashMap<>();
 
     public RepositorySkillActionService(PlayerStateRepository players) {
         this.players = Objects.requireNonNull(players, "player state repository");
@@ -48,6 +53,10 @@ public final class RepositorySkillActionService {
             if (skill.cooldownDeadlines().getOrDefault(binding.bindingId(), 0L) > nowEpochMillis) {
                 return rejected(RepositorySkillActionResult.Status.COOLDOWN, current, pet, null, "skill is cooling down");
             }
+            if (!binding.persistCooldown()
+                    && transientDeadline(playerId, petId, binding.bindingId()) > nowEpochMillis) {
+                return rejected(RepositorySkillActionResult.Status.COOLDOWN, current, pet, null, "skill is cooling down");
+            }
             ProgressionState progression = PetProgressionProjection.read(pet, initialStamina, nowEpochMillis);
             double reserved = skill.pendingActions().values().stream()
                     .mapToDouble(SkillActionReservation::staminaCost).sum();
@@ -57,7 +66,8 @@ public final class RepositorySkillActionService {
             }
             long deadline = saturatingAdd(nowEpochMillis, binding.cooldown().toMillis());
             SkillActionReservation reservation = new SkillActionReservation(
-                    actionId, binding.bindingId(), binding.staminaCost(), deadline, nowEpochMillis);
+                    actionId, binding.bindingId(), binding.staminaCost(), deadline, nowEpochMillis,
+                    binding.persistCooldown());
             Map<UUID, SkillActionReservation> pending = new LinkedHashMap<>(skill.pendingActions());
             pending.put(actionId, reservation);
             PetInstance updated = PetSkillStateProjection.write(pet,
@@ -90,7 +100,11 @@ public final class RepositorySkillActionService {
                     progression.lastStaminaEpochMillis(), progression.extensions());
             Map<String, Long> cooldowns = new LinkedHashMap<>(skill.cooldownDeadlines());
             if (reservation.cooldownDeadline() > nowEpochMillis) {
-                cooldowns.put(reservation.bindingId(), reservation.cooldownDeadline());
+                if (reservation.persistCooldown()) {
+                    cooldowns.put(reservation.bindingId(), reservation.cooldownDeadline());
+                } else {
+                    rememberTransient(playerId, petId, reservation, nowEpochMillis);
+                }
             }
             Map<UUID, SkillActionReservation> pending = new LinkedHashMap<>(skill.pendingActions());
             pending.remove(actionId);
@@ -147,6 +161,26 @@ public final class RepositorySkillActionService {
     private static int index(List<PetInstance> pets, UUID id) {
         for (int index = 0; index < pets.size(); index++) if (pets.get(index).id().equals(id)) return index;
         return -1;
+    }
+
+    /**
+     * Cosmetic cooldowns stay in memory by design, so a restart may clear them. Only bindings
+     * that opt into {@code persistCooldown} survive restart in player state.
+     */
+    private long transientDeadline(UUID playerId, UUID petId, String bindingId) {
+        return transientCooldowns.getOrDefault(transientKey(playerId, petId, bindingId), 0L);
+    }
+
+    private void rememberTransient(
+            UUID playerId, UUID petId, SkillActionReservation reservation, long nowEpochMillis) {
+        transientCooldowns.entrySet().removeIf(entry -> entry.getValue() <= nowEpochMillis);
+        if (transientCooldowns.size() >= MAX_TRANSIENT_COOLDOWNS) return;
+        transientCooldowns.put(
+                transientKey(playerId, petId, reservation.bindingId()), reservation.cooldownDeadline());
+    }
+
+    private static String transientKey(UUID playerId, UUID petId, String bindingId) {
+        return playerId + "/" + petId + "/" + bindingId;
     }
 
     private static MutationResult accepted(

@@ -66,6 +66,33 @@ class RepositorySkillActionServiceTest {
         assertEquals(RepositorySkillActionResult.Status.ACTION_PENDING, duplicate.status());
     }
 
+    @Test
+    void cosmeticCooldownStaysInMemoryWhileMaterialCooldownSurvivesRestart() throws Exception {
+        Fixture fixture = fixture();
+        SkillBinding cosmetic = new SkillBinding(
+                "cosmetic_one", "MYTHICMOBS", "sparkle", SkillTrigger.ACTIVE,
+                Duration.ofSeconds(5), 1.0, 10.0, SkillTargetPolicy.OWNER, false);
+        UUID first = UUID.randomUUID();
+        var prepared = fixture.service.prepare(
+                fixture.playerId, fixture.revision(), fixture.petId, cosmetic, first, 1_000, 100);
+        var completed = fixture.service.complete(
+                fixture.playerId, prepared.state().revision(), fixture.petId, first, 1_100, 100);
+
+        assertTrue(PetSkillStateProjection.read(completed.pet()).cooldownDeadlines().isEmpty());
+
+        var blocked = fixture.service.prepare(
+                fixture.playerId, completed.state().revision(), fixture.petId, cosmetic,
+                UUID.randomUUID(), 2_000, 100);
+        assertEquals(RepositorySkillActionResult.Status.COOLDOWN, blocked.status());
+
+        RepositorySkillActionService restarted = new RepositorySkillActionService(
+                new FilePlayerStateRepository(fixture.root));
+        var afterRestart = restarted.prepare(
+                fixture.playerId, completed.state().revision(), fixture.petId, cosmetic,
+                UUID.randomUUID(), 2_000, 100);
+        assertEquals(RepositorySkillActionResult.Status.PREPARED, afterRestart.status());
+    }
+
     private Fixture fixture() throws Exception {
         UUID playerId = UUID.randomUUID();
         UUID petId = UUID.randomUUID();

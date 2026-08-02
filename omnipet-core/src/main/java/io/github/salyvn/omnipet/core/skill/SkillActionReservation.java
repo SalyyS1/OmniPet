@@ -8,7 +8,8 @@ public record SkillActionReservation(
         String bindingId,
         double staminaCost,
         long cooldownDeadline,
-        long createdAtEpochMillis) {
+        long createdAtEpochMillis,
+        boolean persistCooldown) {
     public SkillActionReservation {
         actionId = Objects.requireNonNull(actionId, "skill action ID");
         if (bindingId == null || bindingId.isBlank()) throw new IllegalArgumentException("skill binding ID is required");
