@@ -43,7 +43,8 @@ public final class PlayerPetMenuRenderer {
                     pet.definitionId(),
                     active ? NamedTextColor.GREEN : NamedTextColor.AQUA,
                     "Instance: " + abbreviate(pet.id().toString()),
-                    active ? "Desired active - click to recall" : "Stored - click to activate"));
+                    active ? "Left-click: recall" : "Left-click: activate",
+                    "Right-click: manage, cultivate, or release"));
         }
 
         if (page > 1) {

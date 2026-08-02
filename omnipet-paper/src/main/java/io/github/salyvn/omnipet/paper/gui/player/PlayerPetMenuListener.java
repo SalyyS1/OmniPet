@@ -11,16 +11,26 @@ import org.bukkit.event.inventory.InventoryOpenEvent;
 
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
 import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
+import io.github.salyvn.omnipet.paper.management.PetManagementMenuController;
 
 public final class PlayerPetMenuListener implements Listener {
     private final PlayerPetController controller;
     private final PlayerSlotPurchaseController slotPurchases;
+    private final PetManagementMenuController management;
 
     public PlayerPetMenuListener(
             PlayerPetController controller,
             PlayerSlotPurchaseController slotPurchases) {
+        this(controller, slotPurchases, null);
+    }
+
+    public PlayerPetMenuListener(
+            PlayerPetController controller,
+            PlayerSlotPurchaseController slotPurchases,
+            PetManagementMenuController management) {
         this.controller = controller;
         this.slotPurchases = slotPurchases;
+        this.management = management;
     }
 
     @EventHandler
@@ -36,7 +46,13 @@ public final class PlayerPetMenuListener implements Listener {
         if (event.getClick() != ClickType.LEFT && event.getClick() != ClickType.RIGHT) return;
         if (rawHolder instanceof PlayerPetInventoryHolder vault) {
             PlayerPetInventoryHolder.Action action = vault.action(event.getRawSlot());
-            if (action != null) controller.click(player, vault, action);
+            if (action != null && event.getClick() == ClickType.RIGHT
+                    && action.type() == PlayerPetInventoryHolder.Type.PET
+                    && management != null) {
+                management.open(player, action.petId());
+            } else if (action != null) {
+                controller.click(player, vault, action);
+            }
         } else if (rawHolder instanceof SlotPurchaseInventoryHolder purchase) {
             SlotPurchaseInventoryHolder.Action action = purchase.action(event.getRawSlot());
             if (action != null) slotPurchases.click(player, purchase, action);
