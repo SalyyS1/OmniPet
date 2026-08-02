@@ -25,6 +25,7 @@ import io.github.salyvn.omnipet.core.persistence.RegistrySnapshot;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository;
 import io.github.salyvn.omnipet.core.persistence.PetReferenceScanner;
 import io.github.salyvn.omnipet.core.persistence.YamlPetDefinitionRepository;
+import io.github.salyvn.omnipet.core.studio.FileStudioAuditSink;
 import io.github.salyvn.omnipet.core.studio.PetDefinitionStudioService;
 import io.github.salyvn.omnipet.core.studio.StudioPetDraft;
 import io.github.salyvn.omnipet.core.studio.input.StudioInputParsers;
@@ -82,9 +83,12 @@ public final class PetStudioController {
         this.sessions = new PetStudioSessionManager(clock, scheduler, guard, Duration.ofMinutes(15), this::onSessionClosed);
         List<PetReferenceScanner> scanners = new ArrayList<>(referenceScanners == null ? List.of() : referenceScanners);
         scanners.add(sessions::references);
-        this.service = new PetDefinitionStudioService(definitions, registry, ignored -> {}, scanners,
-                entry -> plugin.getLogger().info("Studio audit " + entry.operation() + " " + entry.definitionId()
-                        + " generation=" + entry.registryGeneration() + " key=" + entry.idempotencyKey()));
+        this.service = new PetDefinitionStudioService(
+                definitions,
+                registry,
+                ignored -> {},
+                scanners,
+                new FileStudioAuditSink(plugin.getDataFolder().toPath().resolve("data/audit/studio")));
         StudioMainThreadDispatcher dispatcher = task -> plugin.getServer().getScheduler().runTask(plugin, task);
         this.inputs = new ChatInputService(clock, dispatcher, guard, sessions::isCurrent);
     }

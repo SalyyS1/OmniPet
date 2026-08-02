@@ -39,7 +39,7 @@ public final class PetDefinitionStudioService {
     private final RegistrySnapshotTransaction transaction;
     private final Consumer<RegistrySnapshot> activation;
     private final java.util.List<PetReferenceScanner> referenceScanners;
-    private final Consumer<StudioAuditEntry> audit;
+    private final StudioAuditSink audit;
     private final ReentrantLock transactionLock = new ReentrantLock();
     private final LinkedHashMap<UUID, SaveResult> completedSaves = new LinkedHashMap<>();
     private final LinkedHashMap<UUID, RegistrySnapshot> completedArchives = new LinkedHashMap<>();
@@ -49,7 +49,7 @@ public final class PetDefinitionStudioService {
             PetDefinitionRepository definitions,
             RegistrySnapshotRepository snapshots,
             Consumer<RegistrySnapshot> activation) {
-        this(definitions, snapshots, activation, java.util.List.of(), ignored -> {});
+        this(definitions, snapshots, activation, java.util.List.of(), StudioAuditSink.noop());
     }
 
     public PetDefinitionStudioService(
@@ -57,7 +57,7 @@ public final class PetDefinitionStudioService {
             RegistrySnapshotRepository snapshots,
             Consumer<RegistrySnapshot> activation,
             java.util.List<PetReferenceScanner> referenceScanners) {
-        this(definitions, snapshots, activation, referenceScanners, ignored -> {});
+        this(definitions, snapshots, activation, referenceScanners, StudioAuditSink.noop());
     }
 
     public PetDefinitionStudioService(
@@ -66,6 +66,15 @@ public final class PetDefinitionStudioService {
             Consumer<RegistrySnapshot> activation,
             java.util.List<PetReferenceScanner> referenceScanners,
             Consumer<StudioAuditEntry> audit) {
+        this(definitions, snapshots, activation, referenceScanners, StudioAuditSink.fromConsumer(audit));
+    }
+
+    public PetDefinitionStudioService(
+            PetDefinitionRepository definitions,
+            RegistrySnapshotRepository snapshots,
+            Consumer<RegistrySnapshot> activation,
+            java.util.List<PetReferenceScanner> referenceScanners,
+            StudioAuditSink audit) {
         this.definitions = Objects.requireNonNull(definitions, "definitions");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.transaction = new RegistrySnapshotTransaction(snapshots);
@@ -107,13 +116,16 @@ public final class PetDefinitionStudioService {
             PetDefinition source = new PetDefinition(
                     draft.id(), draft.baseRevision(), draft.tier(), draft.icon(), draft.display(), persistedRawNode);
             PetDefinitionDraft repositoryDraft = new PetDefinitionDraft(source, draft.baseRevision());
-            ReceiptHolder receipt = new ReceiptHolder();
+            StudioAuditEntry auditEntry = new StudioAuditEntry(
+                    Instant.now(), idempotencyKey, StudioAuditEntry.Operation.SAVE,
+                    draft.id(), staged.generation(), true, "saved");
+            SaveTransactionHolder receipt = new SaveTransactionHolder();
 
             RegistrySnapshot activated;
             try {
                 activated = transaction.commit(
                         staged,
-                        () -> receipt.write(definitions, repositoryDraft, persisted),
+                        () -> receipt.commit(definitions, repositoryDraft, persisted, audit, auditEntry),
                         receipt::rollback,
                         activation);
             } catch (UncheckedIOException failure) {
@@ -122,8 +134,6 @@ public final class PetDefinitionStudioService {
 
             SaveResult result = new SaveResult(receipt.persisted(), activated);
             remember(idempotencyKey, result);
-            audit.accept(new StudioAuditEntry(Instant.now(), idempotencyKey, StudioAuditEntry.Operation.SAVE,
-                    draft.id(), activated.generation(), true, "saved"));
             return result;
         } finally {
             transactionLock.unlock();
@@ -137,7 +147,7 @@ public final class PetDefinitionStudioService {
             RegistrySnapshot current = snapshots.current();
             RegistrySnapshot staged = snapshots.stage(current.generation() + 1, loaded);
             RegistrySnapshot result = transaction.commit(staged, () -> {}, () -> {}, activation);
-            audit.accept(new StudioAuditEntry(Instant.now(), UUID.randomUUID(), StudioAuditEntry.Operation.RELOAD,
+            appendAudit(new StudioAuditEntry(Instant.now(), UUID.randomUUID(), StudioAuditEntry.Operation.RELOAD,
                     "*", result.generation(), true, "reloaded"));
             return result;
         } finally {
@@ -175,7 +185,7 @@ public final class PetDefinitionStudioService {
                 throw failure.getCause();
             }
             completedArchives.put(idempotencyKey, activated);
-            audit.accept(new StudioAuditEntry(Instant.now(), idempotencyKey, StudioAuditEntry.Operation.ARCHIVE,
+            appendAudit(new StudioAuditEntry(Instant.now(), idempotencyKey, StudioAuditEntry.Operation.ARCHIVE,
                     id, activated.generation(), true, "archived"));
             while (completedArchives.size() > IDEMPOTENCY_HISTORY_LIMIT) {
                 completedArchives.remove(completedArchives.keySet().iterator().next());
@@ -213,7 +223,7 @@ public final class PetDefinitionStudioService {
                 throw failure.getCause();
             }
             completedDeletes.put(idempotencyKey, activated);
-            audit.accept(new StudioAuditEntry(Instant.now(), idempotencyKey, StudioAuditEntry.Operation.HARD_DELETE,
+            appendAudit(new StudioAuditEntry(Instant.now(), idempotencyKey, StudioAuditEntry.Operation.HARD_DELETE,
                     id, activated.generation(), true, "hard deleted"));
             while (completedDeletes.size() > IDEMPOTENCY_HISTORY_LIMIT) {
                 completedDeletes.remove(completedDeletes.keySet().iterator().next());
@@ -435,6 +445,10 @@ public final class PetDefinitionStudioService {
         }
     }
 
+    private void appendAudit(StudioAuditEntry entry) throws IOException {
+        Objects.requireNonNull(audit.append(entry), "audit receipt");
+    }
+
     public record SaveResult(PetDefinitionEnvelope definition, RegistrySnapshot snapshot) {
         public SaveResult {
             Objects.requireNonNull(definition, "definition");
@@ -442,35 +456,67 @@ public final class PetDefinitionStudioService {
         }
     }
 
-    private static final class ReceiptHolder {
-        private PetDefinitionWriteReceipt receipt;
+    private static final class SaveTransactionHolder {
+        private PetDefinitionWriteReceipt definitionReceipt;
+        private StudioAuditReceipt auditReceipt;
 
-        private void write(
+        private void commit(
                 PetDefinitionRepository definitions,
                 PetDefinitionDraft draft,
-                PetDefinition expected) {
+                PetDefinition expected,
+                StudioAuditSink audit,
+                StudioAuditEntry auditEntry) {
             try {
-                receipt = definitions.saveDraftWithRollback(draft);
+                definitionReceipt = definitions.saveDraftWithRollback(draft);
+                if (!definitionReceipt.persisted().definition().equals(expected)) {
+                    throw new IllegalStateException("repository persisted a different definition than the staged snapshot");
+                }
+                auditReceipt = Objects.requireNonNull(audit.append(auditEntry), "audit receipt");
             } catch (IOException failure) {
                 throw new UncheckedIOException(failure);
-            }
-            if (!receipt.persisted().definition().equals(expected)) {
-                throw new IllegalStateException("repository persisted a different definition than the staged snapshot");
             }
         }
 
         private PetDefinitionEnvelope persisted() {
-            if (receipt == null) throw new IllegalStateException("definition write did not complete");
-            return receipt.persisted();
+            if (definitionReceipt == null) throw new IllegalStateException("definition write did not complete");
+            return definitionReceipt.persisted();
         }
 
         private void rollback() {
-            if (receipt == null) return;
+            Throwable failure = rollbackAudit(null);
+            failure = rollbackDefinition(failure);
+            if (failure instanceof RuntimeException runtimeFailure) throw runtimeFailure;
+            if (failure instanceof Error error) throw error;
+        }
+
+        private Throwable rollbackAudit(Throwable prior) {
+            if (auditReceipt == null) return prior;
             try {
-                receipt.rollback();
+                auditReceipt.rollback();
+                return prior;
             } catch (IOException failure) {
-                throw new UncheckedIOException(failure);
+                return accumulate(prior, new UncheckedIOException(failure));
+            } catch (RuntimeException | Error failure) {
+                return accumulate(prior, failure);
             }
+        }
+
+        private Throwable rollbackDefinition(Throwable prior) {
+            if (definitionReceipt == null) return prior;
+            try {
+                definitionReceipt.rollback();
+                return prior;
+            } catch (IOException failure) {
+                return accumulate(prior, new UncheckedIOException(failure));
+            } catch (RuntimeException | Error failure) {
+                return accumulate(prior, failure);
+            }
+        }
+
+        private static Throwable accumulate(Throwable prior, Throwable failure) {
+            if (prior == null) return failure;
+            prior.addSuppressed(failure);
+            return prior;
         }
     }
 
