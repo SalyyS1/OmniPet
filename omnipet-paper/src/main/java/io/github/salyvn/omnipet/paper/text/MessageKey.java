@@ -108,7 +108,14 @@ public enum MessageKey {
 
     // --- commands ----------------------------------------------------------------------------
     COMMAND_FOUNDATION_READY("command.foundation-ready",
-            "OmniPet foundation is enabled; pet features are loading in the next release phase.");
+            "OmniPet foundation is enabled; pet features are loading in the next release phase."),
+
+    // --- help --------------------------------------------------------------------------------
+    HELP_HEADER("help.header", "<gold>OmniPet commands</gold> <gray>(page <page>/<pages>)</gray>"),
+    HELP_LINE("help.line", "<yellow><usage></yellow> <dark_gray>-</dark_gray> <gray><description></gray>"),
+    HELP_FOOTER("help.footer", "<gray>More on <yellow>/pet help <page></yellow></gray>"),
+    HELP_EMPTY("help.empty", "<yellow>OmniPet: You have no available commands.</yellow>"),
+    HELP_PAGE_INVALID("help.page-invalid", "<red>OmniPet: Help page must be a positive integer.</red>");
 
     private final String path;
     private final String defaultValue;

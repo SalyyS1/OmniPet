@@ -1,0 +1,107 @@
+package io.github.salyvn.omnipet.paper.command;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+
+import org.junit.jupiter.api.Test;
+
+class CommandSuggestionsTest {
+    private static final Predicate<String> PLAIN_PLAYER = Set.of("omnipet.general")::contains;
+    private static final Predicate<String> EVERYTHING = permission -> true;
+
+    @Test
+    void aPlainPlayerSeesTheirOwnBranchesAndNoAdminNode() {
+        List<String> suggestions = suggest(PLAIN_PLAYER, true, "");
+
+        assertEquals(List.of("hatch", "slot", "skill", "help"), suggestions);
+        assertFalse(suggestions.contains("admin"));
+    }
+
+    @Test
+    void anAdminSeesTheAdminGroupingLiteral() {
+        assertTrue(suggest(EVERYTHING, true, "").contains("admin"));
+    }
+
+    @Test
+    void aSingleAdminPermissionExposesThatBranchAndNothingElse() {
+        Predicate<String> releaseOnly = Set.of("omnipet.general", "omnipet.admin.release")::contains;
+
+        assertEquals(List.of("hatch", "slot", "skill", "help", "admin"), suggest(releaseOnly, true, ""));
+        assertEquals(List.of("release"), suggest(releaseOnly, true, "admin", ""));
+        assertEquals(List.of("list", "recover", "reconcile"), suggest(releaseOnly, true, "admin", "release", ""));
+    }
+
+    @Test
+    void aPartialTokenFiltersByCaseInsensitivePrefix() {
+        assertEquals(List.of("admin"), suggest(EVERYTHING, true, "ad"));
+        assertEquals(List.of("admin"), suggest(EVERYTHING, true, "AD"));
+        assertEquals(List.of("hatch", "help"), suggest(EVERYTHING, true, "h"));
+    }
+
+    @Test
+    void adminHatchOffersEveryVerbAndInspectIsGatedSeparately() {
+        assertEquals(
+                List.of("inspect", "reduce", "set", "complete", "cancel"),
+                suggest(EVERYTHING, true, "admin", "hatch", ""));
+
+        Predicate<String> inspectOnly = Set.of("omnipet.general", "omnipet.admin.inspect")::contains;
+        assertEquals(List.of("inspect"), suggest(inspectOnly, true, "admin", "hatch", ""));
+
+        Predicate<String> manageOnly = Set.of("omnipet.general", "omnipet.admin.manageegg")::contains;
+        assertEquals(
+                List.of("reduce", "set", "complete", "cancel"),
+                suggest(manageOnly, true, "admin", "hatch", ""));
+    }
+
+    @Test
+    void cultivationItemTypesRequireBothItemAndCultivationPermissions() {
+        Predicate<String> itemOnly = Set.of("omnipet.general", "omnipet.admin.item")::contains;
+
+        assertEquals(List.of("reducer", "instant"), suggest(itemOnly, true, "admin", "item", ""));
+        assertEquals(
+                List.of("reducer", "instant", "candy", "breakthrough"),
+                suggest(EVERYTHING, true, "admin", "item", ""));
+    }
+
+    @Test
+    void consoleSeesOnlyAdminBranchesBecauseTheDispatcherRequiresAPlayerElsewhere() {
+        List<String> suggestions = suggest(EVERYTHING, false, "");
+
+        assertEquals(List.of("help", "admin"), suggestions);
+        assertFalse(suggestions.contains("hatch"));
+        assertFalse(suggestions.contains("slot"));
+        assertFalse(suggestions.contains("skill"));
+    }
+
+    @Test
+    void anArgumentPositionSuggestsNothingRatherThanGuessingAUuid() {
+        assertEquals(List.of(), suggest(EVERYTHING, true, "skill", ""));
+        assertEquals(List.of(), suggest(EVERYTHING, true, "admin", "hatch", "inspect", ""));
+        assertEquals(List.of(), suggest(EVERYTHING, true, "admin", "transactions", ""));
+    }
+
+    @Test
+    void anUnmatchedCompletedTokenStopsTheWalkInsteadOfRestartingAtTheRoot() {
+        assertEquals(List.of(), suggest(EVERYTHING, true, "not-a-branch", ""));
+        assertEquals(List.of(), suggest(EVERYTHING, true, "2", ""));
+    }
+
+    @Test
+    void aSenderWithoutTheGeneralPermissionGetsNothing() {
+        assertEquals(List.of(), suggest(permission -> false, true, ""));
+    }
+
+    @Test
+    void vaultIsNotSuggestedUntilItsDispatcherBranchExists() {
+        assertFalse(suggest(EVERYTHING, true, "").contains("vault"));
+    }
+
+    private static List<String> suggest(Predicate<String> hasPermission, boolean isPlayer, String... args) {
+        return CommandSuggestions.suggest(OmniPetCommandTree.root(), hasPermission, isPlayer, args);
+    }
+}

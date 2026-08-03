@@ -51,7 +51,8 @@ class MessageKeyDefaultsTest {
     void everyPlaceholderUsedInADefaultIsOneOfTheAgreedNames() {
         Set<String> allowed = Set.of(
                 "pet", "player", "amount", "page", "pages", "status", "reason",
-                "detail", "provider", "cost", "balance", "level", "exp", "remaining");
+                "detail", "provider", "cost", "balance", "level", "exp", "remaining",
+                "usage", "description");
         Pattern placeholder = Pattern.compile("<([a-z]+)>");
 
         for (MessageKey key : MessageKey.values()) {

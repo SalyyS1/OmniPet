@@ -1,6 +1,7 @@
 package io.github.salyvn.omnipet.paper.command;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
@@ -309,6 +310,11 @@ public final class OmniPetCommand implements BasicCommand {
         CommandSender sender = source.getSender();
         Player player = sender instanceof Player value ? value : null;
         List<String> arguments = Arrays.asList(args == null ? new String[0] : args);
+        // Matched before any numeric parsing so "help" can never be read as a vault page.
+        if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("help")) {
+            CommandHelpRenderer.send(sender, arguments, player != null);
+            return;
+        }
         if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("hatch")) {
             if (player == null) {
                 sender.sendMessage("OmniPet: a player is required to hatch an egg.");
@@ -504,6 +510,13 @@ public final class OmniPetCommand implements BasicCommand {
         } else if (result instanceof HatchAdminCommandParser.Cancel cancel) {
             hatchAdmin.cancel(sender, cancel.playerId(), cancel.incubationId(), cancel.actionId());
         }
+    }
+
+    @Override
+    public Collection<String> suggest(CommandSourceStack source, String[] args) {
+        CommandSender sender = source.getSender();
+        return CommandSuggestions.suggest(
+                OmniPetCommandTree.root(), sender::hasPermission, sender instanceof Player, args);
     }
 
     @Override
