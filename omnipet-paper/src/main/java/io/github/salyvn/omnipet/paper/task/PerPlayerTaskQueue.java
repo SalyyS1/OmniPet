@@ -172,6 +172,8 @@ public final class PerPlayerTaskQueue {
             try {
                 queues.wait();
             } catch (InterruptedException failure) {
+                // Flagged rather than rethrown: the caller re-asserts the interrupt after draining, so
+                // shutdown still completes instead of abandoning queued player work midway.
                 interrupted = true;
             }
         }

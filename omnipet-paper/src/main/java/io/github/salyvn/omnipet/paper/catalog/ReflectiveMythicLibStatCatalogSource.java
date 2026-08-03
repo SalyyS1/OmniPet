@@ -112,6 +112,8 @@ public final class ReflectiveMythicLibStatCatalogSource implements StatCatalogSo
         try {
             version = plugin.getPluginMeta().getVersion();
         } catch (RuntimeException error) {
+            // Deliberate: the version is diagnostic text only. A provider that cannot report its
+            // version is still usable, so this must not become a health failure.
             version = "unknown";
         }
         return new ProviderView(true, plugin.isEnabled(), false, version, plugin.getClass().getClassLoader());

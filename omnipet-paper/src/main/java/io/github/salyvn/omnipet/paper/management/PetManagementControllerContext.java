@@ -137,6 +137,8 @@ final class PetManagementControllerContext {
         try {
             return state == null ? null : PetManagementViewModel.create(session, state, preview);
         } catch (RuntimeException stale) {
+            // Deliberate: a view model that cannot be built from this state is stale, and null is the
+            // caller's contract for "no view". The caller reports it as a stale session to the player.
             return null;
         }
     }

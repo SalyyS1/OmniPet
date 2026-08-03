@@ -1,6 +1,5 @@
 package io.github.salyvn.omnipet.paper.gui.hub;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,6 +17,7 @@ import io.github.salyvn.omnipet.core.domain.incubation.IncubationStatus;
 import io.github.salyvn.omnipet.core.storage.PetStorageSnapshot;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
 import io.github.salyvn.omnipet.paper.text.Displays;
+import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -95,7 +95,7 @@ public final class HubMenuRenderer {
             lore.add(ready
                     ? Messages.line(MessageKey.HUB_HATCH_READY)
                     : Messages.line(MessageKey.HUB_HATCH_REMAINING,
-                            Messages.of("remaining", format(incubation.remainingActiveMillis()))));
+                            Messages.of("remaining", Durations.countdown(incubation.remainingActiveMillis()))));
         } else {
             lore.add(Messages.line(MessageKey.HUB_HATCH_IDLE));
         }
@@ -115,18 +115,5 @@ public final class HubMenuRenderer {
                                 Messages.of("amount", storage.effectiveActiveSlotCount())),
                         Component.empty(),
                         Messages.line(MessageKey.HUB_SLOTS_HINT)));
-    }
-
-    private static String format(long millis) {
-        long seconds = Math.max(0, Duration.ofMillis(millis).toSeconds());
-        long days = seconds / 86_400;
-        seconds %= 86_400;
-        long hours = seconds / 3_600;
-        seconds %= 3_600;
-        long minutes = seconds / 60;
-        seconds %= 60;
-        return days > 0
-                ? "%dd %02dh %02dm %02ds".formatted(days, hours, minutes, seconds)
-                : "%02dh %02dm %02ds".formatted(hours, minutes, seconds);
     }
 }

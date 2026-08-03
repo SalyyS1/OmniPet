@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Internal cleanup and test gaps"
-status: pending
+status: complete
 priority: P2
 effort: "1d"
 dependencies: [2, 3]

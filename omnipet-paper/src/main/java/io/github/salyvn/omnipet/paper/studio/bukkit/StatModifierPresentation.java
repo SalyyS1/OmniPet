@@ -1,9 +1,9 @@
 package io.github.salyvn.omnipet.paper.studio.bukkit;
 
-import java.util.Locale;
 import java.util.Objects;
 
 import io.github.salyvn.omnipet.core.studio.StatModifierType;
+import io.github.salyvn.omnipet.paper.text.Displays;
 
 /**
  * Human-readable names and one-line explanations for the three stat modifier types.
@@ -18,8 +18,7 @@ final class StatModifierPresentation {
     /** Title-case label, e.g. {@code Additive multiplier}. */
     static String label(StatModifierType modifier) {
         Objects.requireNonNull(modifier, "modifier");
-        String words = modifier.name().toLowerCase(Locale.ROOT).replace('_', ' ');
-        return Character.toUpperCase(words.charAt(0)) + words.substring(1);
+        return Displays.of(modifier);
     }
 
     /** What the modifier does, phrased for someone who has never seen the enum. */

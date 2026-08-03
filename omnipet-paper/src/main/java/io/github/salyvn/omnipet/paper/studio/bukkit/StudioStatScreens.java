@@ -16,6 +16,7 @@ import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
 import io.github.salyvn.omnipet.core.studio.StatLogicalIdentity;
 import io.github.salyvn.omnipet.core.studio.StatModifierType;
 import io.github.salyvn.omnipet.core.studio.StudioStat;
+import io.github.salyvn.omnipet.paper.text.Durations;
 
 /**
  * The stat picker and modifier screens, split out of {@link StudioInventoryRenderer} to keep both
@@ -160,7 +161,7 @@ final class StudioStatScreens {
     }
 
     private static String number(double value) {
-        return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+        return Durations.decimal(value);
     }
 
     private static String abbreviate(String value) {

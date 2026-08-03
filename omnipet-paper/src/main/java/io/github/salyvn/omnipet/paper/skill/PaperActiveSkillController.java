@@ -31,6 +31,7 @@ import io.github.salyvn.omnipet.core.skill.SkillTrigger;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.feedback.Feedback;
 import io.github.salyvn.omnipet.paper.feedback.FeedbackEvent;
+import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -310,7 +311,7 @@ public final class PaperActiveSkillController {
     }
 
     private static String words(Enum<?> value) {
-        return value.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+        return Displays.words(value);
     }
 
     private static String detail(Throwable failure) {

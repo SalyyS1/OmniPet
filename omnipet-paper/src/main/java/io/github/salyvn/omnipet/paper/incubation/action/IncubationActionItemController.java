@@ -16,6 +16,7 @@ import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
 import io.github.salyvn.omnipet.core.incubation.IncubationItemActionStage;
 import io.github.salyvn.omnipet.core.incubation.IncubationItemActionTransaction;
 import io.github.salyvn.omnipet.core.incubation.RepositoryHatchService;
+import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -126,7 +127,7 @@ public final class IncubationActionItemController {
     }
 
     private static String words(Enum<?> value) {
-        return value.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+        return Displays.words(value);
     }
 
     private static String detail(Throwable failure) {

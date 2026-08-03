@@ -29,6 +29,7 @@ import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseOrigin;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
+import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -329,6 +330,6 @@ public final class PlayerSlotPurchaseController {
     }
 
     private static String words(Enum<?> value) {
-        return value.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+        return Displays.words(value);
     }
 }

@@ -1,6 +1,5 @@
 package io.github.salyvn.omnipet.paper.gui.hatch;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +20,7 @@ import io.github.salyvn.omnipet.core.domain.incubation.IncubationStatus;
 import io.github.salyvn.omnipet.paper.gui.GuiColors;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
 import io.github.salyvn.omnipet.paper.text.Displays;
+import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -92,7 +92,7 @@ public final class HatchMenuRenderer {
         lore.add(Messages.line(MessageKey.GUI_HATCH_RARITY,
                 Messages.of("detail", Displays.identifier(incubation.outcome().rarityId()))));
         lore.add(Messages.line(MessageKey.GUI_HATCH_REMAINING,
-                Messages.of("remaining", format(incubation.remainingActiveMillis()))));
+                Messages.of("remaining", Durations.countdown(incubation.remainingActiveMillis()))));
         lore.add(Component.empty());
         lore.add(Messages.line(ready ? MessageKey.GUI_HATCH_READY : MessageKey.GUI_HATCH_ONLINE_ONLY));
         return GuiItems.of(egg,
@@ -105,18 +105,5 @@ public final class HatchMenuRenderer {
     private static void fill(Inventory inventory) {
         ItemStack pane = GuiItems.filler();
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, pane);
-    }
-
-    private static String format(long millis) {
-        long seconds = Math.max(0, Duration.ofMillis(millis).toSeconds());
-        long days = seconds / 86_400;
-        seconds %= 86_400;
-        long hours = seconds / 3_600;
-        seconds %= 3_600;
-        long minutes = seconds / 60;
-        seconds %= 60;
-        return days > 0
-                ? "%dd %02dh %02dm %02ds".formatted(days, hours, minutes, seconds)
-                : "%02dh %02dm %02ds".formatted(hours, minutes, seconds);
     }
 }

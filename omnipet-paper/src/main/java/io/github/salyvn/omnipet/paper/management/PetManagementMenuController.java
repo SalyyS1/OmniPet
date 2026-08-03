@@ -176,6 +176,8 @@ public final class PetManagementMenuController {
         try {
             plugin.getServer().getScheduler().runTask(plugin, task);
         } catch (RuntimeException rejected) {
+            // The scheduler refuses work during shutdown. Releasing the lifecycle request is the whole
+            // point: without it a disable mid-open would leave the player unable to reopen the screen.
             if (request != null) lifecycle.complete(request);
         }
     }

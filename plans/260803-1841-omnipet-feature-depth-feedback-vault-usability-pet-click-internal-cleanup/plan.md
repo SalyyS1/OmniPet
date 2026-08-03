@@ -61,7 +61,7 @@ Also corrected: the hardcoded-value count (3 → **14 literals**, six `Duration`
 | 2 | [Phase 2: Feedback primitives and gui config](./phase-02-feedback-primitives-and-gui-config.md) | Complete | 1 |
 | 3 | [Phase 3: Vault usability at scale](./phase-03-vault-usability-at-scale.md) | Complete | 2 |
 | 4 | [Phase 4: Pet click interaction](./phase-04-pet-click-interaction.md) | Complete | 2 |
-| 5 | [Phase 5: Internal cleanup and test gaps](./phase-05-internal-cleanup-and-test-gaps.md) | Pending | 2, 3 |
+| 5 | [Phase 5: Internal cleanup and test gaps](./phase-05-internal-cleanup-and-test-gaps.md) | Complete | 2, 3 |
 | 6 | [Phase 6: Docs and verification](./phase-06-docs-and-verification.md) | Pending | 2, 3, 4, 5 |
 
 Phase 2 lands as **two commits** (2a config, 2b feedback) — it is too large for one.

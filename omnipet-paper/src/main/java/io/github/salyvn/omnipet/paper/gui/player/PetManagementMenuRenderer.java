@@ -16,6 +16,7 @@ import io.github.salyvn.omnipet.paper.gui.GuiColors;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
 import io.github.salyvn.omnipet.paper.management.PetManagementViewModel;
 import io.github.salyvn.omnipet.paper.text.Displays;
+import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -177,7 +178,7 @@ public final class PetManagementMenuRenderer {
     }
 
     private static String decimal(double value) {
-        return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+        return Durations.decimal(value);
     }
 
     public record Layout(

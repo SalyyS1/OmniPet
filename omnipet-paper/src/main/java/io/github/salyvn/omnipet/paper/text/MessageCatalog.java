@@ -117,7 +117,13 @@ public final class MessageCatalog {
                     ? MINI_MESSAGE.deserialize(raw)
                     : MINI_MESSAGE.deserialize(raw, resolvers);
         } catch (RuntimeException malformed) {
-            // A broken tag must never reach a click handler as an exception; show the text as typed.
+            // Deliberate, and deliberately silent. MiniMessage in its default lenient mode does not
+            // throw on a malformed value: an unknown or unclosed tag renders as literal text, and even
+            // a resolver that throws is swallowed internally (verified empirically against the bundled
+            // Adventure). This catch is a belt-and-braces guard for a future strict-mode build, where
+            // a ParsingException would otherwise escape into a click handler. There is nothing to log
+            // because there is no reachable failure to report, and a warning here would sit in a render
+            // path where it could fire per frame.
             return Component.text(raw);
         }
     }

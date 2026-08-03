@@ -18,6 +18,7 @@ import io.github.salyvn.omnipet.core.domain.PetDefinition;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository;
 import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
 import io.github.salyvn.omnipet.core.progression.ProgressionMutationContext;
+import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.feedback.Feedback;
 import io.github.salyvn.omnipet.paper.feedback.FeedbackEvent;
 import io.github.salyvn.omnipet.paper.gui.player.PetManagementInventoryHolder;
@@ -163,7 +164,7 @@ final class PetManagementMenuSupport {
                     || outcome.status() == PetManagementOutcome.Status.STALE_SESSION
                     ? NamedTextColor.YELLOW : NamedTextColor.RED;
             String text = outcome.detail().isBlank()
-                    ? outcome.status().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ')
+                    ? Displays.words(outcome.status())
                     : outcome.detail();
             message(player, text, color);
             // The colour already encodes the distinction: yellow means "try again", red means refused.
