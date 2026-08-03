@@ -14,8 +14,8 @@ tasks.
 | Metric | Baseline (pre-plan) | Now | Delta |
 | --- | --- | --- | --- |
 | omnipet-core | 63 suites / 256 tests | 63 suites / 256 tests | — |
-| omnipet-paper | 84 suites / 349 tests | 95 suites / 435 tests | +11 suites, +86 tests |
-| **Total** | **147 / 605** | **158 / 691** | **+86 tests** |
+| omnipet-paper | 84 suites / 349 tests | 96 suites / 437 tests | +12 suites, +88 tests |
+| **Total** | **147 / 605** | **159 / 693** | **+88 tests** |
 | Failures / errors / skips | 0 / 0 / 0 | 0 / 0 / 0 | — |
 | `OmniPet-3.0.0-SNAPSHOT.jar` | 1,674,717 B | 1,726,005 B | +51,288 B |
 | JAR sha256 | `485ac4c6…4299a9` | `2df199b16b0ccd1de52db3f30de066bf2579a9e23212238587e50a3c51832732` | — |
