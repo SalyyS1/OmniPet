@@ -70,9 +70,11 @@ class FeedbackCallSiteContractTest {
         String settings = read(MAIN.resolve("feedback/FeedbackSettings.java"));
         String service = read(MAIN.resolve("feedback/FeedbackService.java"));
 
-        assertTrue(settings.contains("Sound.valueOf("), "resolution belongs to the settings load path");
-        assertFalse(service.contains("Sound.valueOf("),
-                "resolving per click would put a lookup and a possible throw inside a click handler");
+        assertTrue(settings.contains("resolver.resolve(cue.sound())"),
+                "resolution belongs to the settings load path");
+        assertFalse(service.contains("SoundResolver"),
+                "resolving per click would put a registry lookup inside a click handler");
+        assertFalse(service.contains("Registry."), service);
     }
 
     @Test

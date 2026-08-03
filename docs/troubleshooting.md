@@ -80,6 +80,15 @@ Console use must include a target when the syntax otherwise defaults to the exec
 - Unreadable transaction files are listed separately. Reads stop at 16 KiB per file; output includes at most 20 issue details plus omission/truncation summaries. Preserve entries and their `.bak` files; do not delete the whole `data/purchases` folder.
 - The adapters are not live-certified yet. Reproduce on staging with exact provider versions before treating a failure as an OmniPet data problem.
 
+## Plugin fails to enable with IncompatibleClassChangeError
+
+If the server log shows `IncompatibleClassChangeError: Method 'org.bukkit.Sound
+org.bukkit.Sound.valueOf(String)' must be InterfaceMethodref constant`, you are running a build from
+before this was fixed on Paper 1.21.11 or newer. `Sound` changed from an enum to an interface on that
+line, so the old call could not load. Update to a build that resolves sounds through `Registry.SOUNDS`;
+there is no config workaround, because the failure happens while the class is being loaded, before any
+config is read.
+
 ## Feedback is silent
 
 - Check `gui.feedback.enabled` in `config.yml`. `false` is the master switch and silences every category at once.

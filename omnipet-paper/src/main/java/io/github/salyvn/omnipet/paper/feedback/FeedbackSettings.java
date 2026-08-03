@@ -39,17 +39,24 @@ public final class FeedbackSettings {
     }
 
     /**
-     * Resolves every configured cue. Unresolvable names are reported through {@code warnings} and
-     * simply absent from the result, which the service reads as "this category is silent".
+     * Resolves every configured cue through the Paper registry. Unresolvable names are reported via
+     * {@code warnings} and simply absent from the result, which the service reads as "silent".
      */
     public static FeedbackSettings resolve(GuiConfig.Feedback config, Consumer<String> warnings) {
+        return resolve(config, warnings, SoundResolver.registry());
+    }
+
+    /** Overload taking the resolver explicitly, so tests need no running server. */
+    public static FeedbackSettings resolve(
+            GuiConfig.Feedback config, Consumer<String> warnings, SoundResolver resolver) {
         Objects.requireNonNull(config, "feedback config");
+        Objects.requireNonNull(resolver, "sound resolver");
         Consumer<String> warn = warnings == null ? message -> {} : warnings;
         Map<FeedbackCategory, ResolvedSound> resolved = new EnumMap<>(FeedbackCategory.class);
-        put(resolved, FeedbackCategory.SUCCESS, config.success(), warn);
-        put(resolved, FeedbackCategory.FAILURE, config.failure(), warn);
-        put(resolved, FeedbackCategory.BLOCKED, config.blocked(), warn);
-        put(resolved, FeedbackCategory.PROGRESS, config.progress(), warn);
+        put(resolved, FeedbackCategory.SUCCESS, config.success(), warn, resolver);
+        put(resolved, FeedbackCategory.FAILURE, config.failure(), warn, resolver);
+        put(resolved, FeedbackCategory.BLOCKED, config.blocked(), warn, resolver);
+        put(resolved, FeedbackCategory.PROGRESS, config.progress(), warn, resolver);
         return new FeedbackSettings(config.enabled(), config.actionBar(), config.minimumInterval(), resolved);
     }
 
@@ -62,11 +69,10 @@ public final class FeedbackSettings {
             Map<FeedbackCategory, ResolvedSound> target,
             FeedbackCategory category,
             GuiConfig.Cue cue,
-            Consumer<String> warn) {
-        Sound sound;
-        try {
-            sound = Sound.valueOf(cue.sound());
-        } catch (IllegalArgumentException unknown) {
+            Consumer<String> warn,
+            SoundResolver resolver) {
+        Sound sound = resolver.resolve(cue.sound());
+        if (sound == null) {
             warn.accept("unknown sound name '" + cue.sound() + "' for gui.feedback."
                     + category.name().toLowerCase(java.util.Locale.ROOT)
                     + "; that category will be silent");

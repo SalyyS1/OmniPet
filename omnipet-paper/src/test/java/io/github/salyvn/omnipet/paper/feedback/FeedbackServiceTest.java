@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.Test;
 
@@ -58,7 +59,7 @@ class FeedbackServiceTest {
                         "BLOCK_NOTE_BLOCK_BASS",
                         "BLOCK_CHEST_LOCKED",
                         "UI_BUTTON_CLICK"),
-                output.sounds.stream().map(s -> s.sound().name()).toList());
+                output.sounds.stream().map(s -> String.valueOf(s.sound())).toList());
     }
 
     @Test
@@ -129,13 +130,13 @@ class FeedbackServiceTest {
                 new GuiConfig.Cue("NO_SUCH_SOUND_ON_THIS_VERSION", 0.6f, 1.0f),
                 defaults.failure(), defaults.blocked(), defaults.progress());
 
-        FeedbackService service = service(FeedbackSettings.resolve(broken, warnings::add));
+        FeedbackService service = service(FeedbackSettings.resolve(broken, warnings::add, NAMES));
         Player player = player();
         service.success(player, FeedbackEvent.PET_ACTIVATED);
         service.failure(player, FeedbackEvent.SLOT_PURCHASE_REJECTED);
 
         assertEquals(1, output.sounds.size(), "only the broken category goes silent");
-        assertEquals("BLOCK_NOTE_BLOCK_BASS", output.sounds.getFirst().sound().name());
+        assertEquals("BLOCK_NOTE_BLOCK_BASS", String.valueOf(output.sounds.getFirst().sound()));
         assertTrue(warnings.stream().anyMatch(w -> w.contains("NO_SUCH_SOUND_ON_THIS_VERSION")), warnings.toString());
         assertTrue(warnings.stream().anyMatch(w -> w.contains("success")), warnings.toString());
     }
@@ -194,7 +195,7 @@ class FeedbackServiceTest {
         return FeedbackSettings.resolve(new GuiConfig.Feedback(
                 true, true, interval,
                 defaults.success(), defaults.failure(), defaults.blocked(), defaults.progress()),
-                warning -> {});
+                warning -> {}, NAMES);
     }
 
     private static FeedbackSettings disabled() {
@@ -202,8 +203,25 @@ class FeedbackServiceTest {
         return FeedbackSettings.resolve(new GuiConfig.Feedback(
                 false, true, Duration.ZERO,
                 defaults.success(), defaults.failure(), defaults.blocked(), defaults.progress()),
-                warning -> {});
+                warning -> {}, NAMES);
     }
+
+    /**
+     * Stands in for the Paper registry, which cannot be class-loaded without a running server.
+     *
+     * <p>Looks the name up reflectively rather than through {@code Sound.valueOf}. Tests compile
+     * against Paper 1.21 where {@code Sound} is still an enum, but production may run 1.21.11+ where
+     * it is an interface; going through reflection keeps this fixture honest about the fact that the
+     * shape differs, and keeps the banned call out of the source entirely.
+     */
+    private static final SoundResolver NAMES = name -> {
+        try {
+            java.lang.reflect.Field constant = Sound.class.getField(name);
+            return (Sound) constant.get(null);
+        } catch (ReflectiveOperationException unknown) {
+            return null;
+        }
+    };
 
     private static Player player() {
         return player(UUID.randomUUID());
