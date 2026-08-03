@@ -385,7 +385,10 @@ public final class OmniPetPlugin extends JavaPlugin {
         return FeedbackSettings.resolve(config, warning -> getLogger().warning("OmniPet feedback: " + warning));
     }
 
-    private OmniPetConfig loadConfig() throws IOException {        if (Files.isSymbolicLink(configFile)) throw new IOException("OmniPet config.yml cannot be a symbolic link");
+    private OmniPetConfig loadConfig() throws IOException {
+        if (Files.isSymbolicLink(configFile)) {
+            throw new IOException("OmniPet config.yml cannot be a symbolic link");
+        }
         OmniPetConfigLoader loader = new OmniPetConfigLoader();
         OmniPetConfigLoader.LoadResult result = loader.load(
                 configFile, warning -> getLogger().warning("OmniPet config.yml: " + warning));

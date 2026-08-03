@@ -21,6 +21,18 @@ The deterministic incubation, egg catalog, item escrow, and structured core hatc
 
 The Paper descriptor declares MythicLib, MMOItems, Vault, PlayerPoints, and LuckPerms as optional server dependencies with isolated classpaths. Economy and LuckPerms use dedicated dynamic registries; no vendor classes appear in core contracts.
 
+## Reference vendor builds
+
+The reflection-safe adapters were written against these builds. They are a record of what was probed, not a supported-version contract: every adapter degrades to its documented missing-plugin behavior on any ABI it cannot bind.
+
+| Plugin | Reference build |
+| --- | --- |
+| MythicLib | `1.7.1-SNAPSHOT` build 106 |
+| MythicMobs | `5.9.0` |
+| ModelEngine | `R4.0.9` |
+
+The authoritative load-order and optionality contract is `paper-plugin.yml`, not this table.
+
 ## Economy and entitlement behavior
 
 - Vault amounts are bounded decimals that must round-trip through the provider's `double` API. PlayerPoints amounts are bounded integers.

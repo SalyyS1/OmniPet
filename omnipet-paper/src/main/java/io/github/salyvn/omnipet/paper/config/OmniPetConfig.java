@@ -9,12 +9,22 @@ public record OmniPetConfig(
         Phase4PaperConfig storage,
         PaperRuntimeSettings runtime,
         ProgressionConfig progression,
+        String experienceFormulaSource,
         CultivationItems cultivationItems,
         GuiConfig gui) {
+    /** The EXP formula used when {@code progression.defaultExperienceFormula} is absent. */
+    public static final String DEFAULT_EXPERIENCE_FORMULA = "100 + level * 25 + evolution * 100";
+
     public OmniPetConfig {
         storage = Objects.requireNonNull(storage, "storage config");
         runtime = Objects.requireNonNull(runtime, "runtime config");
         progression = Objects.requireNonNull(progression, "progression config");
+        // Retained beside the compiled formula because compilation is one-way: ProgressionConfig holds
+        // only a lambda, so without the source text encode() could not write back what the operator
+        // configured and a migration would silently reset a custom formula to the default.
+        experienceFormulaSource = experienceFormulaSource == null || experienceFormulaSource.isBlank()
+                ? DEFAULT_EXPERIENCE_FORMULA
+                : experienceFormulaSource.trim();
         cultivationItems = Objects.requireNonNull(cultivationItems, "cultivation item config");
         gui = gui == null ? GuiConfig.defaults() : gui;
     }

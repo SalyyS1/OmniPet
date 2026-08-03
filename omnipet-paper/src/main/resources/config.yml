@@ -1,33 +1,73 @@
-# OmniPet operational storage limits. Changes are staged and validated before activation.
+# ==============================================================================================
+#  OmniPet
+# ==============================================================================================
+#  Player-facing text is NOT here - it lives in messages.yml, written beside this file on first
+#  run. Pets live in pets/*.yml (edit them with /pet admin browse, not by hand) and eggs in
+#  eggs/*.yml. Full reference: docs/configuration.md
+#
+#  Reloading with /pet admin reload
+#    Most values below apply immediately. The ones that do not are marked RESTART ONLY, and a
+#    reload tells you when it ignored something - it never fails silently.
+#
+#  Two kinds of section
+#    storage:  strict. An unknown key or a bad value stops startup, because a mistake in a
+#              capacity or a price is a mistake about someone's pets or money.
+#    others:   lenient. A bad value warns and falls back to its default, because a typo in a
+#              page size must never stop players using their pets.
+# ==============================================================================================
+
+
+# ----------------------------------------------------------------------------------------------
+#  STORAGE - how many pets a player may own, and how many may be out at once
+# ----------------------------------------------------------------------------------------------
+#  STRICT SECTION. Validated before it is activated; a bad value here stops startup by design.
+#  Lowering a limit never deletes a pet. Pets above the new limit become read-only until
+#  capacity is restored.
+# ----------------------------------------------------------------------------------------------
 storage:
+
+  # How many pets a player may KEEP. This is the vault.
   vault:
-    # Minimum effective owned-pet capacity for every player.
+    # Every player gets at least this much room, no permission needed.
     baseCapacity: 30
-    # Upper bound for configured and legacy permission-derived capacity.
+    # Hard ceiling. Nothing - config, permission, or legacy grant - raises capacity past this.
     maxCapacity: 200
+
+    # Honours capacity from a previous pet plugin so migrated players keep the room they paid for.
     legacyPermission:
-      # Reads consecutive petstorage.slot.N grants live; observations are never persisted.
       enabled: true
       template: "petstorage.slot.%s"
-      # Stops at the first missing node and never checks beyond this safe bound.
+      # Counts consecutive grants (slot.1, slot.2, ...) and stops at the first one missing, so a
+      # gap in the grants ends the scan. Read live and never written into player data.
       maxScan: 200
+
+  # How many of those pets may be ACTIVE - rendered in the world - at the same time.
   activeSlots:
-    # When false, core limits active intent to one pet without deleting stored pets.
+    # false limits every player to one active pet. Stored pets are untouched and nothing is
+    # deleted; extra active intent is simply clamped until you turn this back on.
     multiPetEnabled: true
-    # Starting entitlement used when new player state is initialized.
+    # Active slots a brand-new player starts with.
     base: 1
-    # Global clamp for purchased active-slot entitlements.
+    # Hard ceiling on purchased slots. Also bounds the LuckPerms template check below.
     max: 5
+
+    # Who decides how many active slots a player has.
     entitlement:
-      # OMNIPET is authoritative by default. LUCKPERMS and HYBRID remain explicit opt-ins.
+      #   OMNIPET   - OmniPet's own records decide. Default; needs no other plugin.
+      #   LUCKPERMS - permission nodes decide.
+      #   HYBRID    - both, resolved by `precedence` below.
       mode: OMNIPET
       precedence: OMNIPET_AUTHORITATIVE
+      # Only consulted by LUCKPERMS and HYBRID. %s is the slot number.
       luckPermsPermissionTemplate: "omnipet.slot.unlocked.%s"
+
+    # Price of each slot after `base`. A slot with no entry here cannot be bought.
     unlocks:
       "2":
-        # Empty means every player may buy this slot. A non-empty node is eligibility-only.
+        # Empty = anyone may buy it. A node here gates ELIGIBILITY only - it is never the price.
         permission: ""
-        # Multiple available costs are shown as separate choices; OmniPet never auto-selects.
+        # Every listed currency is offered as a separate choice with its balance shown. OmniPet
+        # never picks for the player. Remove a currency to stop accepting it.
         costs: { VAULT: 25000, PLAYER_POINTS: 50 }
       "3":
         permission: ""
@@ -39,70 +79,104 @@ storage:
         permission: "omnipet.slot.purchase.5"
         costs: { VAULT: 350000, PLAYER_POINTS: 500 }
 
-# One bounded coordinator updates every active pet. Scheduler changes require a restart.
+
+# ----------------------------------------------------------------------------------------------
+#  RUNTIME - the single task that moves every active pet
+# ----------------------------------------------------------------------------------------------
+#  RESTART ONLY. One bounded task updates all pets, visiting owners round-robin - there is no
+#  task per pet, so pet count does not multiply scheduler load. Leave these alone unless you are
+#  diagnosing tick time; the two `maximum` values are the throughput ceiling, not a target.
+# ----------------------------------------------------------------------------------------------
 runtime:
   initialDelayTicks: 1
   periodTicks: 1
+  # Owners visited per tick. Lower this first if OmniPet costs measurable tick time.
   maximumOwnersPerTick: 64
   maximumPetsPerOwner: 10
 
-# Global cultivation fallback. A validated pet definition may override the EXP formula.
+
+# ----------------------------------------------------------------------------------------------
+#  PROGRESSION - levelling, stamina, and the default EXP curve
+# ----------------------------------------------------------------------------------------------
+#  Server-wide fallback. Any pet definition may override the formula for itself.
+# ----------------------------------------------------------------------------------------------
 progression:
   maxLevel: 100
   maxStamina: 100.0
   staminaRegenPerSecond: 1.0
+
+  # EXP needed for the next level. Variables: level, rarity, quality, evolution.
+  # Compiled and test-evaluated at load: a formula that cannot compile, or that yields a value
+  # that is not positive, is rejected at startup rather than at a player's next level-up.
   defaultExperienceFormula: "100 + level * 25 + evolution * 100"
+  # The values the formula is checked against at load. Not gameplay - a startup smoke test.
   formulaSamples: { level: 1.0, rarity: 1.0, quality: 0.5, evolution: 0.0 }
+
+  # Leftover EXP from a level-up: CARRY keeps it, DISCARD drops it.
   overflowPolicy: CARRY
 
-# Standalone material defaults. MMOItems identities can be added through the item adapter.
+
+# ----------------------------------------------------------------------------------------------
+#  ITEMS - what an EXP candy and a breakthrough stone are made of
+# ----------------------------------------------------------------------------------------------
+#  Plain vanilla materials, so these work with no item plugin installed.
+# ----------------------------------------------------------------------------------------------
 items:
   experienceCandy:
     material: EXPERIENCE_BOTTLE
     experience: 100.0
   breakthroughStone:
     material: NETHER_STAR
+    # Minimum level and evolution a pet needs before the stone will apply.
     requiredLevel: 10
     requiredEvolution: 0
 
-# Compatibility targets used by linkage-safe adapters. These values are documentation only.
-integrations:
-  mythicLib: "1.7.1-SNAPSHOT build 106"
-  mythicMobs: "5.9.0"
-  modelEngine: "R4.0.9"
 
-# Menu behaviour and player feedback. The whole section is optional: delete it and OmniPet behaves
-# exactly as it did before this section existed. Unlike `storage:`, a mistake here is never fatal —
-# an unknown key is ignored with a warning and a bad value falls back to its default, because a typo
-# in a page size must not stop players using their pets.
+# ----------------------------------------------------------------------------------------------
+#  GUI - menus, sounds, and on-screen feedback
+# ----------------------------------------------------------------------------------------------
+#  OPTIONAL SECTION. Delete the whole thing and OmniPet behaves exactly as it did before this
+#  section existed - every value below is also its built-in default. Nothing here is fatal: an
+#  unknown key is ignored with a warning, a bad value falls back.
+# ----------------------------------------------------------------------------------------------
 gui:
+
+  # Sound and action-bar confirmation. Without this, every click feels the same - activating a
+  # pet and failing to afford a slot are indistinguishable.
   feedback:
-    # One master switch. `false` silences every sound and action bar plugin-wide, for servers with
-    # their own sound design and for players using a screen reader. Reloads live.
+    # One master switch. false silences every sound and action bar plugin-wide - for servers
+    # with their own sound design, and for players using a screen reader. Chat is unaffected.
     enabled: true
-    # Floor between two sounds from the same player, in milliseconds. Stops a fast-clicking player
-    # becoming an audible nuisance. Reloads live.
+    # Minimum gap between two sounds from the same player, in milliseconds. This is what stops a
+    # fast-clicking player becoming an audible nuisance to everyone nearby.
     minIntervalMillis: 150
-    # Action-bar text alongside the sound. Chat messages are unaffected either way. Reloads live.
+    # Action-bar text alongside the sound.
     actionBar: true
-    # One cue per outcome, not per event, so adding a feature never requires new config here.
-    # An unknown sound name warns at load and silences that one category. Reloads live.
+
+    # One cue per OUTCOME, not per event - so a new feature never needs new keys here.
+    #   success  - it worked          failure  - it did not
+    #   blocked  - not allowed        progress - acknowledged, still working
+    # Cues play to the acting player only, never to bystanders. An unknown sound name warns at
+    # load and silences that one cue; it never disables the others.
     success:  { sound: "ENTITY_EXPERIENCE_ORB_PICKUP", volume: 0.6, pitch: 1.2 }
     failure:  { sound: "BLOCK_NOTE_BLOCK_BASS",        volume: 0.6, pitch: 0.8 }
     blocked:  { sound: "BLOCK_CHEST_LOCKED",           volume: 0.6, pitch: 1.0 }
     progress: { sound: "UI_BUTTON_CLICK",              volume: 0.4, pitch: 1.0 }
+
   vault:
-    # RESTART ONLY - /pet admin reload will not apply a change here.
-    # Capped at 45: the 54-slot layout reserves the bottom row for paging and controls.
+    # RESTART ONLY - the vault renderer reads this once, when it is built.
+    # Capped at 45: the menu is 54 slots and the bottom row is paging and controls.
     petsPerPage: 45
+
   help:
-    # RESTART ONLY - /pet admin reload will not apply a change here. Capped at 20.
+    # Lines per /pet help page. Reloads live. Capped at 20.
     linesPerPage: 8
+
   studio:
-    # RESTART ONLY - /pet admin reload will not apply a change here.
-    # How long a Studio chat prompt waits for a reply before expiring.
+    # RESTART ONLY. How long a Studio chat prompt waits for your reply before it expires.
     promptTimeoutSeconds: 120
-    # Saving a pet in the Studio also writes eggs/<definitionId>_egg.yml, so the new pet can be
-    # obtained with /pet admin egg give. An existing catalog entry is never overwritten. Set false
-    # if your egg catalog is hand-designed and you do not want the Studio adding files. Reloads live.
+    # Saving a pet in the Studio also writes eggs/<definitionId>_egg.yml, so the new pet is
+    # immediately obtainable with /pet admin egg give. An existing egg is never overwritten, so
+    # your hand-tuned durations and candidate pools are safe. Set false to stop the Studio
+    # writing egg files at all. Reloads live.
     autoCreateEgg: true

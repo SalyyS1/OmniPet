@@ -18,6 +18,14 @@ import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeSettings;
 
 /** Aggregate loader that preserves the strict Phase 4 storage contract. */
 public final class OmniPetConfigLoader {
+    /**
+     * Accepted root sections.
+     *
+     * <p>{@code integrations} is accepted but never read. It documented reference vendor builds and is
+     * no longer written; it stays listed so an existing config that still carries the section keeps
+     * loading instead of failing startup on an unknown key. Those versions now live in
+     * {@code docs/integrations.md}.
+     */
     private static final Set<String> ROOT_KEYS =
             Set.of("storage", "runtime", "progression", "items", "integrations", "gui");
 
@@ -48,10 +56,12 @@ public final class OmniPetConfigLoader {
                 : new Phase4PaperConfigLoader().parseWithReport(YamlDocuments.writeMap(Map.of(
                         "storage", requiredMap(root.get("storage"), "storage"))));
         PaperRuntimeSettings runtime = runtime(optionalMap(root.get("runtime"), "runtime"));
-        ProgressionConfig progression = progression(optionalMap(root.get("progression"), "progression"));
+        Map<String, Object> progressionValues = optionalMap(root.get("progression"), "progression");
+        ProgressionConfig progression = progression(progressionValues);
         OmniPetConfig.CultivationItems items = items(optionalMap(root.get("items"), "items"));
         GuiConfig gui = new GuiConfigLoader().parse(root.get("gui"), warnings);
-        return new LoadResult(new OmniPetConfig(storage.config(), runtime, progression, items, gui),
+        return new LoadResult(new OmniPetConfig(storage.config(), runtime, progression,
+                experienceFormulaSource(progressionValues), items, gui),
                 legacy || storage.migratedLegacy());
     }
 
@@ -66,7 +76,7 @@ public final class OmniPetConfigLoader {
         progression.put("maxLevel", config.progression().maxLevel());
         progression.put("maxStamina", config.progression().maxStamina());
         progression.put("staminaRegenPerSecond", config.progression().staminaRegenPerSecond());
-        progression.put("defaultExperienceFormula", "100 + level * 25 + evolution * 100");
+        progression.put("defaultExperienceFormula", config.experienceFormulaSource());
         progression.put("formulaSamples", config.progression().formulaSamples());
         progression.put("overflowPolicy", config.progression().overflowPolicy().name());
         LinkedHashMap<String, Object> items = new LinkedHashMap<>();
@@ -77,16 +87,11 @@ public final class OmniPetConfigLoader {
                 "material", config.cultivationItems().breakthroughMaterial(),
                 "requiredLevel", config.cultivationItems().breakthroughRequiredLevel(),
                 "requiredEvolution", config.cultivationItems().breakthroughRequiredEvolution()));
-        LinkedHashMap<String, Object> integrations = new LinkedHashMap<>();
-        integrations.put("mythicLib", "1.7.1-SNAPSHOT build 106");
-        integrations.put("mythicMobs", "5.9.0");
-        integrations.put("modelEngine", "R4.0.9");
         LinkedHashMap<String, Object> root = new LinkedHashMap<>();
         root.put("storage", storageRoot.get("storage"));
         root.put("runtime", runtime);
         root.put("progression", progression);
         root.put("items", items);
-        root.put("integrations", integrations);
         // Serialised, not omitted: encode() is what a legacy migration writes back, so leaving gui out
         // would silently discard the operator's display and feedback settings on upgrade.
         root.put("gui", new GuiConfigLoader().encode(config.gui()));
@@ -103,12 +108,23 @@ public final class OmniPetConfigLoader {
                 integer(values.getOrDefault("maximumPetsPerOwner", 10), "runtime.maximumPetsPerOwner"));
     }
 
+    /**
+     * The formula exactly as the operator wrote it, or the default when the key is absent.
+     *
+     * <p>Read separately from {@link #progression} because compiling is one-way: the compiled result is
+     * a lambda that cannot reproduce its own source, and {@link #encode} must write back the operator's
+     * text rather than resetting a tuned formula to the default.
+     */
+    private static String experienceFormulaSource(Map<String, Object> values) {
+        return text(values.getOrDefault(
+                "defaultExperienceFormula", OmniPetConfig.DEFAULT_EXPERIENCE_FORMULA),
+                "progression.defaultExperienceFormula");
+    }
+
     private static ProgressionConfig progression(Map<String, Object> values) {
         rejectUnknown(values, Set.of("maxLevel", "maxStamina", "staminaRegenPerSecond",
                 "defaultExperienceFormula", "formulaSamples", "overflowPolicy"), "progression");
-        String formula = text(values.getOrDefault(
-                "defaultExperienceFormula", "100 + level * 25 + evolution * 100"),
-                "progression.defaultExperienceFormula");
+        String formula = experienceFormulaSource(values);
         Map<String, Double> samples = numberMap(optionalMap(values.get("formulaSamples"), "progression.formulaSamples"));
         if (samples.isEmpty()) samples = Map.of("level", 1.0, "rarity", 1.0, "quality", 0.5, "evolution", 0.0);
         CompiledFormula compiled = StudioFormulaValidator.compile(formula);

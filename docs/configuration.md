@@ -142,18 +142,13 @@ items:
     material: NETHER_STAR
     requiredLevel: 10
     requiredEvolution: 0
-
-integrations:
-  mythicLib: "1.7.1-SNAPSHOT build 106"
-  mythicMobs: "5.9.0"
-  modelEngine: "R4.0.9"
 ```
 
 - `runtime` bounds the single pet coordinator. `maximumOwnersPerTick` and `maximumPetsPerOwner` cap work per tick; owners are visited round-robin so a large fleet degrades update rate instead of tick time. Scheduler values are read at enable; changing them logs a warning and requires a restart.
-- `progression.defaultExperienceFormula` is compiled and evaluated against `formulaSamples` before activation. A non-finite or non-positive sample rejects the config. A pet definition may override the formula; an invalid override falls back to this validated global one.
+- `progression.defaultExperienceFormula` is compiled and evaluated against `formulaSamples` before activation. A non-finite or non-positive sample rejects the config. A pet definition may override the formula; an invalid override falls back to this validated global one. The formula text is retained beside the compiled result, so a legacy migration rewrites your formula rather than resetting it to the default.
 - `overflowPolicy` is `CARRY` or `DISCARD` and decides what happens to experience granted at `maxLevel`.
 - `items` defines the standalone material identities for EXP candy and breakthrough stones. MMOItems identities are not supported yet.
-- `integrations` records the vendor builds the linkage-safe adapters target. These values are documentation only; they do not gate loading.
+- A retired `integrations` section is still accepted, so an older file keeps loading, but it is never read and is no longer written back. Reference vendor builds now live in [integrations](integrations.md).
 - `gui` is optional and owns menu behaviour and player feedback. Deleting the whole section reproduces the behaviour OmniPet had before it existed. See below.
 - Unknown root **sections** fail closed before the live snapshot changes. The one exception is inside `gui`, which is lenient on purpose.
 
@@ -172,7 +167,7 @@ gui:
   vault:
     petsPerPage: 45            # RESTART ONLY, capped at 45
   help:
-    linesPerPage: 8            # RESTART ONLY, capped at 20
+    linesPerPage: 8            # reloads live, capped at 20
   studio:
     promptTimeoutSeconds: 120  # RESTART ONLY
     autoCreateEgg: true        # write eggs/<id>_egg.yml when the Studio saves a pet
@@ -197,7 +192,7 @@ sort, filter, status, hub, and slot-purchase controls.
 | --- | --- |
 | `gui.feedback.*` | **Live.** Settings are resolved before anything is swapped, so a config whose sound names fail to resolve leaves the previous settings active. |
 | `gui.vault.petsPerPage` | **Restart only.** The vault renderer is constructed once and reads its page size then. |
-| `gui.help.linesPerPage` | **Restart only.** |
+| `gui.help.linesPerPage` | **Live.** Help paging reads the page size on each `/pet help`, so a reload applies it. |
 | `gui.studio.promptTimeoutSeconds` | **Restart only.** The Studio's chat-input service is built at startup and reload does not rebuild it. |
 | `gui.studio.autoCreateEgg` | **Live.** Read at each save, so toggling it takes effect on the next definition you save. |
 
