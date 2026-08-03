@@ -10,13 +10,16 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 
 import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.storage.PetStorageSnapshot;
+import io.github.salyvn.omnipet.paper.gui.GuiColors;
+import io.github.salyvn.omnipet.paper.gui.GuiItems;
+import io.github.salyvn.omnipet.paper.text.Displays;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class PlayerPetMenuRenderer {
     private static final int PETS_PER_PAGE = 45;
@@ -27,8 +30,8 @@ public final class PlayerPetMenuRenderer {
         Map<Integer, PlayerPetInventoryHolder.Action> actions = new HashMap<>();
         PlayerPetInventoryHolder holder = new PlayerPetInventoryHolder(
                 player.getUniqueId(), snapshot.revision(), page, actions);
-        Inventory inventory = Bukkit.createInventory(
-                holder, 54, Component.text("OmniPet Vault | " + page + "/" + pages, NamedTextColor.GOLD));
+        Inventory inventory = Bukkit.createInventory(holder, 54, Messages.line(
+                MessageKey.GUI_TITLE_VAULT, Messages.of("page", page), Messages.of("pages", pages)));
         holder.bind(inventory);
         fill(inventory);
 
@@ -38,58 +41,76 @@ public final class PlayerPetMenuRenderer {
             boolean active = snapshot.desiredActivePetIds().contains(pet.id());
             int slot = index - start;
             actions.put(slot, PlayerPetInventoryHolder.Action.pet(pet.id(), active));
-            inventory.setItem(slot, item(
-                    active ? Material.LIME_DYE : Material.PLAYER_HEAD,
-                    pet.definitionId(),
-                    active ? NamedTextColor.GREEN : NamedTextColor.AQUA,
-                    "Instance: " + abbreviate(pet.id().toString()),
-                    active ? "Left-click: recall" : "Left-click: activate",
-                    "Right-click: manage, cultivate, or release"));
+            inventory.setItem(slot, petRow(pet, active));
         }
 
         if (page > 1) {
             actions.put(45, PlayerPetInventoryHolder.Action.previous());
-            inventory.setItem(45, item(Material.ARROW, "Previous page", NamedTextColor.YELLOW));
+            inventory.setItem(45, GuiItems.of(Material.ARROW,
+                    Messages.line(MessageKey.GUI_VAULT_PREVIOUS), List.of()));
         }
         if (page < pages) {
             actions.put(53, PlayerPetInventoryHolder.Action.next());
-            inventory.setItem(53, item(Material.ARROW, "Next page", NamedTextColor.YELLOW));
+            inventory.setItem(53, GuiItems.of(Material.ARROW,
+                    Messages.line(MessageKey.GUI_VAULT_NEXT), List.of()));
         }
-        inventory.setItem(49, item(
-                snapshot.vaultOverflow() > 0 ? Material.RED_STAINED_GLASS : Material.ENDER_CHEST,
-                "Vault status", snapshot.vaultOverflow() > 0 ? NamedTextColor.RED : NamedTextColor.GREEN,
-                "Owned: " + snapshot.ownedCount() + "/" + snapshot.effectiveVaultCapacity(),
-                "Desired active: " + snapshot.desiredActivePetIds().size() + "/" + snapshot.effectiveActiveSlotCount(),
-                snapshot.vaultOverflow() > 0
-                        ? "Overflow is read-only; no pet was deleted"
-                        : "Active slot purchases use explicit provider choice"));
+        inventory.setItem(49, vaultStatus(snapshot));
         actions.put(50, PlayerPetInventoryHolder.Action.purchaseSlot());
-        inventory.setItem(50, item(
+        inventory.setItem(50, GuiItems.of(
                 Material.EXPERIENCE_BOTTLE,
-                "Unlock active slot",
-                NamedTextColor.GOLD,
-                "Click to review configured Vault/PlayerPoints prices",
-                "OmniPet never auto-selects a currency"));
+                Messages.line(MessageKey.GUI_VAULT_UNLOCK_SLOT),
+                List.of(Messages.line(MessageKey.GUI_VAULT_UNLOCK_HINT))));
         return inventory;
     }
 
+    /**
+     * Pet name, then level and rarity where present, then the action hints.
+     *
+     * <p>Values come from {@link VaultPetSummary}, which omits what it cannot read rather than
+     * throwing, so one malformed legacy pet cannot blank the page. The previous truncated instance
+     * UUID is gone — it was noise for players; full UUIDs remain in the management screen.
+     */
+    private static ItemStack petRow(PetInstance pet, boolean active) {
+        VaultPetSummary summary = VaultPetSummary.of(pet);
+        List<Component> lore = new ArrayList<>();
+        summary.level().ifPresent(level -> lore.add(
+                Messages.line(MessageKey.GUI_VAULT_PET_LEVEL, Messages.of("level", level))));
+        summary.rarity().ifPresent(rarity -> lore.add(Messages.line(
+                MessageKey.GUI_VAULT_PET_RARITY, Messages.of("status", Displays.identifier(rarity)))));
+        // Value lines first, spacer, then the action hints last so players always read actions in
+        // the same position across every menu.
+        lore.add(Component.empty());
+        lore.add(Messages.line(active
+                ? MessageKey.GUI_VAULT_PET_RECALL
+                : MessageKey.GUI_VAULT_PET_ACTIVATE));
+        lore.add(Messages.line(MessageKey.GUI_VAULT_PET_MANAGE));
+        return GuiItems.of(
+                active ? Material.LIME_DYE : Material.PLAYER_HEAD,
+                GuiItems.label(pet.definitionId(), active ? GuiColors.POSITIVE : GuiColors.ACCENT),
+                lore);
+    }
+
+    private static ItemStack vaultStatus(PetStorageSnapshot snapshot) {
+        boolean overflow = snapshot.vaultOverflow() > 0;
+        List<Component> lore = new ArrayList<>();
+        lore.add(Messages.line(MessageKey.GUI_VAULT_OWNED,
+                Messages.of("amount", snapshot.ownedCount()),
+                Messages.of("total", snapshot.effectiveVaultCapacity())));
+        lore.add(Messages.line(MessageKey.GUI_VAULT_ACTIVE,
+                Messages.of("amount", snapshot.desiredActivePetIds().size()),
+                Messages.of("total", snapshot.effectiveActiveSlotCount())));
+        lore.add(Component.empty());
+        lore.add(Messages.line(overflow
+                ? MessageKey.GUI_VAULT_OVERFLOW
+                : MessageKey.GUI_VAULT_PROVIDER_NOTE));
+        return GuiItems.of(
+                overflow ? Material.RED_STAINED_GLASS : Material.ENDER_CHEST,
+                Messages.line(MessageKey.GUI_VAULT_STATUS).color(GuiColors.availability(!overflow)),
+                lore);
+    }
+
     private static void fill(Inventory inventory) {
-        ItemStack pane = item(Material.GRAY_STAINED_GLASS_PANE, " ", NamedTextColor.GRAY);
+        ItemStack pane = GuiItems.filler();
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, pane);
-    }
-
-    private static ItemStack item(Material material, String name, NamedTextColor color, String... lore) {
-        ItemStack stack = new ItemStack(material);
-        ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(name, color));
-        List<Component> lines = new ArrayList<>();
-        for (String line : lore) lines.add(Component.text(line, NamedTextColor.GRAY));
-        meta.lore(lines);
-        stack.setItemMeta(meta);
-        return stack;
-    }
-
-    private static String abbreviate(String value) {
-        return value.length() <= 18 ? value : value.substring(0, 18) + "...";
     }
 }

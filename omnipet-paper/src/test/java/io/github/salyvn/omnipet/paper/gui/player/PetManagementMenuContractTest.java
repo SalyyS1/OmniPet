@@ -15,7 +15,10 @@ import java.util.UUID;
 
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.Inventory;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.domain.PlayerState;
@@ -23,8 +26,15 @@ import io.github.salyvn.omnipet.core.release.ReleasePreview;
 import io.github.salyvn.omnipet.core.release.ReleaseRewardBundle;
 import io.github.salyvn.omnipet.paper.management.PetManagementSession;
 import io.github.salyvn.omnipet.paper.management.PetManagementViewModel;
+import io.github.salyvn.omnipet.paper.text.MessageCatalog;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 class PetManagementMenuContractTest {
+    @BeforeAll
+    static void bindMessageCatalog() {
+        // The renderer resolves its text through the catalog, which onEnable normally binds.
+        Messages.bind(MessageCatalog.defaults());
+    }
     @Test
     void holderSnapshotsActionsInsteadOfTrustingCallerMutation() {
         PetManagementSession session = view(null).session();
@@ -87,7 +97,11 @@ class PetManagementMenuContractTest {
         assertEquals(PetManagementInventoryHolder.View.RELEASE_CONFIRMATION, layout.holder().view());
         assertEquals(view.releasePreview(), layout.holder().releasePreview());
         assertNotNull(layout.holder().action(15));
-        assertTrue(layout.entries().get(15).lore().stream().anyMatch(line -> line.contains("pet_dust")));
+        // Lore is Component now that GUI text resolves through the message catalog; compare on the
+        // rendered plain text so the assertion still checks what a player actually reads.
+        assertTrue(layout.entries().get(15).lore().stream()
+                .map(line -> PlainTextComponentSerializer.plainText().serialize(line))
+                .anyMatch(line -> line.contains("Pet dust")));
         assertTrue(PetManagementInventoryGuard.cancelsDrag(Set.of(5, 30), 27));
         assertFalse(PetManagementInventoryGuard.cancelsDrag(Set.of(27, 30), 27));
     }

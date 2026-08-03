@@ -10,6 +10,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
 /**
@@ -26,7 +27,7 @@ public final class GuiItems {
     private GuiItems() {}
 
     /** Builds a colored, non-italic label. */
-    public static Component label(String text, NamedTextColor color) {
+    public static Component label(String text, TextColor color) {
         return upright(Component.text(Objects.requireNonNull(text, "label text"), color));
     }
 

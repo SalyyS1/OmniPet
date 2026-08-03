@@ -13,7 +13,6 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -23,8 +22,9 @@ import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
 import io.github.salyvn.omnipet.core.domain.PetDefinition;
 import io.github.salyvn.omnipet.core.domain.PetTier;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshot;
-import io.github.salyvn.omnipet.core.studio.StatLogicalIdentity;
 import io.github.salyvn.omnipet.core.studio.StudioPetDraft;
+import io.github.salyvn.omnipet.paper.gui.GuiColors;
+import io.github.salyvn.omnipet.paper.gui.GuiItems;
 import io.github.salyvn.omnipet.paper.studio.session.StudioViewToken;
 
 final class StudioInventoryRenderer {
@@ -177,29 +177,27 @@ final class StudioInventoryRenderer {
     }
 
     private static Inventory create(StudioInventoryHolder holder, int size, String title) {
-        Inventory inventory = Bukkit.createInventory(holder, size, Component.text(title, NamedTextColor.GOLD));
+        Inventory inventory = Bukkit.createInventory(holder, size,
+                GuiItems.label(title, GuiColors.TITLE));
         holder.bind(inventory);
         return inventory;
     }
 
     private static void fill(Inventory inventory) {
-        ItemStack pane = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta meta = pane.getItemMeta();
-        meta.displayName(Component.text(" "));
-        pane.setItemMeta(meta);
+        ItemStack pane = GuiItems.filler();
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, pane);
     }
 
-    /** Shared with {@link StudioStatScreens} so every Studio item is built identically. */
+    /**
+     * Shared with {@link StudioStatScreens} so every Studio item is built identically.
+     *
+     * <p>Routes through {@link GuiItems}, so no Studio lore line renders italic. Studio stays
+     * admin-facing: IDs and revisions are kept because staff need them.
+     */
     static ItemStack item(Material material, String name, NamedTextColor color, String... lore) {
-        ItemStack stack = new ItemStack(material);
-        ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(name, color));
-        List<Component> lines = new ArrayList<>();
-        for (String line : lore) lines.add(Component.text(line, NamedTextColor.GRAY));
-        meta.lore(lines);
-        stack.setItemMeta(meta);
-        return stack;
+        List<Component> lines = new ArrayList<>(lore.length);
+        for (String line : lore) lines.add(GuiItems.lore(line));
+        return GuiItems.of(material, GuiItems.label(name, color), lines);
     }
 
     private static String statCatalogLine(StudioState state) {

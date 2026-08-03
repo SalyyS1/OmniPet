@@ -8,25 +8,25 @@ import java.util.Map;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 
 import io.github.salyvn.omnipet.core.release.ReleaseRewardBundle;
+import io.github.salyvn.omnipet.paper.gui.GuiColors;
+import io.github.salyvn.omnipet.paper.gui.GuiItems;
 import io.github.salyvn.omnipet.paper.management.PetManagementViewModel;
+import io.github.salyvn.omnipet.paper.text.Displays;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class PetManagementMenuRenderer {
     public Inventory render(PetManagementViewModel view) {
         Layout layout = layout(view);
-        Inventory inventory = Bukkit.createInventory(
-                layout.holder(), layout.size(), Component.text(layout.title(), NamedTextColor.GOLD));
+        Inventory inventory = Bukkit.createInventory(layout.holder(), layout.size(), layout.title());
         layout.holder().bind(inventory);
-        ItemStack filler = item(Material.GRAY_STAINED_GLASS_PANE, " ", NamedTextColor.GRAY, List.of());
-        for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, filler);
-        layout.entries().forEach((slot, entry) -> inventory.setItem(
-                slot, item(entry.material(), entry.name(), entry.color(), entry.lore())));
+        for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, GuiItems.filler());
+        layout.entries().forEach((slot, entry) ->
+                inventory.setItem(slot, GuiItems.of(entry.material(), entry.name(), entry.lore())));
         return inventory;
     }
 
@@ -37,77 +37,127 @@ public final class PetManagementMenuRenderer {
     private Layout management(PetManagementViewModel view) {
         Map<Integer, PetManagementInventoryHolder.Action> actions = new LinkedHashMap<>();
         Map<Integer, Entry> entries = new LinkedHashMap<>();
+        boolean favorite = view.metadata().favorite();
+        boolean locked = view.metadata().locked();
+
         put(actions, entries, 10,
-                PetManagementInventoryHolder.Action.favorite(!view.metadata().favorite()),
-                view.metadata().favorite() ? Material.NETHER_STAR : Material.GRAY_DYE,
-                view.metadata().favorite() ? "Unfavorite" : "Favorite", NamedTextColor.YELLOW,
-                "Stable instance: " + shortId(view.pet().id()));
+                PetManagementInventoryHolder.Action.favorite(!favorite),
+                favorite ? Material.NETHER_STAR : Material.GRAY_DYE,
+                label(favorite ? MessageKey.GUI_MANAGE_UNFAVORITE : MessageKey.GUI_MANAGE_FAVORITE,
+                        GuiColors.WARNING),
+                Messages.line(MessageKey.GUI_MANAGE_FAVORITE_HINT));
         put(actions, entries, 11,
-                PetManagementInventoryHolder.Action.lock(!view.metadata().locked()),
-                view.metadata().locked() ? Material.TRIPWIRE_HOOK : Material.IRON_NUGGET,
-                view.metadata().locked() ? "Unlock pet" : "Lock pet", NamedTextColor.AQUA,
-                view.metadata().locked() ? "Release and destructive actions disabled" : "Protect this pet from release");
-        if (view.petIndex() > 0) put(actions, entries, 12,
-                PetManagementInventoryHolder.Action.move(view.petIndex() - 1),
-                Material.ARROW, "Move left", NamedTextColor.YELLOW, "Target position: " + view.petIndex());
-        if (view.petIndex() + 1 < view.ownerState().pets().size()) put(actions, entries, 13,
-                PetManagementInventoryHolder.Action.move(view.petIndex() + 1),
-                Material.ARROW, "Move right", NamedTextColor.YELLOW, "Target position: " + (view.petIndex() + 2));
-        put(actions, entries, 14, PetManagementInventoryHolder.Action.simple(
-                        PetManagementInventoryHolder.Type.ADD_EXPERIENCE),
-                Material.EXPERIENCE_BOTTLE, "Use EXP candy", NamedTextColor.GREEN,
-                "Level " + view.progression().level() + " | EXP " + decimal(view.progression().experience()),
-                "The exact captured item is consumed only after persistence");
-        put(actions, entries, 15, PetManagementInventoryHolder.Action.simple(
-                        PetManagementInventoryHolder.Type.BREAKTHROUGH),
-                Material.AMETHYST_SHARD, "Breakthrough", NamedTextColor.LIGHT_PURPLE,
-                "Evolution " + view.progression().evolution(), "Requirements come from the captured stone");
-        put(actions, entries, 16, PetManagementInventoryHolder.Action.simple(
-                        PetManagementInventoryHolder.Type.PREVIEW_RELEASE),
-                view.metadata().locked() ? Material.BARRIER : Material.LAVA_BUCKET,
-                "Release pet", view.metadata().locked() ? NamedTextColor.DARK_GRAY : NamedTextColor.RED,
-                view.metadata().locked() ? "Unlock this pet first" : "Preview frozen rewards before confirmation");
-        put(actions, entries, 31, PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.REFRESH),
-                Material.CLOCK, "Refresh", NamedTextColor.AQUA, "Revision " + view.session().expectedRevision());
-        put(actions, entries, 35, PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.BACK),
-                Material.BARRIER, "Back to vault", NamedTextColor.YELLOW);
+                PetManagementInventoryHolder.Action.lock(!locked),
+                locked ? Material.TRIPWIRE_HOOK : Material.IRON_NUGGET,
+                label(locked ? MessageKey.GUI_MANAGE_UNLOCK : MessageKey.GUI_MANAGE_LOCK, GuiColors.ACCENT),
+                Messages.line(locked
+                        ? MessageKey.GUI_MANAGE_LOCKED_HINT
+                        : MessageKey.GUI_MANAGE_UNLOCKED_HINT));
+        if (view.petIndex() > 0) {
+            put(actions, entries, 12,
+                    PetManagementInventoryHolder.Action.move(view.petIndex() - 1),
+                    Material.ARROW, label(MessageKey.GUI_MANAGE_MOVE_LEFT, GuiColors.WARNING),
+                    Messages.line(MessageKey.GUI_MANAGE_MOVE_TARGET, Messages.of("amount", view.petIndex())));
+        }
+        if (view.petIndex() + 1 < view.ownerState().pets().size()) {
+            put(actions, entries, 13,
+                    PetManagementInventoryHolder.Action.move(view.petIndex() + 1),
+                    Material.ARROW, label(MessageKey.GUI_MANAGE_MOVE_RIGHT, GuiColors.WARNING),
+                    Messages.line(MessageKey.GUI_MANAGE_MOVE_TARGET,
+                            Messages.of("amount", view.petIndex() + 2)));
+        }
+        put(actions, entries, 14,
+                PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.ADD_EXPERIENCE),
+                Material.EXPERIENCE_BOTTLE, label(MessageKey.GUI_MANAGE_CANDY, GuiColors.POSITIVE),
+                Messages.line(MessageKey.GUI_MANAGE_LEVEL, Messages.of("level", view.progression().level())),
+                Messages.line(MessageKey.GUI_MANAGE_EXPERIENCE,
+                        Messages.of("exp", decimal(view.progression().experience()))),
+                Component.empty(),
+                Messages.line(MessageKey.GUI_MANAGE_CANDY_HINT));
+        put(actions, entries, 15,
+                PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.BREAKTHROUGH),
+                Material.AMETHYST_SHARD, label(MessageKey.GUI_MANAGE_BREAKTHROUGH, GuiColors.TITLE),
+                Messages.line(MessageKey.GUI_MANAGE_EVOLUTION,
+                        Messages.of("amount", view.progression().evolution())),
+                Component.empty(),
+                Messages.line(MessageKey.GUI_MANAGE_BREAKTHROUGH_HINT));
+        put(actions, entries, 16,
+                PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.PREVIEW_RELEASE),
+                locked ? Material.BARRIER : Material.LAVA_BUCKET,
+                label(MessageKey.GUI_MANAGE_RELEASE, locked ? GuiColors.SECTION : GuiColors.BLOCKED),
+                Messages.line(locked
+                        ? MessageKey.GUI_MANAGE_RELEASE_LOCKED
+                        : MessageKey.GUI_MANAGE_RELEASE_HINT));
+        put(actions, entries, 31,
+                PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.REFRESH),
+                Material.CLOCK, Messages.line(MessageKey.GUI_MANAGE_REFRESH),
+                Messages.line(MessageKey.GUI_MANAGE_REFRESH_HINT));
+        put(actions, entries, 35,
+                PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.BACK),
+                Material.BARRIER, Messages.line(MessageKey.GUI_MANAGE_BACK));
+
+        // Staff need the full instance UUID here, so it stays — unlike the vault, which dropped it.
+        String customName = view.metadata().customName();
         entries.put(22, new Entry(
                 Material.PLAYER_HEAD,
-                view.metadata().customName().isBlank() ? view.pet().definitionId() : view.metadata().customName(),
-                view.active() ? NamedTextColor.GREEN : NamedTextColor.AQUA,
-                List.of("Definition: " + view.pet().definitionId(), "UUID: " + shortId(view.pet().id()),
-                        view.active() ? "Desired active" : "Stored")));
+                GuiItems.label(customName.isBlank() ? view.pet().definitionId() : customName,
+                        view.active() ? GuiColors.POSITIVE : GuiColors.ACCENT),
+                List.of(
+                        Messages.line(MessageKey.GUI_MANAGE_DEFINITION,
+                                Messages.of("pet", view.pet().definitionId())),
+                        Messages.line(MessageKey.GUI_MANAGE_INSTANCE,
+                                Messages.of("detail", view.pet().id().toString())),
+                        Component.empty(),
+                        Messages.line(view.active()
+                                ? MessageKey.GUI_MANAGE_ACTIVE
+                                : MessageKey.GUI_MANAGE_STORED))));
         PetManagementInventoryHolder holder = new PetManagementInventoryHolder(
                 view.session(), PetManagementInventoryHolder.View.MANAGEMENT, actions, null);
-        return new Layout(45, "OmniPet | Manage", holder, entries);
+        return new Layout(45, Messages.line(MessageKey.GUI_TITLE_MANAGE), holder, entries);
     }
 
     private Layout release(PetManagementViewModel view) {
         Map<Integer, PetManagementInventoryHolder.Action> actions = new LinkedHashMap<>();
         Map<Integer, Entry> entries = new LinkedHashMap<>();
-        actions.put(11, PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.CANCEL_RELEASE));
-        entries.put(11, new Entry(Material.BARRIER, "Cancel", NamedTextColor.YELLOW, List.of("No state changes")));
-        actions.put(15, PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.CONFIRM_RELEASE));
-        entries.put(15, new Entry(Material.LAVA_BUCKET, "Confirm release", NamedTextColor.RED,
+        actions.put(11, PetManagementInventoryHolder.Action.simple(
+                PetManagementInventoryHolder.Type.CANCEL_RELEASE));
+        entries.put(11, new Entry(Material.BARRIER, Messages.line(MessageKey.GUI_RELEASE_CANCEL),
+                List.of(Messages.line(MessageKey.GUI_RELEASE_CANCEL_HINT))));
+        actions.put(15, PetManagementInventoryHolder.Action.simple(
+                PetManagementInventoryHolder.Type.CONFIRM_RELEASE));
+        entries.put(15, new Entry(Material.LAVA_BUCKET, Messages.line(MessageKey.GUI_RELEASE_CONFIRM),
                 rewardLore(view.releasePreview().rewards())));
-        entries.put(13, new Entry(Material.PAPER, "Frozen reward preview", NamedTextColor.GOLD,
-                List.of("Transaction: " + shortId(view.releasePreview().transactionId()),
-                        "Revision: " + view.releasePreview().expectedRevision(),
-                        "Pet: " + shortId(view.releasePreview().petId()))));
+        entries.put(13, new Entry(Material.PAPER, Messages.line(MessageKey.GUI_RELEASE_PREVIEW),
+                List.of(
+                        Messages.line(MessageKey.GUI_RELEASE_REVISION,
+                                Messages.of("amount", view.releasePreview().expectedRevision())),
+                        Messages.line(MessageKey.GUI_RELEASE_TRANSACTION,
+                                Messages.of("detail", view.releasePreview().transactionId().toString())))));
         PetManagementInventoryHolder holder = new PetManagementInventoryHolder(
                 view.session(), PetManagementInventoryHolder.View.RELEASE_CONFIRMATION,
                 actions, view.releasePreview());
-        return new Layout(27, "OmniPet | Confirm Release", holder, entries);
+        return new Layout(27, Messages.line(MessageKey.GUI_TITLE_RELEASE), holder, entries);
     }
 
-    private static List<String> rewardLore(ReleaseRewardBundle rewards) {
-        List<String> lore = new ArrayList<>();
-        rewards.internalRewards().forEach(reward -> lore.add("Internal: " + reward.rewardId() + " x" + reward.amount()));
-        rewards.externalRewards().forEach(reward -> lore.add(
-                reward.provider() + ": " + reward.rewardId() + " " + reward.amount().toPlainString()));
-        if (lore.isEmpty()) lore.add("No configured rewards");
-        lore.add("Pet removal and internal outbox persist atomically");
+    private static List<Component> rewardLore(ReleaseRewardBundle rewards) {
+        List<Component> lore = new ArrayList<>();
+        rewards.internalRewards().forEach(reward -> lore.add(Messages.line(
+                MessageKey.GUI_RELEASE_REWARD_INTERNAL,
+                Messages.of("detail", Displays.identifier(reward.rewardId())),
+                Messages.of("amount", reward.amount()))));
+        rewards.externalRewards().forEach(reward -> lore.add(Messages.line(
+                MessageKey.GUI_RELEASE_REWARD_EXTERNAL,
+                Messages.of("provider", Displays.identifier(String.valueOf(reward.provider()))),
+                Messages.of("detail", Displays.identifier(reward.rewardId())),
+                Messages.of("amount", reward.amount().toPlainString()))));
+        if (lore.isEmpty()) lore.add(Messages.line(MessageKey.GUI_RELEASE_REWARD_NONE));
+        lore.add(Component.empty());
+        lore.add(Messages.line(MessageKey.GUI_RELEASE_ATOMIC_NOTE));
         return List.copyOf(lore);
+    }
+
+    private static Component label(MessageKey key, net.kyori.adventure.text.format.TextColor color) {
+        return Messages.line(key).colorIfAbsent(color);
     }
 
     private static void put(
@@ -116,26 +166,10 @@ public final class PetManagementMenuRenderer {
             int slot,
             PetManagementInventoryHolder.Action action,
             Material material,
-            String name,
-            NamedTextColor color,
-            String... lore) {
+            Component name,
+            Component... lore) {
         actions.put(slot, action);
-        entries.put(slot, new Entry(material, name, color, List.of(lore)));
-    }
-
-    private static ItemStack item(
-            Material material, String name, NamedTextColor color, List<String> lore) {
-        ItemStack stack = new ItemStack(material);
-        ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(name, color));
-        meta.lore(lore.stream().map(line -> Component.text(line, NamedTextColor.GRAY)).toList());
-        stack.setItemMeta(meta);
-        return stack;
-    }
-
-    private static String shortId(Object value) {
-        String text = String.valueOf(value);
-        return text.length() <= 18 ? text : text.substring(0, 18) + "...";
+        entries.put(slot, new Entry(material, name, List.of(lore)));
     }
 
     private static String decimal(double value) {
@@ -144,7 +178,7 @@ public final class PetManagementMenuRenderer {
 
     public record Layout(
             int size,
-            String title,
+            Component title,
             PetManagementInventoryHolder holder,
             Map<Integer, Entry> entries) {
         public Layout {
@@ -152,7 +186,7 @@ public final class PetManagementMenuRenderer {
         }
     }
 
-    public record Entry(Material material, String name, NamedTextColor color, List<String> lore) {
+    public record Entry(Material material, Component name, List<Component> lore) {
         public Entry {
             lore = List.copyOf(lore);
         }

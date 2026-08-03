@@ -12,14 +12,17 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 
 import io.github.salyvn.omnipet.core.economy.EconomyAmount;
 import io.github.salyvn.omnipet.core.economy.EconomyProvider;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfig;
+import io.github.salyvn.omnipet.paper.gui.GuiColors;
+import io.github.salyvn.omnipet.paper.gui.GuiItems;
+import io.github.salyvn.omnipet.paper.text.Displays;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class SlotPurchaseMenuRenderer {
     public Inventory selection(
@@ -31,13 +34,13 @@ public final class SlotPurchaseMenuRenderer {
             Phase4PaperConfig.SlotUnlock unlock,
             Function<EconomyProvider, Boolean> available,
             Function<EconomyProvider, String> diagnostic,
-            Function<EconomyProvider, String> balance) {
+            Function<EconomyProvider, SlotBalanceDisplay> balance) {
         Map<Integer, SlotPurchaseInventoryHolder.Action> actions = new HashMap<>();
         SlotPurchaseInventoryHolder holder = holder(
                 player, revision, slot, returnPage, transactionId,
                 SlotPurchaseInventoryHolder.Stage.SELECT_PROVIDER, actions);
-        Inventory inventory = Bukkit.createInventory(
-                holder, 27, Component.text("Unlock active slot " + slot, NamedTextColor.GOLD));
+        Inventory inventory = Bukkit.createInventory(holder, 27, Messages.line(
+                MessageKey.GUI_TITLE_SLOT_SELECT, Messages.of("amount", slot)));
         holder.bind(inventory);
         fill(inventory);
 
@@ -46,20 +49,18 @@ public final class SlotPurchaseMenuRenderer {
         for (Map.Entry<EconomyProvider, EconomyAmount> entry : unlock.costs().entrySet().stream()
                 .sorted(Map.Entry.comparingByKey()).toList()) {
             int position = positions[Math.min(index++, positions.length - 1)];
-            boolean providerAvailable = available.apply(entry.getKey());
+            EconomyProvider provider = entry.getKey();
+            boolean providerAvailable = available.apply(provider);
             if (providerAvailable) {
                 actions.put(position, SlotPurchaseInventoryHolder.Action.select(entry.getValue()));
             }
-            inventory.setItem(position, item(
-                    providerAvailable ? material(entry.getKey()) : Material.BARRIER,
-                    entry.getKey() == EconomyProvider.VAULT ? "Pay with Vault" : "Pay with PlayerPoints",
-                    providerAvailable ? NamedTextColor.GREEN : NamedTextColor.RED,
-                    "Cost: " + entry.getValue().value().toPlainString(),
-                    balance.apply(entry.getKey()),
-                    providerAvailable ? "Click to review" : diagnostic.apply(entry.getKey())));
+            inventory.setItem(position, providerOption(
+                    provider, entry.getValue(), providerAvailable,
+                    balance.apply(provider), diagnostic.apply(provider)));
         }
         actions.put(22, SlotPurchaseInventoryHolder.Action.cancel());
-        inventory.setItem(22, item(Material.ARROW, "Back to vault", NamedTextColor.YELLOW));
+        inventory.setItem(22, GuiItems.of(Material.ARROW,
+                Messages.line(MessageKey.GUI_SLOT_BACK_TO_VAULT), List.of()));
         return inventory;
     }
 
@@ -76,21 +77,50 @@ public final class SlotPurchaseMenuRenderer {
                 previous.transactionId(),
                 SlotPurchaseInventoryHolder.Stage.CONFIRM,
                 actions);
-        Inventory inventory = Bukkit.createInventory(
-                holder, 27, Component.text("Confirm slot " + previous.slot(), NamedTextColor.GOLD));
+        Inventory inventory = Bukkit.createInventory(holder, 27, Messages.line(
+                MessageKey.GUI_TITLE_SLOT_CONFIRM, Messages.of("amount", previous.slot())));
         holder.bind(inventory);
         fill(inventory);
         actions.put(11, SlotPurchaseInventoryHolder.Action.confirm(amount));
         actions.put(15, SlotPurchaseInventoryHolder.Action.cancel());
-        inventory.setItem(11, item(
+        inventory.setItem(11, GuiItems.of(
                 Material.LIME_CONCRETE,
-                "Confirm purchase",
-                NamedTextColor.GREEN,
-                "Provider: " + amount.provider(),
-                "Cost: " + amount.value().toPlainString(),
-                "One click creates one durable transaction"));
-        inventory.setItem(15, item(Material.RED_CONCRETE, "Cancel", NamedTextColor.RED));
+                Messages.line(MessageKey.GUI_SLOT_CONFIRM),
+                List.of(
+                        Messages.line(MessageKey.GUI_SLOT_CONFIRM_PROVIDER,
+                                Messages.of("provider", Displays.of(amount.provider()))),
+                        Messages.line(MessageKey.GUI_SLOT_COST,
+                                Messages.of("cost", amount.value().toPlainString())),
+                        Component.empty(),
+                        Messages.line(MessageKey.GUI_SLOT_CONFIRM_ONCE))));
+        inventory.setItem(15, GuiItems.of(Material.RED_CONCRETE,
+                Messages.line(MessageKey.GUI_SLOT_CANCEL), List.of()));
         return inventory;
+    }
+
+    private static ItemStack providerOption(
+            EconomyProvider provider,
+            EconomyAmount amount,
+            boolean available,
+            SlotBalanceDisplay balance,
+            String diagnostic) {
+        List<Component> lore = new ArrayList<>();
+        lore.add(Messages.line(MessageKey.GUI_SLOT_COST, Messages.of("cost", amount.value().toPlainString())));
+        lore.add(balance != null && balance.known()
+                ? Messages.line(MessageKey.GUI_SLOT_BALANCE, Messages.of("balance", balance.plain()))
+                : Messages.line(MessageKey.GUI_SLOT_BALANCE_UNAVAILABLE, Messages.of("detail",
+                        balance == null ? "unknown" : balance.unavailableDetail())));
+        lore.add(Component.empty());
+        lore.add(available
+                ? Messages.line(MessageKey.GUI_SLOT_REVIEW_HINT)
+                : GuiItems.label(diagnostic, GuiColors.BLOCKED));
+        return GuiItems.of(
+                available ? material(provider) : Material.BARRIER,
+                Messages.line(provider == EconomyProvider.VAULT
+                                ? MessageKey.GUI_SLOT_PAY_VAULT
+                                : MessageKey.GUI_SLOT_PAY_PLAYERPOINTS)
+                        .color(GuiColors.availability(available)),
+                lore);
     }
 
     private static SlotPurchaseInventoryHolder holder(
@@ -110,18 +140,7 @@ public final class SlotPurchaseMenuRenderer {
     }
 
     private static void fill(Inventory inventory) {
-        ItemStack pane = item(Material.GRAY_STAINED_GLASS_PANE, " ", NamedTextColor.GRAY);
+        ItemStack pane = GuiItems.filler();
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, pane);
-    }
-
-    private static ItemStack item(Material material, String name, NamedTextColor color, String... lore) {
-        ItemStack stack = new ItemStack(material);
-        ItemMeta meta = stack.getItemMeta();
-        meta.displayName(Component.text(name, color));
-        List<Component> lines = new ArrayList<>();
-        for (String line : lore) lines.add(Component.text(line, NamedTextColor.GRAY));
-        meta.lore(lines);
-        stack.setItemMeta(meta);
-        return stack;
     }
 }

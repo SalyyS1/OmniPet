@@ -20,6 +20,7 @@ import io.github.salyvn.omnipet.core.persistence.PlayerStateRepository;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfig;
 import io.github.salyvn.omnipet.paper.economy.PaperEconomyProviderRegistry;
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
+import io.github.salyvn.omnipet.paper.gui.player.SlotBalanceDisplay;
 import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseMenuRenderer;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
@@ -108,15 +109,15 @@ public final class PlayerSlotPurchaseController {
                             Messages.of("detail", entitlements.unavailableReason(config.entitlement())))));
                     return;
                 }
-                java.util.Map<io.github.salyvn.omnipet.core.economy.EconomyProvider, String> balances =
+                java.util.Map<io.github.salyvn.omnipet.core.economy.EconomyProvider, SlotBalanceDisplay> balances =
                         unlock.costs().keySet().stream().collect(java.util.stream.Collectors.toMap(
                                 provider -> provider,
                                 provider -> {
                                     var result = providers.balance(playerId, provider);
                                     return result.status()
                                                     == io.github.salyvn.omnipet.core.economy.EconomyBalanceResult.Status.AVAILABLE
-                                            ? "Balance: " + result.balance().toPlainString()
-                                            : "Balance unavailable: " + result.detail();
+                                            ? SlotBalanceDisplay.available(result.balance())
+                                            : SlotBalanceDisplay.unavailable(result.detail());
                                 }));
                 complete(player, request, expectedTop, () -> player.openInventory(renderer.selection(
                         player,

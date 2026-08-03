@@ -12,7 +12,6 @@ import java.util.function.Predicate;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
 import io.github.salyvn.omnipet.core.domain.PetDefinition;
@@ -21,6 +20,8 @@ import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
 import io.github.salyvn.omnipet.core.progression.ProgressionMutationContext;
 import io.github.salyvn.omnipet.paper.gui.player.PetManagementInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.player.PetManagementMenuRenderer;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 final class PetManagementMenuSupport {
     private PetManagementMenuSupport() {}
@@ -82,8 +83,17 @@ final class PetManagementMenuSupport {
         };
     }
 
+    /**
+     * Player-facing management feedback.
+     *
+     * <p>The colour selects the catalog key, because a catalog value cannot branch on severity.
+     */
     static void message(Player player, String text, NamedTextColor color) {
-        player.sendMessage(Component.text("OmniPet: " + text, color));
+        MessageKey key;
+        if (color == NamedTextColor.GREEN) key = MessageKey.MANAGE_RELEASED;
+        else if (color == NamedTextColor.YELLOW) key = MessageKey.MANAGE_BUSY;
+        else key = MessageKey.MANAGE_FAILED;
+        player.sendMessage(Messages.line(key, Messages.of("detail", text)));
     }
 
     static String detail(Throwable failure) {
