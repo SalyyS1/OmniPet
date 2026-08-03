@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added a unified player hub: `/pet` with no arguments now opens it, with Vault, Hatch, Active slots, Help, and (staff only) Studio tiles, each showing a live summary from one coalesced storage read. `/pet <page>` and the new `/pet vault [page]` keep direct vault access; vault, hatch, and management gained back-to-hub controls.
+- Added `/pet help [page]` and permission-filtered tab-complete, both generated from one declarative command spec so they cannot drift from the dispatcher. Grouping literals such as `admin` only appear when the sender holds one of their child permissions.
+- Added `messages.yml`: player-facing chat, GUI titles, and GUI lore are now operator-editable with MiniMessage, generated from the built-in defaults on first start, and reloaded by `/pet admin reload`. Unknown keys warn, missing keys fall back, broken tags render literally, and the file never disables the plugin. Operator audit output stays in the plugin.
+- Added a shared `GuiItems` builder: no OmniPet menu renders italic lore any more, lore is grouped with a consistent colour grammar, and titles carry location context.
+- Added Studio input fixes: every chat field now prompts with format, example, and the `cancel` hint; clicking a stat shows one explained button per supported modifier before asking for `min max` (the full `FLAT 10 50` form still works); the head-icon field auto-detects a pasted base64 payload, an `http(s)` URL, or a bare 64-character texture hash while keeping the legacy `<SOURCE> <value>` form.
 - Added player schema 4 with a typed singular incubation state, deterministic `splitmix64-v1` hatch outcomes, bounded action-token idempotency, and capacity-safe atomic claim behavior.
 - Added schema 1 egg-definition codecs/repository for one-file-per-egg catalogs with duration parsing, weighted candidates, case-safe IDs, and bounded file/catalog reads.
 - Added the dependency-neutral item-escrow saga with atomic exactly-once create/compare-transition behavior, stable item identity, bounded journal reads/scans, and conservative recovery directives.
@@ -13,6 +18,7 @@
 
 ### Changed
 
+- `/pet` with no arguments now opens the player hub instead of vault page 1. `/pet <page>` and `/pet vault [page]` preserve direct vault access.
 - Rebranded the public project, descriptor, examples, and operator documentation as OmniPet by SalyVn.
 - Switched the documented build workflow from Maven to Gradle Kotlin DSL.
 - Added Paper 1.21.x/Java 21 and Paper 26.1+/Java 25 compatibility guidance with an explicit alpha/experimental caveat for 26.x.
@@ -21,7 +27,7 @@
 - Added dual-read documentation for legacy item identifiers and optional MythicLib/MMOItems integrations.
 - Unified vault and slot-purchase work behind one plugin-owned per-player queue, with namespaced pending-read coalescing and FIFO cross-controller serialization; hardened lifecycle shutdown ordering, accepted-mutation draining, and dispatch-rejection isolation.
 - Hardened hatch timing and recovery: the monotonic baseline begins only when committed escrow is observed, failed persisted ticks accumulate elapsed online time, and start-failure/tick/join recovery uses bounded pending scans with explicit operator-review warnings.
-- Updated clean-build evidence to the current JDK 21 Gradle verification checkpoint: 18/18 tasks, 83 suites/290 tests (core 40/164, Paper 43/126), zero failures/errors/skips, a 1,010,248-byte artifact, and zero Maven entries. Compatibility probes, crash-injection proof, and live-server certification were not rerun for this checkpoint.
+- Updated clean-build evidence to the current JDK 21 Gradle verification checkpoint: 18/18 tasks, 147 suites/605 tests (core 63/256, Paper 84/349), zero failures/errors/skips, a 1,674,717-byte artifact, and zero Maven or bundled MiniMessage entries. Compatibility probes, crash-injection proof, and live-server certification were not rerun for this checkpoint.
 
 ### Compatibility notes
 

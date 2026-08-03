@@ -17,7 +17,24 @@ An `UnsupportedClassVersionError` usually means the Java runtime is older than t
 
 ## Current runtime boundary
 
-The current release ships definition persistence, migration journaling, `/pet [page]`, the player vault/active-intent slice, slot purchase/reconciliation logic, Admin Pet Studio, Paper egg items/PDC, online incubation timing, conservative recovery, hatch commands/GUI, and escrow-gated claims. Renderers, triggers, and live pet runtime remain future work.
+The current release ships definition persistence, migration journaling, `/pet` (hub), `/pet vault [page]`, `/pet help`, permission-filtered tab-complete, the player vault/active-intent slice, slot purchase/reconciliation logic, Admin Pet Studio with self-explaining chat prompts and head-icon auto-detection, Paper egg items/PDC, online incubation timing, conservative recovery, hatch commands/GUI, escrow-gated claims, and non-italic catalog-owned menu text. Renderers, triggers, and live pet runtime remain future work.
+
+## Message text problems
+
+`messages.yml` is generated on first start under `plugins/OmniPet/`. It is deliberately lenient:
+
+- An unknown key logs `OmniPet messages.yml: unknown ... key ignored` and keeps the built-in default.
+- Removing a key restores its default.
+- A value with a broken MiniMessage tag is shown literally, and the previous catalog stays live until a fixed reload succeeds. A broken edit never disables the plugin.
+- Player-supplied values (pet names, IDs) are inserted literally: a pet named `<red>` cannot colour another player's screen.
+
+Reload with `/pet admin reload`. Operator output such as transaction pages and reconcile reasons is deliberately not in the file — it is an audit trail.
+
+## Studio input problems
+
+- **Head icon rejected**: the field accepts a pasted base64 payload, an `http(s)` texture URL, a bare 64-character texture hash, or `<TEXTURE_URL|BASE64|HEAD_CATALOG> <value>`. A rejected payload usually means the base64 does not decode to an object with `textures.SKIN.url` as an absolute HTTP(S) URL, or it is larger than 16 KiB. Chat and Save use the same rules.
+- **Stat modifier rejected**: clicking a stat opens a screen with one explained button per supported modifier. After choosing, only `min max` is needed — for example `10 50`. The full `FLAT 10 50` form still works.
+- Every Studio chat prompt states the format, an example, and that `cancel` aborts; if no prompt appears, the field never started capturing.
 
 ## Configuration fails to load
 

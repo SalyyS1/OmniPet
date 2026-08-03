@@ -57,6 +57,18 @@ Purchase journals currently write schema 2. When a schema 1 row is read in `COMP
 - `/pet admin transactions [limit] [cursor]` returns bounded pages and prints an opaque continuation cursor when more candidates remain.
 - At most 20 unreadable issues are printed per page. Additional issues use an omission count, and truncated invalid-name discovery is reported separately.
 
+## `messages.yml`
+
+Player-facing chat, GUI titles, and GUI lore are owned by `plugins/OmniPet/messages.yml`, which is
+generated with the built-in defaults on first start. Values use
+[MiniMessage](https://docs.advntr.dev/minimessage/format.html) and are reloaded by
+`/pet admin reload`. The file is deliberately lenient: an unknown key warns and is ignored, a missing
+key falls back to its default, and a value with a broken tag is shown literally. Removing a key
+restores its default; deleting the file regenerates it. Placeholders such as `<pet>` and `<amount>`
+are inserted literally and never re-parsed, so player-supplied text cannot inject tags into another
+viewer's screen. Operator and console output — transaction pages, cursors, reconcile reasons, item
+delivery receipts — stays in the plugin: it is an audit trail, not UI.
+
 ## `config.yml`
 
 ```yaml
@@ -175,7 +187,7 @@ display:
   model: null
 ```
 
-Current required fields are `classification.tier`, `icon.head.source`, `icon.head.value`, and `display.provider`. Tier is one of `D`, `C`, `B`, `A`, or `S`. Supported Studio icon sources are `TEXTURE_URL`, `BASE64`, and capability-gated `HEAD_CATALOG`.
+Current required fields are `classification.tier`, `icon.head.source`, `icon.head.value`, and `display.provider`. Tier is one of `D`, `C`, `B`, `A`, or `S`. Studio icon sources are `TEXTURE_URL`, `BASE64`, and capability-gated `HEAD_CATALOG`. When typing the icon in the Studio chat field, the source is auto-detected: a pasted base64 payload, an `http(s)` texture URL, or a bare 64-character texture hash are all accepted without a source keyword; the legacy `<TEXTURE_URL|BASE64|HEAD_CATALOG> <value>` form still works and is matched first.
 
 `display.provider` accepts `HEAD` or `MODELENGINE`; `MODELENGINE` requires a non-blank `display.model`. These are authoring/persistence values only. No HEAD, Paper display-entity, or ModelEngine live renderer ships in this checkpoint.
 

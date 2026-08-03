@@ -43,7 +43,7 @@ Verified release metrics: 1,589,478 bytes; SHA-256 `0DC987AED51CD28775627DE74918
 3. Put the release JAR in `plugins/`.
 4. Start Paper with the Java runtime required by that exact server build.
 5. Confirm the log contains `OmniPet enabled with Pet Studio and <count> definitions.` or a clear fail-closed initialization error.
-6. Run `/pet` or `/pets` to open page 1 of the player vault; use `/pet 2` for another page when enough pets exist. Use `/pet slot` to inspect the next configured active-slot upgrade. Use `/pet hatch` to open the durable hatch GUI; `main`, `off`, `claim`, and `refresh` are also available as subcommands. Staff with `omnipet.admin.managepet` can run `/pet admin browse` to open the D/C/B/A/S Studio.
+6. Run `/pet` or `/pets` to open the hub, then pick a tile, or jump straight in with `/pet vault` (or `/pet 2` for another page), `/pet slot`, or `/pet hatch`. `/pet help` lists every command you can use, paged and permission-filtered; Tab after `/pet ` offers the same list. Staff with `omnipet.admin.managepet` can run `/pet admin browse` to open the D/C/B/A/S Studio.
 
 The player command requires `omnipet.general`, which defaults to `true`; Studio also requires `omnipet.admin.managepet`. Vault clicks change persisted desired-active intent only. Slot purchases and the hatch GUI are implemented but still require live certification against the exact Vault/PlayerPoints/LuckPerms/Paper builds. Hatch start is escrow-gated, countdown advances only online, and a READY result remains pending until vault capacity allows claim. Visible pet runtime behavior is not shipped yet.
 

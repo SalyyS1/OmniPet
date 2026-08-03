@@ -23,6 +23,20 @@ display:
 
 The ID is the filename without `.yml`. `HEAD` is persisted authoring metadata and supplies a Studio/vault icon; it does not summon or render a live companion.
 
+The same `icon.head` node accepts a base64 texture payload. The value is the base64 of a Minecraft
+texture JSON object with a `textures.SKIN.url`:
+
+```yaml
+icon:
+  head:
+    source: BASE64
+    value: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHBzOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzY1MzZkZTk3M2YwZDU3ZDRkMWM5YjNjY2U3OTQwOTgyYzJkY2Q5MGI5MTNlMWY2ZDU2MDY2MTZkZDQ3NmJmNWQifX19"
+```
+
+In the Studio chat field the source is auto-detected, so the raw pasted blob, an `http(s)` URL, or a
+bare 64-character texture hash all work without the `TEXTURE_URL`/`BASE64` prefix; the explicit
+`<SOURCE> <value>` form is matched first and still accepted.
+
 ## ModelEngine metadata
 
 Schema 2 accepts ModelEngine metadata:

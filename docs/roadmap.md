@@ -38,14 +38,14 @@ The Gradle/persistence foundation, Admin Pet Studio slice, Phase 4 storage/econo
 | MythicMobs skills | Shipped Phase 6 slice | Provider-neutral bindings, reservation/commit/rollback dispatch, per-binding cooldown persistence, durable pending reservations, `/pet skill`, and `/pet admin skill`. Reflective adapter fails closed and quarantines per epoch. Provider-present smoke remains a gate. |
 | Entity interaction and riding | Deferred | Activation populates a stable entity-to-owner index, but no interact listener routes through it. No `RideService` exists; the head renderer advertises `riding=false`. |
 | Progression, cultivation, and release | Shipped Phase 7 slice | Bounded EXP/level/stamina/breakthrough transitions with global and per-definition formulas, durable journaled cultivation item redemption, preview-and-commit release with an atomic internal outbox, idempotent mailbox delivery, and `UNKNOWN_COMMIT` external reconciliation. |
-| Player management UI | Partial | Per-pet management menu (favorite, lock, reorder, candy, breakthrough, release) is generation- and revision-safe. The combined hub with Active Party, Incubator, and Slot Upgrade views, rename control, ride/skill controls, and admin target mode are not built. |
+| Player management UI | Shipped navigation hub | The combined player hub is built: `/pet` opens it with Vault, Hatch, Active slots, Help, and (staff) Studio tiles, one coalesced storage read per open, and back-to-hub controls in vault, hatch, and management. Per-pet management (favorite, lock, reorder, candy, breakthrough, release) is generation- and revision-safe. Active Party, rename control, ride/skill controls, and admin target mode remain deferred. |
 | Integration QA and release certification | Deferred to Phase 8 | Includes exact vendor/server smoke matrix and release-grade examples. |
 | GitHub Pages | Deployed from `main` | The public site is live at `https://salyys1.github.io/OmniPet/`; current branch changes publish only after merge and a successful workflow. This is not runtime support certification. |
 | GitHub wiki | Not initialized | Wiki is enabled, but no initial wiki repository/page exists; repository Markdown remains authoritative. |
 
 ## Non-claims
 
-The current JAR does not ship riding, entity click interaction or passive event triggers, a combined player hub, MMOItems cultivation identities, a live MythicMobs skill picker in the Studio, an optional head-catalog provider, admin target mode, or a separately versioned public addon API. Provider and Paper runtime compatibility remain unclaimed until live smoke evidence exists: no crash-injection, process-kill, live lifecycle, real inventory-event, live performance, or vendor certification has been run.
+The current JAR does not ship riding, entity click interaction or passive event triggers, Active Party, rename control, MMOItems cultivation identities, a live MythicMobs skill picker in the Studio, an optional head-catalog provider, admin target mode, or a separately versioned public addon API. Provider and Paper runtime compatibility remain unclaimed until live smoke evidence exists: no crash-injection, process-kill, live lifecycle, real inventory-event, live performance, or vendor certification has been run.
 
 ## Release gates
 

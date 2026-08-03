@@ -1,12 +1,15 @@
 # Commands and permissions
 
-The Gradle-built Paper runtime registers the player vault, Admin Pet Studio, the durable hatch view, live pet rendering, per-pet management and cultivation, active skills, and release reward administration. Riding, entity click interaction, and the combined player hub are not implemented.
+The Gradle-built Paper runtime registers the player hub, the player vault, Admin Pet Studio, the durable hatch view, live pet rendering, per-pet management and cultivation, active skills, and release reward administration. Riding and entity click interaction are not implemented.
 
 ## Command entry point
 
 | Command | Alias | Permission | Current behavior |
 | --- | --- | --- | --- |
-| `/pet [page]` | `/pets [page]` | `omnipet.general` | Opens the paginated player vault. Left-click toggles persisted desired-active intent; right-click opens per-pet management. |
+| `/pet` | `/pets` | `omnipet.general` | Opens the player hub: Vault, Hatch, Active slots, Help, and (for staff) Studio tiles. |
+| `/pet vault [page]` | `/pets vault [page]` | `omnipet.general` | Opens the paginated player vault. Left-click toggles persisted desired-active intent; right-click opens per-pet management. |
+| `/pet <page>` | `/pets <page>` | `omnipet.general` | Opens the vault directly on the given page. |
+| `/pet help [page]` | `/pets help [page]` | `omnipet.general` | Lists the commands the sender may use, paged. Tab-complete on `/pet ` is permission-filtered. |
 | `/pet slot` | `/pets slot` | `omnipet.general` | Opens explicit Vault/PlayerPoints choices for the next configured active slot. |
 | `/pet hatch [main\|off\|claim\|refresh\|use-main\|use-off]` | `/pets hatch ...` | `omnipet.general` | Opens the hatch GUI, captures an exact main/off-hand egg, claims a committed READY hatch, refreshes the durable view, or redeems a reducer/instant item from the named hand. |
 | `/pet skill <pet-uuid> <binding-id>` | `/pets skill ...` | `omnipet.general` | Casts an ACTIVE skill binding on an owned, currently active pet. |
