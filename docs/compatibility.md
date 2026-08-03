@@ -2,7 +2,7 @@
 
 Current compatibility evidence consists of Java/Gradle tests and Paper API compile probes. It does not include a live Paper server smoke test, gameplay certification, or vendor-plugin certification.
 
-Verification snapshot: 2026-08-03. The clean JDK 21 Gradle build passed all 18 tasks and 159 suites/693 tests with zero failures, errors, or skips. The `1.21` and `1.21.1` compile probes were rerun for this checkpoint because two new Paper API surfaces were introduced; the remaining rows were not rerun.
+Verification snapshot: 2026-08-03. The clean JDK 21 Gradle build passed all 18 tasks and 160 suites/695 tests with zero failures, errors, or skips. The `1.21` and `1.21.1` compile probes were rerun for this checkpoint because two new Paper API surfaces were introduced; the remaining rows were not rerun.
 
 ## Newly relied-upon Paper API surfaces
 
