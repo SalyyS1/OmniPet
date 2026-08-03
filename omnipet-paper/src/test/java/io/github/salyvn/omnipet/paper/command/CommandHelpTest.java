@@ -20,7 +20,8 @@ class CommandHelpTest {
 
         assertEquals(
                 List.of(
-                        "/pet [page]",
+                        "/pet",
+                        "/pet vault [page]",
                         "/pet hatch",
                         "/pet hatch main",
                         "/pet hatch off",
@@ -60,7 +61,8 @@ class CommandHelpTest {
         List<String> usages = usages(EVERYTHING, false);
 
         assertTrue(usages.contains("/pet admin reload"));
-        assertFalse(usages.contains("/pet [page]"));
+        assertFalse(usages.contains("/pet"));
+        assertFalse(usages.contains("/pet vault [page]"));
         assertFalse(usages.contains("/pet admin browse"));
         assertTrue(usages.stream().noneMatch(usage -> usage.startsWith("/pet hatch ")
                 && !usage.startsWith("/pet admin")));

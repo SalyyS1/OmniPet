@@ -55,6 +55,10 @@ public final class PlayerPetMenuRenderer {
                     Messages.line(MessageKey.GUI_VAULT_NEXT), List.of()));
         }
         inventory.setItem(49, vaultStatus(snapshot));
+        // Slot 48 is free: 45/49/50/53 are taken by paging, status, and slot purchase.
+        actions.put(48, PlayerPetInventoryHolder.Action.hub());
+        inventory.setItem(48, GuiItems.of(Material.COMPASS,
+                Messages.line(MessageKey.HUB_BACK), List.of()));
         actions.put(50, PlayerPetInventoryHolder.Action.purchaseSlot());
         inventory.setItem(50, GuiItems.of(
                 Material.EXPERIENCE_BOTTLE,

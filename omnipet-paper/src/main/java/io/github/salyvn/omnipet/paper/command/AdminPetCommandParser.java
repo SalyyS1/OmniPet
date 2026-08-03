@@ -26,10 +26,25 @@ public final class AdminPetCommandParser {
         }
 
         if (request.playerId() == null) return new Rejected(RejectReason.PLAYER_REQUIRED);
-        if (arguments.isEmpty()) return new PlayerPage(request.playerId(), 1);
+        // No arguments opens the hub. /pet <page> and /pet vault [page] keep direct vault access.
+        if (arguments.isEmpty()) return new OpenHub(request.playerId());
+        if (arguments.getFirst().equalsIgnoreCase("vault")) return parseVault(request, arguments);
         if (arguments.size() != 1) return new Rejected(RejectReason.INVALID_ARGUMENTS);
         try {
             int page = Integer.parseInt(arguments.getFirst());
+            return page > 0
+                    ? new PlayerPage(request.playerId(), page)
+                    : new Rejected(RejectReason.INVALID_PAGE);
+        } catch (NumberFormatException ignored) {
+            return new Rejected(RejectReason.INVALID_ARGUMENTS);
+        }
+    }
+
+    private static Result parseVault(Request request, List<String> arguments) {
+        if (arguments.size() == 1) return new PlayerPage(request.playerId(), 1);
+        if (arguments.size() != 2) return new Rejected(RejectReason.INVALID_ARGUMENTS);
+        try {
+            int page = Integer.parseInt(arguments.get(1));
             return page > 0
                     ? new PlayerPage(request.playerId(), page)
                     : new Rejected(RejectReason.INVALID_PAGE);
@@ -59,10 +74,17 @@ public final class AdminPetCommandParser {
         }
     }
 
-    public sealed interface Result permits OpenAdminBrowse, PlayerPage, Rejected {}
+    public sealed interface Result permits OpenAdminBrowse, OpenHub, PlayerPage, Rejected {}
 
     public record OpenAdminBrowse(UUID viewerId) implements Result {
         public OpenAdminBrowse {
+            Objects.requireNonNull(viewerId, "viewerId");
+        }
+    }
+
+    /** {@code /pet} with no arguments: open the navigation hub. */
+    public record OpenHub(UUID viewerId) implements Result {
+        public OpenHub {
             Objects.requireNonNull(viewerId, "viewerId");
         }
     }

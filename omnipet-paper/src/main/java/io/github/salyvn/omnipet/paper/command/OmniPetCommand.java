@@ -37,6 +37,18 @@ public final class OmniPetCommand implements BasicCommand {
     private final SlotTransactionAdminTarget transactions;
     private final PlayerSlotPurchaseController slotPurchases;
     private final BooleanSupplier reloadRuntime;
+    /**
+     * Set after construction so the ten existing constructor overloads stay unchanged.
+     *
+     * <p>When absent, {@code /pet} keeps its previous vault-first behavior, which is what the
+     * narrower overloads used by tests rely on.
+     */
+    private volatile HubTarget hub;
+
+    /** Wires the hub. Called once from {@code onEnable}. */
+    public void bindHub(HubTarget target) {
+        this.hub = target;
+    }
 
     public OmniPetCommand(
             PetStudioController studio,
@@ -467,6 +479,15 @@ public final class OmniPetCommand implements BasicCommand {
         if (result instanceof AdminPetCommandParser.OpenAdminBrowse) {
             players.release(playerId);
             studio.openBrowse(player);
+        } else if (result instanceof AdminPetCommandParser.OpenHub) {
+            HubTarget target = hub;
+            if (target == null) {
+                // No hub wired: keep the previous vault-first behavior.
+                players.openVault(player, 1);
+            } else {
+                players.release(playerId);
+                target.open(player);
+            }
         } else if (result instanceof AdminPetCommandParser.PlayerPage page) {
             players.openVault(player, page.page());
         } else if (result instanceof AdminPetCommandParser.Rejected rejected) {
@@ -532,14 +553,18 @@ public final class OmniPetCommand implements BasicCommand {
 
     @Override
     public String permission() { return null; }
+
+    /** The hub entry point, kept as a seam so the command stays testable without the hub. */
+    @FunctionalInterface
+    public interface HubTarget {
+        void open(Player player);
+    }
 }
 
 @FunctionalInterface
 interface PlayerHatchCommandTarget {
     void command(Player player, String action);
-}
-
-@FunctionalInterface
+}@FunctionalInterface
 interface PlayerSkillCommandTarget {
     void cast(Player player, UUID petId, String bindingId);
 }

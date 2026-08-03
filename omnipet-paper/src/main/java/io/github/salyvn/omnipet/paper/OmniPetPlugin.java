@@ -45,6 +45,7 @@ import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegis
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuListener;
+import io.github.salyvn.omnipet.paper.gui.hub.HubMenuListener;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationServices;
 import io.github.salyvn.omnipet.paper.incubation.PaperIncubationCoordinator;
 import io.github.salyvn.omnipet.paper.incubation.HatchAdminController;
@@ -57,6 +58,7 @@ import io.github.salyvn.omnipet.paper.incubation.action.RepositoryIncubationItem
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.player.PlayerPetController;
 import io.github.salyvn.omnipet.paper.player.PlayerHatchController;
+import io.github.salyvn.omnipet.paper.player.PlayerHubController;
 import io.github.salyvn.omnipet.paper.player.PlayerSlotPurchaseController;
 import io.github.salyvn.omnipet.paper.player.PlayerStorageLifecycleListener;
 import io.github.salyvn.omnipet.paper.runtime.PaperPetRuntimeCoordinator;
@@ -98,6 +100,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PaperMythicMobsSkillContext skillProviders;
     private PaperActiveSkillController activeSkills;
     private OmniPetManagementServices managementServices;
+    private PlayerHubController hubController;
     private Path messagesFile;
 
     @Override
@@ -188,6 +191,15 @@ public final class OmniPetPlugin extends JavaPlugin {
             hatchController.setActionItems(actionItems);
             hatchAdmin = new HatchAdminController(this, incubation.hatches(), playerTasks);
             incubationCoordinator.setRefreshListener(hatchController::refresh);
+            hubController = new PlayerHubController(
+                    this,
+                    incubation.hatches(),
+                    limitsResolver,
+                    playerTasks,
+                    playerPets,
+                    hatchController,
+                    slotPurchases,
+                    studio::openBrowse);
             transactionAdmin = new SlotTransactionAdminController(
                     this,
                     new SlotPurchaseReconciliationService(playerStates, purchaseJournal, purchaseTransactions),
@@ -208,6 +220,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(
                     new IncubationLifecycleListener(incubationCoordinator, hatchController), this);
             getServer().getPluginManager().registerEvents(new HatchMenuListener(hatchController), this);
+            getServer().getPluginManager().registerEvents(new HubMenuListener(hubController), this);
             getServer().getPluginManager().registerEvents(new EconomyProviderLifecycleListener(
                     this,
                     economyProviders,
@@ -234,6 +247,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             boolean idle = PlayerTaskShutdown.stopAndDrain(
                     () -> {
                         if (hatchController != null) hatchController.close();
+                        if (hubController != null) hubController.close();
                         if (incubationCoordinator != null) incubationCoordinator.close();
                         if (managementServices != null) managementServices.close();
                         if (playerPets != null) playerPets.closeAll();
@@ -273,23 +287,24 @@ public final class OmniPetPlugin extends JavaPlugin {
     }
 
     private void registerCommands() {
-        getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
-                event.registrar().register(
-                        FoundationCommandContract.NAME,
-                        FoundationCommandContract.ALIASES,
-                        new OmniPetCommand(
-                                studio,
-                                playerPets,
-                                hatchController,
-                                hatchAdmin,
-                                actionItems,
-                                managementServices.cultivationItems(),
-                                activeSkills,
-                                managementServices.releaseAdmin(),
-                                managementServices.cultivationAdmin(),
-                                transactionAdmin,
-                                slotPurchases,
-                                this::reloadRuntime)));
+        getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
+            OmniPetCommand command = new OmniPetCommand(
+                    studio,
+                    playerPets,
+                    hatchController,
+                    hatchAdmin,
+                    actionItems,
+                    managementServices.cultivationItems(),
+                    activeSkills,
+                    managementServices.releaseAdmin(),
+                    managementServices.cultivationAdmin(),
+                    transactionAdmin,
+                    slotPurchases,
+                    this::reloadRuntime);
+            command.bindHub(hubController::open);
+            event.registrar().register(
+                    FoundationCommandContract.NAME, FoundationCommandContract.ALIASES, command);
+        });
     }
 
     private boolean reloadRuntime() {
@@ -303,6 +318,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             slotPurchases.updateLimitsResolver(nextLimits);
             incubationCoordinator.updateLimitsResolver(nextLimits);
             hatchController.updateLimitsResolver(nextLimits);
+            hubController.updateLimitsResolver(nextLimits);
             transactionAdmin.updateActiveSlots(stagedConfig.activeSlots());
             ownerBuffs.refreshProvider();
             skillProviders.refresh();

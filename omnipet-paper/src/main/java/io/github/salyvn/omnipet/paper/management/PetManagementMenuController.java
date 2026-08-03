@@ -72,10 +72,14 @@ public final class PetManagementMenuController {
             PetManagementInventoryHolder holder,
             PetManagementInventoryHolder.Action action) {
         if (action == null || !current(player, holder)) return;
-        if (action.type() == PetManagementInventoryHolder.Type.BACK) {
+        if (action.type() == PetManagementInventoryHolder.Type.BACK
+                || action.type() == PetManagementInventoryHolder.Type.HUB) {
             close(holder, holder.getInventory());
             storageRefresh.accept(player);
-            player.performCommand("pet");
+            // BACK returns to the vault page the player came from; HUB goes to the hub. Both run
+            // through the command so the destination controller owns its own coalesced read.
+            player.performCommand(action.type() == PetManagementInventoryHolder.Type.HUB
+                    ? "pet" : "pet vault");
             return;
         }
         PetManagementMenuSupport.ViewLifecycle.Request request = lifecycle.beginAction(holder);
@@ -125,6 +129,7 @@ public final class PetManagementMenuController {
             case CONFIRM_RELEASE -> management.confirmRelease(holder.session(), holder.releasePreview());
             case CANCEL_RELEASE, REFRESH -> management.open(holder.viewerId(), holder.ownerId(), holder.petId());
             case BACK -> throw new IllegalStateException("back is handled before async dispatch");
+            case HUB -> throw new IllegalStateException("hub is handled before async dispatch");
         };
     }
 

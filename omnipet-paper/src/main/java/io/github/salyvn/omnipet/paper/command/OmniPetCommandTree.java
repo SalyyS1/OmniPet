@@ -8,8 +8,8 @@ package io.github.salyvn.omnipet.paper.command;
  * {@code OmniPetCommandTreeContractTest} asserts every permission is declared in
  * {@code paper-plugin.yml}, so a typo cannot silently hide a branch from everyone.
  *
- * <p>{@code vault [page]} is deliberately absent: the dispatcher has no such branch yet. Phase 6
- * adds the literal here and in the dispatcher together, so help never advertises a dead command.
+ * <p>{@code /pet} itself opens the hub. {@code /pet <page>} still opens a vault page directly and is
+ * not listed as a separate node, because the bare numeric argument has no literal to suggest.
  */
 public final class OmniPetCommandTree {
     private static final CommandSpec ROOT = build();
@@ -21,11 +21,14 @@ public final class OmniPetCommandTree {
     }
 
     private static CommandSpec build() {
-        return CommandSpec.of("pet", "Open your pet vault")
-                .args("[page]")
+        return CommandSpec.of("pet", "Open the OmniPet hub")
                 .permission(AdminPetCommandParser.GENERAL_PERMISSION)
                 .playerOnly()
                 .child(
+                        CommandSpec.of("vault", "Open your pet vault")
+                                .args("[page]")
+                                .permission(AdminPetCommandParser.GENERAL_PERMISSION)
+                                .playerOnly(),
                         hatch(),
                         CommandSpec.of("slot", "Review and buy the next active slot")
                                 .permission(AdminPetCommandParser.GENERAL_PERMISSION)

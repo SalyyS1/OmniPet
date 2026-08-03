@@ -43,11 +43,17 @@ public final class MessageCatalogFile {
         Files.writeString(file, defaultDocument(), StandardCharsets.UTF_8);
     }
 
-    /** The full default document, header included. */
+    /** The full default document, header included. Groups are sorted by path. */
     public static String defaultDocument() {
         StringBuilder document = new StringBuilder(HEADER);
         String group = null;
-        for (MessageKey key : MessageKey.values()) {
+        // Sort by path so the emitted YAML is order-independent of the enum's declaration order.
+        // An out-of-order enum constant would otherwise emit a second mapping for its group and
+        // produce a duplicate-key YAML document that SnakeYAML rejects.
+        java.util.List<MessageKey> keys = java.util.Arrays.stream(MessageKey.values())
+                .sorted(java.util.Comparator.comparing(MessageKey::path))
+                .toList();
+        for (MessageKey key : keys) {
             String path = key.path();
             int separator = path.indexOf('.');
             String prefix = separator < 0 ? "" : path.substring(0, separator);

@@ -43,14 +43,49 @@ class AdminPetCommandParserTest {
 
     @Test
     void preservesOneBasedPlayerPageArguments() {
-        PlayerPage defaultPage = assertInstanceOf(PlayerPage.class,
-                parse("pet", List.of(), playerId, true, false));
+        // Accepted contract change: no arguments now opens the hub, not vault page 1.
         PlayerPage explicitPage = assertInstanceOf(PlayerPage.class,
                 parse("pets", List.of("3"), playerId, true, false));
-        assertEquals(1, defaultPage.page());
         assertEquals(3, explicitPage.page());
         assertRejected(RejectReason.INVALID_PAGE,
                 parse("pet", List.of("0"), playerId, true, false));
+    }
+
+    @Test
+    void noArgumentsOpensTheHub() {
+        AdminPetCommandParser.OpenHub hub = assertInstanceOf(AdminPetCommandParser.OpenHub.class,
+                parse("pet", List.of(), playerId, true, false));
+
+        assertEquals(playerId, hub.viewerId());
+        assertInstanceOf(AdminPetCommandParser.OpenHub.class,
+                parse("pets", List.of(), playerId, true, false));
+    }
+
+    @Test
+    void theVaultLiteralKeepsDirectPagedAccess() {
+        assertEquals(1, assertInstanceOf(PlayerPage.class,
+                parse("pet", List.of("vault"), playerId, true, false)).page());
+        assertEquals(3, assertInstanceOf(PlayerPage.class,
+                parse("pet", List.of("vault", "3"), playerId, true, false)).page());
+        assertEquals(3, assertInstanceOf(PlayerPage.class,
+                parse("pet", List.of("3"), playerId, true, false)).page());
+    }
+
+    @Test
+    void theVaultLiteralIsCaseInsensitiveAndValidatesItsPage() {
+        assertInstanceOf(PlayerPage.class, parse("pet", List.of("VAULT"), playerId, true, false));
+        assertRejected(RejectReason.INVALID_PAGE,
+                parse("pet", List.of("vault", "0"), playerId, true, false));
+        assertRejected(RejectReason.INVALID_ARGUMENTS,
+                parse("pet", List.of("vault", "abc"), playerId, true, false));
+        assertRejected(RejectReason.INVALID_ARGUMENTS,
+                parse("pet", List.of("vault", "1", "2"), playerId, true, false));
+    }
+
+    @Test
+    void consoleStillCannotOpenAPlayerView() {
+        assertRejected(RejectReason.PLAYER_REQUIRED, parse("pet", List.of(), null, true, false));
+        assertRejected(RejectReason.PLAYER_REQUIRED, parse("pet", List.of("vault"), null, true, false));
     }
 
     private static AdminPetCommandParser.Result parse(

@@ -38,12 +38,13 @@ class OmniPetCommandTreeContractTest {
     }
 
     @Test
-    void everyTopLevelLiteralIsMatchedByTheDispatcher() throws IOException {
-        String dispatcher = Files.readString(DISPATCHER);
+    void everyTopLevelLiteralIsMatchedByTheDispatcherOrItsParser() throws IOException {
+        // vault is matched by AdminPetCommandParser rather than inline in the dispatcher.
+        String routing = Files.readString(DISPATCHER) + Files.readString(sibling("AdminPetCommandParser.java"));
 
         for (CommandSpec child : OmniPetCommandTree.root().children()) {
-            assertTrue(dispatcher.contains("equalsIgnoreCase(\"" + child.literal() + "\")"),
-                    () -> "the tree advertises /pet " + child.literal() + " but the dispatcher never matches it");
+            assertTrue(routing.contains("equalsIgnoreCase(\"" + child.literal() + "\")"),
+                    () -> "the tree advertises /pet " + child.literal() + " but nothing matches it");
         }
     }
 
@@ -135,9 +136,20 @@ class OmniPetCommandTreeContractTest {
     }
 
     @Test
-    void theTreeDoesNotYetAdvertiseTheVaultLiteralAddedInPhaseSix() throws IOException {
-        assertFalse(Files.readString(DISPATCHER).contains("equalsIgnoreCase(\"vault\")"));
-        assertFalse(OmniPetCommandTree.root().children().stream()
+    void theVaultLiteralIsAdvertisedNowThatItsParserBranchExists() throws IOException {
+        // The Phase 3 form of this test asserted the opposite: help must never advertise a command
+        // the dispatcher cannot route, so the literal and its branch had to land together.
+        assertTrue(Files.readString(sibling("AdminPetCommandParser.java"))
+                .contains("equalsIgnoreCase(\"vault\")"));
+        assertTrue(OmniPetCommandTree.root().children().stream()
                 .anyMatch(child -> child.literal().equals("vault")));
+    }
+
+    @Test
+    void theHubResultIsDispatchedRatherThanFallingThroughToTheVault() throws IOException {
+        String dispatcher = Files.readString(DISPATCHER);
+
+        assertTrue(dispatcher.contains("AdminPetCommandParser.OpenHub"));
+        assertTrue(dispatcher.contains("target.open(player)"));
     }
 }

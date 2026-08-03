@@ -18,7 +18,7 @@ class CommandSuggestionsTest {
     void aPlainPlayerSeesTheirOwnBranchesAndNoAdminNode() {
         List<String> suggestions = suggest(PLAIN_PLAYER, true, "");
 
-        assertEquals(List.of("hatch", "slot", "skill", "help"), suggestions);
+        assertEquals(List.of("vault", "hatch", "slot", "skill", "help"), suggestions);
         assertFalse(suggestions.contains("admin"));
     }
 
@@ -31,7 +31,7 @@ class CommandSuggestionsTest {
     void aSingleAdminPermissionExposesThatBranchAndNothingElse() {
         Predicate<String> releaseOnly = Set.of("omnipet.general", "omnipet.admin.release")::contains;
 
-        assertEquals(List.of("hatch", "slot", "skill", "help", "admin"), suggest(releaseOnly, true, ""));
+        assertEquals(List.of("vault", "hatch", "slot", "skill", "help", "admin"), suggest(releaseOnly, true, ""));
         assertEquals(List.of("release"), suggest(releaseOnly, true, "admin", ""));
         assertEquals(List.of("list", "recover", "reconcile"), suggest(releaseOnly, true, "admin", "release", ""));
     }
@@ -97,8 +97,9 @@ class CommandSuggestionsTest {
     }
 
     @Test
-    void vaultIsNotSuggestedUntilItsDispatcherBranchExists() {
-        assertFalse(suggest(EVERYTHING, true, "").contains("vault"));
+    void vaultIsSuggestedNowThatItsParserBranchExists() {
+        assertTrue(suggest(EVERYTHING, true, "").contains("vault"));
+        assertEquals(List.of("vault"), suggest(EVERYTHING, true, "va"));
     }
 
     private static List<String> suggest(Predicate<String> hasPermission, boolean isPlayer, String... args) {

@@ -87,6 +87,7 @@ public final class PetManagementInventoryHolder implements InventoryHolder {
         CONFIRM_RELEASE,
         CANCEL_RELEASE,
         REFRESH,
-        BACK
+        BACK,
+        HUB
     }
 }

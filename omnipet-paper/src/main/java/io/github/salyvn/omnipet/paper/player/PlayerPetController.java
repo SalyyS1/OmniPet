@@ -114,6 +114,10 @@ public final class PlayerPetController {
                 case NEXT -> openVault(player, holder.page() + 1);
                 case PET -> toggle(player, holder, action);
                 case PURCHASE_SLOT -> player.performCommand("pet slot " + holder.page());
+                case HUB -> {
+                    release(player.getUniqueId());
+                    player.performCommand("pet");
+                }
             }
         });
     }

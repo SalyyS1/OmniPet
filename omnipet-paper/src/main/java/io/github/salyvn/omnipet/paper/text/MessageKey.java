@@ -130,6 +130,7 @@ public enum MessageKey {
 
     // --- GUI titles --------------------------------------------------------------------------
     // Titles carry location context so a player always knows which screen they are on.
+    GUI_TITLE_HUB("gui.title.hub", "OmniPet"),
     GUI_TITLE_VAULT("gui.title.vault", "OmniPet <dark_gray>▸</dark_gray> Vault <gray>(<page>/<pages>)</gray>"),
     GUI_TITLE_HATCH("gui.title.hatch", "OmniPet <dark_gray>▸</dark_gray> Hatch"),
     GUI_TITLE_MANAGE("gui.title.manage", "OmniPet <dark_gray>▸</dark_gray> Manage"),
@@ -241,7 +242,29 @@ public enum MessageKey {
     // --- management chat ---------------------------------------------------------------------
     MANAGE_FAILED("manage.failed", "<red>OmniPet: <detail></red>"),
     MANAGE_BUSY("manage.busy", "<yellow>OmniPet: <detail></yellow>"),
-    MANAGE_RELEASED("manage.released", "<green>OmniPet: <detail></green>");
+    MANAGE_RELEASED("manage.released", "<green>OmniPet: <detail></green>"),
+
+    // --- hub ---------------------------------------------------------------------------------
+    HUB_VAULT("hub.vault", "<gold>Pet vault</gold>"),
+    HUB_VAULT_OWNED("hub.vault-owned", "<gray>Pets</gray> <white><amount>/<total></white>"),
+    HUB_VAULT_ACTIVE("hub.vault-active", "<gray>Active</gray> <white><amount>/<total></white>"),
+    HUB_VAULT_OVERFLOW("hub.vault-overflow", "<red>Over capacity by <amount></red>"),
+    HUB_VAULT_HINT("hub.vault-hint", "<yellow>Click</yellow> <gray>open your vault</gray>"),
+    HUB_HATCH("hub.hatch", "<aqua>Incubation</aqua>"),
+    HUB_HATCH_STATUS("hub.hatch-status", "<gray>Status</gray> <white><status></white>"),
+    HUB_HATCH_REMAINING("hub.hatch-remaining", "<gray>Remaining</gray> <white><remaining></white>"),
+    HUB_HATCH_READY("hub.hatch-ready", "<green>Ready to claim</green>"),
+    HUB_HATCH_IDLE("hub.hatch-idle", "<gray>No active incubation</gray>"),
+    HUB_HATCH_HINT("hub.hatch-hint", "<yellow>Click</yellow> <gray>open the hatch menu</gray>"),
+    HUB_SLOTS("hub.slots", "<gold>Active slots</gold>"),
+    HUB_SLOTS_COUNT("hub.slots-count", "<gray>Unlocked</gray> <white><amount></white>"),
+    HUB_SLOTS_HINT("hub.slots-hint", "<yellow>Click</yellow> <gray>review the next unlock</gray>"),
+    HUB_HELP("hub.help", "<yellow>Commands</yellow>"),
+    HUB_HELP_HINT("hub.help-hint", "<gray>List every command you can use.</gray>"),
+    HUB_STUDIO("hub.studio", "<light_purple>Pet Studio</light_purple>"),
+    HUB_STUDIO_HINT("hub.studio-hint", "<gray>Browse and edit pet definitions.</gray>"),
+    HUB_BACK("hub.back", "<yellow>Back to hub</yellow>"),
+    HUB_FAILURE("hub.failure", "<red>OmniPet: <detail>.</red>");
 
     private final String path;
     private final String defaultValue;

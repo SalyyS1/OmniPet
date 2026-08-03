@@ -53,7 +53,9 @@ public final class HatchInventoryHolder implements InventoryHolder {
         public static Action claim() { return new Action(Type.CLAIM); }
 
         public static Action refresh() { return new Action(Type.REFRESH); }
+
+        public static Action hub() { return new Action(Type.HUB); }
     }
 
-    public enum Type { START_MAIN, START_OFF_HAND, CLAIM, REFRESH }
+    public enum Type { START_MAIN, START_OFF_HAND, CLAIM, REFRESH, HUB }
 }

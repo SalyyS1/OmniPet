@@ -56,6 +56,10 @@ public final class HatchMenuRenderer {
         inventory.setItem(22, GuiItems.of(Material.CLOCK,
                 Messages.line(MessageKey.GUI_HATCH_REFRESH),
                 List.of(Messages.line(MessageKey.GUI_HATCH_REFRESH_HINT))));
+        // Slot 18 is free: 11/13/15/22 carry the start, incubation, and refresh controls.
+        actions.put(18, HatchInventoryHolder.Action.hub());
+        inventory.setItem(18, GuiItems.of(Material.COMPASS,
+                Messages.line(MessageKey.HUB_BACK), List.of()));
         return inventory;
     }
 

@@ -95,6 +95,10 @@ public final class PetManagementMenuRenderer {
         put(actions, entries, 35,
                 PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.BACK),
                 Material.BARRIER, Messages.line(MessageKey.GUI_MANAGE_BACK));
+        // Slot 27 is free: 10-16, 22, 31, and 35 carry the existing controls.
+        put(actions, entries, 27,
+                PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.HUB),
+                Material.COMPASS, Messages.line(MessageKey.HUB_BACK));
 
         // Staff need the full instance UUID here, so it stays — unlike the vault, which dropped it.
         String customName = view.metadata().customName();
