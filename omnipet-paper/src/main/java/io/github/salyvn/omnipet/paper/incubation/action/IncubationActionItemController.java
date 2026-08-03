@@ -12,13 +12,12 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-
 import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
 import io.github.salyvn.omnipet.core.incubation.IncubationItemActionStage;
 import io.github.salyvn.omnipet.core.incubation.IncubationItemActionTransaction;
 import io.github.salyvn.omnipet.core.incubation.RepositoryHatchService;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 /** Player redemption and bounded operator distribution for durable incubation action items. */
 public final class IncubationActionItemController {
@@ -44,7 +43,7 @@ public final class IncubationActionItemController {
         try {
             var state = hatches.snapshot(player.getUniqueId());
             if (state.incubation() == null) {
-                message(player, "No incubation is active.", NamedTextColor.YELLOW);
+                player.sendMessage(Messages.line(MessageKey.HATCH_ITEM_NO_INCUBATION));
                 return;
             }
             CapturedIncubationItemAction captured = inventory.capture(player.getUniqueId(), hand);
@@ -59,12 +58,14 @@ public final class IncubationActionItemController {
                     captured.effectMillis(),
                     IncubationItemActionStage.PREPARED);
             IncubationItemActionResult result = coordinator.redeem(requested);
-            message(player, "Incubation item: " + words(result.status()) + ".",
-                    result.status() == IncubationItemActionResult.Status.COMMITTED
-                            || result.status() == IncubationItemActionResult.Status.ALREADY_COMMITTED
-                            ? NamedTextColor.GREEN : NamedTextColor.YELLOW);
+            boolean committed = result.status() == IncubationItemActionResult.Status.COMMITTED
+                    || result.status() == IncubationItemActionResult.Status.ALREADY_COMMITTED;
+            player.sendMessage(Messages.line(
+                    committed ? MessageKey.HATCH_ITEM_RESULT : MessageKey.HATCH_ITEM_RESULT_PENDING,
+                    Messages.of("status", words(result.status()))));
         } catch (IOException | RuntimeException failure) {
-            message(player, "Incubation item failed: " + detail(failure) + ".", NamedTextColor.RED);
+            player.sendMessage(Messages.line(MessageKey.HATCH_ITEM_FAILED,
+                    Messages.of("detail", detail(failure))));
         }
     }
 
@@ -122,10 +123,6 @@ public final class IncubationActionItemController {
 
     private static void requireMainThread() {
         if (!Bukkit.isPrimaryThread()) throw new IllegalStateException("incubation item commands require the Paper main thread");
-    }
-
-    private static void message(Player player, String text, NamedTextColor color) {
-        player.sendMessage(Component.text("OmniPet: " + text, color));
     }
 
     private static String words(Enum<?> value) {

@@ -67,6 +67,9 @@ import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioListener;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerTaskShutdown;
+import io.github.salyvn.omnipet.paper.text.MessageCatalog;
+import io.github.salyvn.omnipet.paper.text.MessageCatalogFile;
+import io.github.salyvn.omnipet.paper.text.Messages;
 import io.github.salyvn.omnipet.paper.skill.MythicMobsSkillLifecycleListener;
 import io.github.salyvn.omnipet.paper.skill.PaperActiveSkillController;
 import io.github.salyvn.omnipet.paper.skill.PaperMythicMobsSkillContext;
@@ -95,6 +98,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PaperMythicMobsSkillContext skillProviders;
     private PaperActiveSkillController activeSkills;
     private OmniPetManagementServices managementServices;
+    private Path messagesFile;
 
     @Override
     public void onEnable() {
@@ -110,6 +114,9 @@ public final class OmniPetPlugin extends JavaPlugin {
             }
             if (!Files.exists(configFile, LinkOption.NOFOLLOW_LINKS)) saveResource("config.yml", false);
             activeConfig = loadConfig();
+            messagesFile = dataRoot.resolve("messages.yml");
+            MessageCatalogFile.writeDefaultsIfAbsent(messagesFile);
+            Messages.bind(loadMessages());
             Phase4PaperConfig phase4Config = activeConfig.storage();
             migrateLegacyEggDefinitions(dataRoot);
             YamlPetDefinitionRepository definitions = new YamlPetDefinitionRepository(dataRoot.resolve("pets"));
@@ -249,6 +256,7 @@ public final class OmniPetPlugin extends JavaPlugin {
         }
         if (transactionAdmin != null) transactionAdmin.close();
         if (studio != null) studio.onDisable();
+        Messages.unbind();
     }
 
     private void migrateLegacyEggDefinitions(Path dataRoot) throws IOException {
@@ -287,6 +295,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private boolean reloadRuntime() {
         try {
             OmniPetConfig staged = loadConfig();
+            MessageCatalog stagedMessages = loadMessages();
             Phase4PaperConfig stagedConfig = staged.storage();
             if (!studio.reload()) return false;
             PaperStorageLimitsResolver nextLimits = new PaperStorageLimitsResolver(stagedConfig);
@@ -303,6 +312,7 @@ public final class OmniPetPlugin extends JavaPlugin {
                 getLogger().warning("Runtime scheduler settings changed; restart the server to activate them safely.");
             }
             activeConfig = staged;
+            Messages.bind(stagedMessages);
             petRuntime.reload(registry.current());
             getServer().getOnlinePlayers().forEach(playerPets::reconcile);
             return true;
@@ -321,6 +331,14 @@ public final class OmniPetPlugin extends JavaPlugin {
             getLogger().info("Migrated legacy config to the OmniPet aggregate schema; original kept as config.yml.bak.");
         }
         return result.config();
+    }
+
+    /**
+     * Reads {@code messages.yml}. Unknown keys and unusable values are logged and skipped, so an
+     * operator typo degrades one line instead of blocking startup or a reload.
+     */
+    private MessageCatalog loadMessages() throws IOException {
+        return MessageCatalog.load(messagesFile, warning -> getLogger().warning("OmniPet messages.yml: " + warning));
     }
 
     PlayerStateRepository playerStates() {

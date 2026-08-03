@@ -11,9 +11,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-
 import io.github.salyvn.omnipet.core.economy.SlotPurchaseQuote;
 import io.github.salyvn.omnipet.core.economy.SlotPurchaseResult;
 import io.github.salyvn.omnipet.core.economy.SlotUnlockRule;
@@ -28,6 +25,8 @@ import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseMenuRenderer;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class PlayerSlotPurchaseController {
     private static final String VIEW_TASK = "slot:view";
@@ -83,40 +82,30 @@ public final class PlayerSlotPurchaseController {
                 try {
                 var state = playerStates.snapshot(playerId);
                 if (state.activeSlotCount() < config.base()) {
-                    complete(player, request, expectedTop, () -> message(
-                            player,
-                            "Active slot baseline reconciliation is still pending; reopen this menu shortly.",
-                            NamedTextColor.YELLOW));
+                    complete(player, request, expectedTop, () -> message(player, MessageKey.SLOT_BASELINE_PENDING));
                     return;
                 }
                 if (config.entitlement().policy().mode()
                                 != io.github.salyvn.omnipet.core.storage.SlotEntitlementMode.OMNIPET
                         && observedLimits.observedExternalActiveSlotCount() != state.activeSlotCount()) {
-                    complete(player, request, expectedTop, () -> message(
-                            player,
-                            "OmniPet and LuckPerms slot counts differ; reconcile them before another purchase.",
-                            NamedTextColor.RED));
+                    complete(player, request, expectedTop, () -> message(player, MessageKey.SLOT_COUNTS_DIFFER));
                     return;
                 }
                 int slot = state.activeSlotCount() + 1;
                 Phase4PaperConfig.SlotUnlock unlock = config.unlock(slot).orElse(null);
                 if (slot > config.max() || unlock == null) {
-                    complete(player, request, expectedTop, () -> message(
-                            player, "No further active slot upgrade is configured.", NamedTextColor.YELLOW));
+                    complete(player, request, expectedTop, () -> message(player, MessageKey.SLOT_NO_UPGRADE));
                     return;
                 }
                 if (!eligibility.getOrDefault(slot, false)) {
-                    complete(player, request, expectedTop, () -> message(
-                            player, "You do not meet the permission requirement for slot " + slot + ".",
-                            NamedTextColor.RED));
+                    complete(player, request, expectedTop, () -> player.sendMessage(Messages.line(
+                            MessageKey.SLOT_NOT_ELIGIBLE, Messages.of("amount", slot))));
                     return;
                 }
                 if (!entitlements.available(config.entitlement())) {
-                    complete(player, request, expectedTop, () -> message(
-                            player,
-                            "Slot entitlement provider unavailable: "
-                                    + entitlements.unavailableReason(config.entitlement()),
-                            NamedTextColor.RED));
+                    complete(player, request, expectedTop, () -> player.sendMessage(Messages.line(
+                            MessageKey.SLOT_ENTITLEMENT_UNAVAILABLE,
+                            Messages.of("detail", entitlements.unavailableReason(config.entitlement())))));
                     return;
                 }
                 java.util.Map<io.github.salyvn.omnipet.core.economy.EconomyProvider, String> balances =
@@ -184,7 +173,8 @@ public final class PlayerSlotPurchaseController {
 
     private void select(Player player, SlotPurchaseInventoryHolder holder, SlotPurchaseInventoryHolder.Action action) {
         if (providers.find(action.amount().provider()).isEmpty()) {
-            message(player, providers.diagnostic(action.amount().provider()), NamedTextColor.RED);
+            player.sendMessage(Messages.line(MessageKey.SLOT_PROVIDER_UNAVAILABLE,
+                    Messages.of("detail", providers.diagnostic(action.amount().provider()))));
             return;
         }
         player.openInventory(renderer.confirmation(player, holder, action.amount()));
@@ -195,15 +185,15 @@ public final class PlayerSlotPurchaseController {
         Phase4PaperConfig.ActiveSlots config = limitsResolver.activeSlots();
         Phase4PaperConfig.SlotUnlock current = config.unlock(holder.slot()).orElse(null);
         if (current == null || !action.amount().equals(current.costs().get(action.amount().provider()))) {
-            message(player, "Slot price changed; reopen the purchase menu.", NamedTextColor.YELLOW);
+            message(player, MessageKey.SLOT_PRICE_CHANGED);
             return;
         }
         if (!current.eligible(player::hasPermission) || !entitlements.available(config.entitlement())) {
-            message(player, "Slot purchase requirements are no longer available.", NamedTextColor.RED);
+            message(player, MessageKey.SLOT_REQUIREMENTS_GONE);
             return;
         }
         if (!mutations.add(playerId)) {
-            message(player, "A slot purchase is already processing.", NamedTextColor.YELLOW);
+            message(player, MessageKey.SLOT_PURCHASE_IN_FLIGHT);
             return;
         }
         Inventory expectedTop = holder.getInventory();
@@ -262,19 +252,20 @@ public final class PlayerSlotPurchaseController {
             Inventory expectedTop) {
         finishMutation(player, holder.viewerId(), request, expectedTop, () -> {
             if (result.succeeded()) {
-                message(player, "Active slot " + holder.slot() + " unlocked.", NamedTextColor.GREEN);
+                player.sendMessage(Messages.line(MessageKey.SLOT_UNLOCKED, Messages.of("amount", holder.slot())));
                 player.performCommand("pet " + holder.returnPage());
                 return;
             }
             if (result.status() == SlotPurchaseResult.Status.ENTITLEMENT_SYNC_PENDING) {
-                message(player, "Slot saved, but entitlement sync needs admin review: " + result.detail(),
-                        NamedTextColor.YELLOW);
+                player.sendMessage(Messages.line(MessageKey.SLOT_SYNC_PENDING,
+                        Messages.of("detail", result.detail())));
                 plugin.getLogger().warning("Slot " + holder.slot() + " for " + holder.viewerId()
                         + " is awaiting external entitlement sync: " + result.detail());
                 return;
             }
-            message(player, "Slot purchase " + result.status().name().toLowerCase().replace('_', ' ')
-                    + ": " + result.detail(), NamedTextColor.RED);
+            player.sendMessage(Messages.line(MessageKey.SLOT_PURCHASE_REJECTED,
+                    Messages.of("status", words(result.status())),
+                    Messages.of("detail", result.detail())));
             if (result.status() == SlotPurchaseResult.Status.STALE_QUOTE) open(player, holder.returnPage());
         });
     }
@@ -317,11 +308,15 @@ public final class PlayerSlotPurchaseController {
     }
 
     private void fail(Player player, String message, Throwable failure) {
-        message(player, message + ".", NamedTextColor.RED);
+        player.sendMessage(Messages.line(MessageKey.SLOT_FAILURE, Messages.of("detail", message)));
         plugin.getLogger().warning(message + " for " + player.getUniqueId() + ": " + failure.getMessage());
     }
 
-    private static void message(Player player, String message, NamedTextColor color) {
-        player.sendMessage(Component.text("OmniPet: " + message, color));
+    private static void message(Player player, MessageKey key) {
+        player.sendMessage(Messages.line(key));
+    }
+
+    private static String words(Enum<?> value) {
+        return value.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
     }
 }

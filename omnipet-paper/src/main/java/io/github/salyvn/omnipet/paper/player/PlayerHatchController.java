@@ -12,7 +12,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 
 import io.github.salyvn.omnipet.core.incubation.EggEscrowStage;
 import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
@@ -26,6 +25,8 @@ import io.github.salyvn.omnipet.paper.incubation.action.IncubationActionItemCont
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class PlayerHatchController {
     private static final String VIEW_TASK = "hatch:view";
@@ -80,9 +81,9 @@ public final class PlayerHatchController {
                     failAsync(playerId, request, expectedTop, "hatch state could not be loaded", failure);
                 }
             });
-            if (!accepted && !shuttingDown) message(player, "Hatch view could not be scheduled.", NamedTextColor.RED);
+            if (!accepted && !shuttingDown) message(player, MessageKey.HATCH_VIEW_NOT_SCHEDULED);
         } catch (RuntimeException failure) {
-            message(player, "Hatch view could not be scheduled.", NamedTextColor.RED);
+            message(player, MessageKey.HATCH_VIEW_NOT_SCHEDULED);
             plugin.getLogger().warning("Hatch view queue failed for " + playerId + ": " + failure.getMessage());
         }
     }
@@ -99,15 +100,14 @@ public final class PlayerHatchController {
             case "refresh" -> open(player);
             case "use-main" -> redeemItem(player, EggInventoryHand.MAIN_HAND);
             case "use-off", "use-offhand" -> redeemItem(player, EggInventoryHand.OFF_HAND);
-            default -> message(player,
-                    "Use /pet hatch [main|off|claim|refresh|use-main|use-off].", NamedTextColor.YELLOW);
+            default -> message(player, MessageKey.HATCH_USAGE);
         }
     }
 
     private void redeemItem(Player player, EggInventoryHand hand) {
         IncubationActionItemController controller = actionItems;
         if (controller == null) {
-            message(player, "Incubation action items are unavailable.", NamedTextColor.RED);
+            message(player, MessageKey.HATCH_ACTION_ITEMS_UNAVAILABLE);
             return;
         }
         controller.redeem(player, hand);
@@ -160,15 +160,13 @@ public final class PlayerHatchController {
         UUID playerId = player.getUniqueId();
         Inventory expectedTop = player.getOpenInventory().getTopInventory();
         if (!mutations.add(playerId)) {
-            message(player, "A hatch action is already processing.", NamedTextColor.YELLOW);
+            message(player, MessageKey.HATCH_ACTION_IN_FLIGHT);
             return;
         }
         long actionRequest = mutationRequests.begin(playerId);
         try {
             boolean accepted = coordinator.start(player, hand);
-            message(player, accepted
-                    ? "Egg start queued; the escrow must commit before time advances."
-                    : "Egg start could not be queued.", accepted ? NamedTextColor.GREEN : NamedTextColor.RED);
+            message(player, accepted ? MessageKey.HATCH_START_QUEUED : MessageKey.HATCH_START_NOT_QUEUED);
             if (!accepted) {
                 mutations.remove(playerId);
                 mutationRequests.invalidate(playerId);
@@ -179,7 +177,7 @@ public final class PlayerHatchController {
         } catch (RuntimeException failure) {
             mutations.remove(playerId);
             mutationRequests.invalidate(playerId);
-            message(player, "Egg start failed.", NamedTextColor.RED);
+            message(player, MessageKey.HATCH_START_FAILED);
             plugin.getLogger().warning("Egg start failed for " + playerId + ": " + failure.getMessage());
         }
     }
@@ -190,7 +188,7 @@ public final class PlayerHatchController {
         try {
             limits = limitsResolver.resolve(player::hasPermission).limits();
         } catch (RuntimeException failure) {
-            message(player, "Vault limits could not be resolved.", NamedTextColor.RED);
+            message(player, MessageKey.HATCH_LIMITS_UNRESOLVED);
             return;
         }
         if (!mutations.add(playerId)) return;
@@ -201,7 +199,8 @@ public final class PlayerHatchController {
                 try {
                     var state = services.hatches().snapshot(playerId);
                     if (state.incubation() == null) {
-                        finishClaim(playerId, actionRequest, expectedTop, null, "No incubation is available.");
+                        finishClaim(playerId, actionRequest, expectedTop, null,
+                                Messages.line(MessageKey.HATCH_NO_INCUBATION));
                         return;
                     }
                     claimAsync(
@@ -212,12 +211,7 @@ public final class PlayerHatchController {
                             state.incubation().id(),
                             limits);
                 } catch (IOException | RuntimeException failure) {
-                    finishClaim(
-                            playerId,
-                            actionRequest,
-                            expectedTop,
-                            null,
-                            "Claim failed: " + failure.getMessage());
+                    finishClaim(playerId, actionRequest, expectedTop, null, claimFailure(failure));
                 }
             });
             if (!accepted) {
@@ -227,7 +221,7 @@ public final class PlayerHatchController {
         } catch (RuntimeException failure) {
             mutations.remove(playerId);
             mutationRequests.invalidate(playerId);
-            message(player, "Claim could not be scheduled.", NamedTextColor.RED);
+            message(player, MessageKey.HATCH_CLAIM_NOT_SCHEDULED);
         }
     }
 
@@ -242,7 +236,7 @@ public final class PlayerHatchController {
         } catch (RuntimeException failure) {
             mutations.remove(playerId);
             mutationRequests.invalidate(playerId);
-            message(player, "Vault limits could not be resolved.", NamedTextColor.RED);
+            message(player, MessageKey.HATCH_LIMITS_UNRESOLVED);
             return;
         }
         try {
@@ -261,7 +255,7 @@ public final class PlayerHatchController {
         } catch (RuntimeException failure) {
             mutations.remove(playerId);
             mutationRequests.invalidate(playerId);
-            message(player, "Claim could not be scheduled.", NamedTextColor.RED);
+            message(player, MessageKey.HATCH_CLAIM_NOT_SCHEDULED);
         }
     }
 
@@ -276,13 +270,13 @@ public final class PlayerHatchController {
             var escrow = services.eggEscrowJournal().find(incubationId).orElse(null);
             if (escrow == null || escrow.stage() != EggEscrowStage.COMMITTED) {
                 finishClaim(playerId, actionRequest, expectedTop, null,
-                        "Egg payment is still being recovered; claim is locked.");
+                        Messages.line(MessageKey.HATCH_CLAIM_LOCKED));
                 return;
             }
             HatchResult result = services.hatches().claim(playerId, revision, incubationId, limits);
             finishClaim(playerId, actionRequest, expectedTop, result, null);
         } catch (IOException | RuntimeException failure) {
-            finishClaim(playerId, actionRequest, expectedTop, null, "Claim failed: " + failure.getMessage());
+            finishClaim(playerId, actionRequest, expectedTop, null, claimFailure(failure));
         }
     }
 
@@ -299,16 +293,22 @@ public final class PlayerHatchController {
             long actionRequest,
             Inventory expectedTop,
             HatchResult result,
-            String failure) {
+            Component failure) {
         runMain(playerId, actionRequest, player -> {
             mutations.remove(playerId);
             mutationRequests.invalidate(playerId);
             if (player.getOpenInventory().getTopInventory() != expectedTop) return;
-            if (failure != null) message(player, failure, NamedTextColor.RED);
-            else message(player, result.status() == HatchResult.Status.CLAIMED
-                    ? "Pet claimed into your vault."
-                    : "Claim result: " + words(result.status()),
-                    result.succeeded() ? NamedTextColor.GREEN : NamedTextColor.YELLOW);
+            if (failure != null) {
+                player.sendMessage(failure);
+            } else if (result.status() == HatchResult.Status.CLAIMED) {
+                message(player, MessageKey.HATCH_CLAIMED);
+            } else {
+                player.sendMessage(Messages.line(
+                        result.succeeded()
+                                ? MessageKey.HATCH_CLAIM_RESULT
+                                : MessageKey.HATCH_CLAIM_RESULT_REJECTED,
+                        Messages.of("status", words(result.status()))));
+            }
             open(player);
         });
     }
@@ -331,7 +331,7 @@ public final class PlayerHatchController {
             String message,
             Throwable failure) {
         complete(playerId, request, expectedTop, player -> {
-            message(player, message + ".", NamedTextColor.RED);
+            message(player, MessageKey.HATCH_STATE_LOAD_FAILED);
             plugin.getLogger().warning(message + " for " + playerId + ": " + failure.getMessage());
         });
     }
@@ -371,8 +371,15 @@ public final class PlayerHatchController {
                 && player.getOpenInventory().getTopInventory().getHolder() == holder;
     }
 
-    private static void message(Player player, String text, NamedTextColor color) {
-        player.sendMessage(Component.text("OmniPet: " + text, color));
+    private static void message(Player player, MessageKey key) {
+        player.sendMessage(Messages.line(key));
+    }
+
+    /** Claim failures carry the underlying cause so a player can quote it to an operator. */
+    private static Component claimFailure(Throwable failure) {
+        String detail = failure.getMessage();
+        return Messages.line(MessageKey.HATCH_CLAIM_FAILED, Messages.of("detail",
+                detail == null || detail.isBlank() ? failure.getClass().getSimpleName() : detail));
     }
 
     private static String words(Enum<?> value) {

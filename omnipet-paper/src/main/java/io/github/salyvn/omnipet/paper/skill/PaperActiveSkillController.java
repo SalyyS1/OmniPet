@@ -29,6 +29,8 @@ import io.github.salyvn.omnipet.core.skill.SkillCastResult;
 import io.github.salyvn.omnipet.core.skill.SkillProvider;
 import io.github.salyvn.omnipet.core.skill.SkillTrigger;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 /** Durable prepare -> main-thread provider cast -> complete/rollback skill workflow. */
 public final class PaperActiveSkillController {
@@ -65,16 +67,16 @@ public final class PaperActiveSkillController {
         Objects.requireNonNull(player, "skill player");
         Objects.requireNonNull(petId, "skill pet ID");
         if (bindingId == null || bindingId.isBlank()) {
-            message(player, "Skill binding ID is required.", NamedTextColor.RED);
+            player.sendMessage(Messages.line(MessageKey.SKILL_BINDING_REQUIRED));
             return;
         }
         UUID playerId = player.getUniqueId();
         if (!inFlight.add(playerId)) {
-            message(player, "Another pet skill is still resolving.", NamedTextColor.YELLOW);
+            player.sendMessage(Messages.line(MessageKey.SKILL_IN_FLIGHT));
             return;
         }
         boolean accepted = tasks.submit(playerId, () -> prepare(playerId, petId, bindingId.trim()));
-        if (!accepted) finish(playerId, "Skill request could not be scheduled.", NamedTextColor.RED);
+        if (!accepted) finish(playerId, Messages.line(MessageKey.SKILL_NOT_SCHEDULED));
     }
 
     public void adminCommand(CommandSender sender, List<String> arguments) {
@@ -102,30 +104,30 @@ public final class PaperActiveSkillController {
         try {
             var state = players.snapshot(playerId);
             if (!state.desiredActivePetIds().contains(petId)) {
-                finish(playerId, "Only an active owned pet can cast a skill.", NamedTextColor.YELLOW);
+                finish(playerId, Messages.line(MessageKey.SKILL_REQUIRES_ACTIVE_PET));
                 return;
             }
             var pet = state.pets().stream().filter(candidate -> candidate.id().equals(petId)).findFirst().orElse(null);
             if (pet == null) {
-                finish(playerId, "Pet is no longer owned.", NamedTextColor.YELLOW);
+                finish(playerId, Messages.line(MessageKey.SKILL_PET_NOT_OWNED));
                 return;
             }
             PetDefinition definition = registry.current().definitions().get(pet.definitionId());
             SkillBinding binding = definition == null ? null : SkillBindingProjection.read(definition).stream()
                     .filter(candidate -> candidate.bindingId().equals(bindingId)).findFirst().orElse(null);
             if (binding == null || binding.trigger() != SkillTrigger.ACTIVE) {
-                finish(playerId, "Active skill binding was not found.", NamedTextColor.YELLOW);
+                finish(playerId, Messages.line(MessageKey.SKILL_BINDING_NOT_FOUND));
                 return;
             }
             SkillProvider provider = providers.provider();
             if (!provider.providerId().equalsIgnoreCase(binding.provider())
                     || !provider.catalog().health().available()
                     || !provider.catalog().contains(binding.skillId())) {
-                finish(playerId, "Skill provider or skill ID is unavailable.", NamedTextColor.YELLOW);
+                finish(playerId, Messages.line(MessageKey.SKILL_PROVIDER_UNAVAILABLE));
                 return;
             }
             if (Math.random() >= binding.chance()) {
-                finish(playerId, "The pet skill chance did not trigger.", NamedTextColor.GRAY);
+                finish(playerId, Messages.line(MessageKey.SKILL_CHANCE_MISSED));
                 return;
             }
             UUID actionId = UUID.randomUUID();
@@ -135,19 +137,21 @@ public final class PaperActiveSkillController {
                     playerId, state.revision(), petId, binding, actionId, now, config.maxStamina());
             if (prepared.status() != RepositorySkillActionResult.Status.PREPARED
                     && prepared.status() != RepositorySkillActionResult.Status.ALREADY_PREPARED) {
-                finish(playerId, "Skill rejected: " + words(prepared.status()) + ".", NamedTextColor.YELLOW);
+                finish(playerId, Messages.line(MessageKey.SKILL_REJECTED,
+                        Messages.of("status", words(prepared.status()))));
                 return;
             }
             runMain(playerId, () -> castPrepared(playerId, petId, binding, actionId));
         } catch (IOException | RuntimeException failure) {
-            finish(playerId, "Skill preparation failed: " + detail(failure) + ".", NamedTextColor.RED);
+            finish(playerId, Messages.line(MessageKey.SKILL_PREPARE_FAILED,
+                    Messages.of("detail", detail(failure))));
         }
     }
 
     private void castPrepared(UUID playerId, UUID petId, SkillBinding binding, UUID actionId) {
         Player player = Bukkit.getPlayer(playerId);
         if (player == null || !player.isOnline()) {
-            queueRollback(playerId, petId, actionId, "Player left before the cast; reservation rolled back.");
+            queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(MessageKey.SKILL_PLAYER_LEFT)));
             return;
         }
         SkillCastResult cast;
@@ -156,16 +160,17 @@ public final class PaperActiveSkillController {
                     actionId, playerId, playerId, petId, binding.skillId(), binding.targetPolicy(),
                     Map.of("world", player.getWorld().getName())));
         } catch (RuntimeException | LinkageError failure) {
-            queueRollback(playerId, petId, actionId, "Provider failed: " + detail(failure) + ".");
+            queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(
+                    MessageKey.SKILL_PROVIDER_FAILED, Messages.of("detail", detail(failure)))));
             return;
         }
         if (!cast.succeeded()) {
-            queueRollback(playerId, petId, actionId, "Skill cast failed: " + cast.detail() + ".");
+            queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(
+                    MessageKey.SKILL_CAST_FAILED, Messages.of("detail", cast.detail()))));
             return;
         }
         if (!tasks.submit(playerId, () -> complete(playerId, petId, actionId))) {
-            finish(playerId, "Skill cast happened; durable completion could not be scheduled and requires review.",
-                    NamedTextColor.RED);
+            finish(playerId, Messages.line(MessageKey.SKILL_COMPLETION_NOT_SCHEDULED));
         }
     }
 
@@ -175,14 +180,14 @@ public final class PaperActiveSkillController {
             RepositorySkillActionResult result = actions.complete(
                     playerId, current.revision(), petId, actionId, System.currentTimeMillis(), progression.maxStamina());
             if (result.status() == RepositorySkillActionResult.Status.COMPLETED) {
-                finish(playerId, "Pet skill cast succeeded.", NamedTextColor.GREEN);
+                finish(playerId, Messages.line(MessageKey.SKILL_SUCCEEDED));
             } else {
-                finish(playerId, "Skill cast happened, but durable completion requires review: "
-                        + words(result.status()) + ".", NamedTextColor.RED);
+                finish(playerId, Messages.line(MessageKey.SKILL_COMPLETION_NEEDS_REVIEW,
+                        Messages.of("status", words(result.status()))));
             }
         } catch (IOException | RuntimeException failure) {
-            finish(playerId, "Skill cast happened; reservation remains pending for recovery: "
-                    + detail(failure) + ".", NamedTextColor.RED);
+            finish(playerId, Messages.line(MessageKey.SKILL_RESERVATION_PENDING,
+                    Messages.of("detail", detail(failure))));
         }
     }
 
@@ -192,12 +197,15 @@ public final class PaperActiveSkillController {
                 var current = players.snapshot(playerId);
                 actions.rollback(playerId, current.revision(), petId, actionId);
             } catch (IOException | RuntimeException failure) {
-                finish(playerId, detail + " Durable rollback needs review: " + detail(failure) + ".", NamedTextColor.RED);
+                finish(playerId, Messages.line(MessageKey.SKILL_ROLLBACK_NEEDS_REVIEW,
+                        Messages.of("detail", detail), Messages.of("reason", detail(failure))));
                 return;
             }
-            finish(playerId, detail, NamedTextColor.YELLOW);
+            finish(playerId, Messages.line(MessageKey.SKILL_ROLLED_BACK, Messages.of("detail", detail)));
         });
-        if (!accepted) finish(playerId, detail + " Durable rollback could not be scheduled.", NamedTextColor.RED);
+        if (!accepted) {
+            finish(playerId, Messages.line(MessageKey.SKILL_ROLLBACK_NOT_SCHEDULED, Messages.of("detail", detail)));
+        }
     }
 
     private void inspectPending(CommandSender sender, UUID playerId) {
@@ -252,11 +260,11 @@ public final class PaperActiveSkillController {
         }
     }
 
-    private void finish(UUID playerId, String text, NamedTextColor color) {
+    private void finish(UUID playerId, Component text) {
         inFlight.remove(playerId);
         runMain(playerId, () -> {
             Player player = Bukkit.getPlayer(playerId);
-            if (player != null && player.isOnline()) message(player, text, color);
+            if (player != null && player.isOnline()) player.sendMessage(text);
         });
     }
 
@@ -273,10 +281,7 @@ public final class PaperActiveSkillController {
         plugin.getServer().getScheduler().runTask(plugin, action);
     }
 
-    private static void message(Player player, String text, NamedTextColor color) {
-        player.sendMessage(Component.text("OmniPet: " + text, color));
-    }
-
+    /** Operator output: an audit trail, deliberately not catalog-owned. */
     private static void message(CommandSender sender, String text, NamedTextColor color) {
         sender.sendMessage(Component.text("OmniPet: " + text, color));
     }

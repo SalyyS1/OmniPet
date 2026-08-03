@@ -12,9 +12,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-
 import io.github.salyvn.omnipet.core.persistence.StaleRevisionException;
 import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
 import io.github.salyvn.omnipet.core.storage.PetStorageResult;
@@ -25,6 +22,8 @@ import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuRenderer;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class PlayerPetController {
     private static final String VAULT_VIEW_TASK = "vault:view";
@@ -159,7 +158,7 @@ public final class PlayerPetController {
     private void toggle(Player player, PlayerPetInventoryHolder holder, PlayerPetInventoryHolder.Action action) {
         UUID playerId = player.getUniqueId();
         if (!mutationsInFlight.add(playerId)) {
-            player.sendMessage(Component.text("OmniPet: a pet change is already processing.", NamedTextColor.YELLOW));
+            player.sendMessage(Messages.line(MessageKey.VAULT_CHANGE_IN_FLIGHT));
             return;
         }
         PetStorageLimits limits;
@@ -184,8 +183,7 @@ public final class PlayerPetController {
                             () -> showMutationResult(player, holder.page(), result));
                 } catch (StaleRevisionException stale) {
                     completeUi(player, playerId, request, expectedTop, true, () -> {
-                        player.sendMessage(Component.text(
-                                "OmniPet vault changed; refreshed the page.", NamedTextColor.YELLOW));
+                        player.sendMessage(Messages.line(MessageKey.VAULT_REFRESHED));
                         openVault(player, holder.page());
                     });
                 } catch (IOException | RuntimeException failure) {
@@ -221,10 +219,8 @@ public final class PlayerPetController {
             runMain(() -> {
                 if (!isAvailable(player, playerId) || completed == null) return;
                 if (!completed.recalledPetIds().isEmpty()) {
-                    player.sendMessage(Component.text(
-                            "OmniPet recalled " + completed.recalledPetIds().size()
-                                    + " overflow active pet(s).",
-                            NamedTextColor.YELLOW));
+                    player.sendMessage(Messages.line(MessageKey.VAULT_OVERFLOW_RECALLED,
+                            Messages.of("amount", completed.recalledPetIds().size())));
                 }
             });
         } catch (IOException | RuntimeException failure) {
@@ -238,9 +234,8 @@ public final class PlayerPetController {
 
     private void showMutationResult(Player player, int page, PetStorageResult result) {
         if (!result.succeeded()) {
-            player.sendMessage(Component.text(
-                    "OmniPet: " + result.status().name().toLowerCase().replace('_', ' '),
-                    NamedTextColor.RED));
+            player.sendMessage(Messages.line(MessageKey.VAULT_MUTATION_REJECTED,
+                    Messages.of("status", words(result.status()))));
         }
         player.openInventory(renderer.render(player, result.snapshot(), page));
     }
@@ -308,8 +303,12 @@ public final class PlayerPetController {
     }
 
     private void reportFailure(Player player, String message, Throwable failure) {
-        player.sendMessage(Component.text("OmniPet: " + message + ".", NamedTextColor.RED));
+        player.sendMessage(Messages.line(MessageKey.VAULT_FAILURE, Messages.of("detail", message)));
         plugin.getLogger().warning(message + " for " + player.getUniqueId() + ": " + failure.getMessage());
+    }
+
+    private static String words(Enum<?> value) {
+        return value.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
     }
 
     private void publishSnapshot(PetStorageSnapshot snapshot) {
