@@ -14,7 +14,7 @@ public final class SlotPurchaseInventoryHolder implements InventoryHolder {
     private final UUID viewerId;
     private final long expectedRevision;
     private final int slot;
-    private final int returnPage;
+    private final SlotPurchaseOrigin origin;
     private final UUID transactionId;
     private final Stage stage;
     private final Map<Integer, Action> actions;
@@ -24,17 +24,16 @@ public final class SlotPurchaseInventoryHolder implements InventoryHolder {
             UUID viewerId,
             long expectedRevision,
             int slot,
-            int returnPage,
+            SlotPurchaseOrigin origin,
             UUID transactionId,
             Stage stage,
             Map<Integer, Action> actions) {
         this.viewerId = Objects.requireNonNull(viewerId, "viewer id");
         if (expectedRevision < 0) throw new IllegalArgumentException("expected revision cannot be negative");
         if (slot < 2 || slot > 64) throw new IllegalArgumentException("slot is outside the supported range");
-        if (returnPage < 1) throw new IllegalArgumentException("return page must be one-based");
         this.expectedRevision = expectedRevision;
         this.slot = slot;
-        this.returnPage = returnPage;
+        this.origin = Objects.requireNonNull(origin, "slot purchase origin");
         this.transactionId = Objects.requireNonNull(transactionId, "transaction id");
         this.stage = Objects.requireNonNull(stage, "purchase stage");
         this.actions = Collections.unmodifiableMap(actions == null ? Map.of() : actions);
@@ -48,7 +47,7 @@ public final class SlotPurchaseInventoryHolder implements InventoryHolder {
     public UUID viewerId() { return viewerId; }
     public long expectedRevision() { return expectedRevision; }
     public int slot() { return slot; }
-    public int returnPage() { return returnPage; }
+    public SlotPurchaseOrigin origin() { return origin; }
     public UUID transactionId() { return transactionId; }
     public Stage stage() { return stage; }
     public Action action(int rawSlot) { return actions.get(rawSlot); }

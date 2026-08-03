@@ -2,7 +2,9 @@ package io.github.salyvn.omnipet.paper.player;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -15,6 +17,7 @@ import io.github.salyvn.omnipet.paper.command.AdminPetCommandParser;
 import io.github.salyvn.omnipet.paper.gui.hub.HubInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.hub.HubMenuRenderer;
 import io.github.salyvn.omnipet.paper.gui.hub.HubView;
+import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseOrigin;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
@@ -38,6 +41,9 @@ public final class PlayerHubController {
     private final HubMenuRenderer renderer = new HubMenuRenderer();
     private final PerPlayerTaskQueue taskQueue;
     private final PlayerRequestTracker requests = new PlayerRequestTracker();
+    // PlayerRequestTracker is a stale-completion filter, not a mutex: begin() unconditionally
+    // overwrites and returns a new token, so it cannot reject a second concurrent open. This set can.
+    private final Set<UUID> opens = ConcurrentHashMap.newKeySet();
     private final PlayerPetController playerPets;
     private final PlayerHatchController hatchController;
     private final PlayerSlotPurchaseController slotPurchases;
@@ -81,29 +87,42 @@ public final class PlayerHubController {
         }
         boolean studioVisible = studio != null
                 && player.hasPermission(AdminPetCommandParser.MANAGE_PET_PERMISSION);
+        // A second open while one is still in flight is dropped, matching every sibling controller.
+        // Released on failure as well as success, or a failed open would lock the hub permanently.
+        if (!opens.add(playerId)) return;
         long request = requests.begin(playerId);
         Inventory expectedTop = player.getOpenInventory().getTopInventory();
         try {
             boolean accepted = taskQueue.submitLatest(playerId, HUB_VIEW_TASK, () -> {
-                if (shuttingDown || !requests.isCurrent(playerId, request)) return;
+                // Released here rather than inside runMain: runMain drops its task during shutdown or
+                // when the plugin is disabled, which would leak the guard and lock the hub.
                 try {
-                    HubView view = HubView.from(hatches.snapshot(playerId), limits);
-                    runMain(() -> {
-                        if (!isCurrent(player, playerId, request, expectedTop)) return;
-                        player.openInventory(renderer.render(view, studioVisible));
-                    });
-                } catch (IOException | RuntimeException failure) {
-                    runMain(() -> {
-                        if (isCurrent(player, playerId, request, expectedTop)) {
-                            fail(player, "hub could not be loaded", failure);
-                        }
-                    });
+                    if (shuttingDown || !requests.isCurrent(playerId, request)) return;
+                    try {
+                        HubView view = HubView.from(hatches.snapshot(playerId), limits);
+                        runMain(() -> {
+                            if (!isCurrent(player, playerId, request, expectedTop)) return;
+                            player.openInventory(renderer.render(view, studioVisible));
+                        });
+                    } catch (IOException | RuntimeException failure) {
+                        runMain(() -> {
+                            if (isCurrent(player, playerId, request, expectedTop)) {
+                                fail(player, "hub could not be loaded", failure);
+                            }
+                        });
+                    }
+                } finally {
+                    opens.remove(playerId);
                 }
             });
-            if (!accepted && !shuttingDown) {
-                fail(player, "hub could not be scheduled", new IllegalStateException("queue closed"));
+            if (!accepted) {
+                opens.remove(playerId);
+                if (!shuttingDown) {
+                    fail(player, "hub could not be scheduled", new IllegalStateException("queue closed"));
+                }
             }
         } catch (RuntimeException failure) {
+            opens.remove(playerId);
             if (!shuttingDown) fail(player, "hub could not be scheduled", failure);
         }
     }
@@ -119,7 +138,7 @@ public final class PlayerHubController {
             switch (action) {
                 case VAULT -> playerPets.openVault(player, 1);
                 case HATCH -> hatchController.open(player);
-                case SLOTS -> slotPurchases.open(player, 1);
+                case SLOTS -> slotPurchases.open(player, SlotPurchaseOrigin.hub());
                 case HELP -> player.performCommand("pet help");
                 case STUDIO -> openStudio(player);
             }
@@ -128,6 +147,7 @@ public final class PlayerHubController {
 
     public void release(UUID playerId) {
         requests.invalidate(playerId);
+        opens.remove(playerId);
     }
 
     public void close() {
@@ -138,6 +158,7 @@ public final class PlayerHubController {
                 player.closeInventory();
             }
         }
+        opens.clear();
     }
 
     private void openStudio(Player player) {

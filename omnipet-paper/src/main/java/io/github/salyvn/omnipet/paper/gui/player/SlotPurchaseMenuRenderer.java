@@ -29,7 +29,7 @@ public final class SlotPurchaseMenuRenderer {
             Player player,
             long revision,
             int slot,
-            int returnPage,
+            SlotPurchaseOrigin origin,
             UUID transactionId,
             Phase4PaperConfig.SlotUnlock unlock,
             Function<EconomyProvider, Boolean> available,
@@ -37,7 +37,7 @@ public final class SlotPurchaseMenuRenderer {
             Function<EconomyProvider, SlotBalanceDisplay> balance) {
         Map<Integer, SlotPurchaseInventoryHolder.Action> actions = new HashMap<>();
         SlotPurchaseInventoryHolder holder = holder(
-                player, revision, slot, returnPage, transactionId,
+                player, revision, slot, origin, transactionId,
                 SlotPurchaseInventoryHolder.Stage.SELECT_PROVIDER, actions);
         Inventory inventory = Bukkit.createInventory(holder, 27, Messages.line(
                 MessageKey.GUI_TITLE_SLOT_SELECT, Messages.of("amount", slot)));
@@ -73,7 +73,7 @@ public final class SlotPurchaseMenuRenderer {
                 player,
                 previous.expectedRevision(),
                 previous.slot(),
-                previous.returnPage(),
+                previous.origin(),
                 previous.transactionId(),
                 SlotPurchaseInventoryHolder.Stage.CONFIRM,
                 actions);
@@ -127,12 +127,12 @@ public final class SlotPurchaseMenuRenderer {
             Player player,
             long revision,
             int slot,
-            int returnPage,
+            SlotPurchaseOrigin origin,
             UUID transactionId,
             SlotPurchaseInventoryHolder.Stage stage,
             Map<Integer, SlotPurchaseInventoryHolder.Action> actions) {
         return new SlotPurchaseInventoryHolder(
-                player.getUniqueId(), revision, slot, returnPage, transactionId, stage, actions);
+                player.getUniqueId(), revision, slot, origin, transactionId, stage, actions);
     }
 
     private static Material material(EconomyProvider provider) {

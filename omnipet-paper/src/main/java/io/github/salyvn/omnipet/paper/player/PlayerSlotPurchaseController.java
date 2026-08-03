@@ -20,9 +20,12 @@ import io.github.salyvn.omnipet.core.persistence.PlayerStateRepository;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfig;
 import io.github.salyvn.omnipet.paper.economy.PaperEconomyProviderRegistry;
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
+import io.github.salyvn.omnipet.paper.feedback.Feedback;
+import io.github.salyvn.omnipet.paper.feedback.FeedbackEvent;
 import io.github.salyvn.omnipet.paper.gui.player.SlotBalanceDisplay;
 import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseMenuRenderer;
+import io.github.salyvn.omnipet.paper.gui.player.SlotPurchaseOrigin;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
@@ -66,7 +69,12 @@ public final class PlayerSlotPurchaseController {
     }
 
     public void open(Player player, int returnPage) {
+        open(player, SlotPurchaseOrigin.vault(returnPage));
+    }
+
+    public void open(Player player, SlotPurchaseOrigin origin) {
         Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(origin, "slot purchase origin");
         if (shuttingDown) return;
         PaperStorageLimitsResolver resolver = limitsResolver;
         Phase4PaperConfig.ActiveSlots config = resolver.activeSlots();
@@ -123,7 +131,7 @@ public final class PlayerSlotPurchaseController {
                         player,
                         state.revision(),
                         slot,
-                        returnPage,
+                        origin,
                         UUID.randomUUID(),
                         unlock,
                         provider -> providers.find(provider).isPresent(),
@@ -150,7 +158,7 @@ public final class PlayerSlotPurchaseController {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (!isCurrent(player, holder)) return;
             switch (action.type()) {
-                case CANCEL -> player.performCommand("pet " + holder.returnPage());
+                case CANCEL -> player.performCommand(holder.origin().returnCommand());
                 case SELECT -> select(player, holder, action);
                 case CONFIRM -> confirm(player, holder, action);
             }
@@ -195,6 +203,7 @@ public final class PlayerSlotPurchaseController {
         }
         if (!mutations.add(playerId)) {
             message(player, MessageKey.SLOT_PURCHASE_IN_FLIGHT);
+            Feedback.blocked(player, FeedbackEvent.SLOT_PURCHASE_IN_FLIGHT);
             return;
         }
         Inventory expectedTop = holder.getInventory();
@@ -254,7 +263,8 @@ public final class PlayerSlotPurchaseController {
         finishMutation(player, holder.viewerId(), request, expectedTop, () -> {
             if (result.succeeded()) {
                 player.sendMessage(Messages.line(MessageKey.SLOT_UNLOCKED, Messages.of("amount", holder.slot())));
-                player.performCommand("pet " + holder.returnPage());
+                Feedback.success(player, FeedbackEvent.SLOT_UNLOCKED);
+                player.performCommand(holder.origin().returnCommand());
                 return;
             }
             if (result.status() == SlotPurchaseResult.Status.ENTITLEMENT_SYNC_PENDING) {
@@ -267,7 +277,8 @@ public final class PlayerSlotPurchaseController {
             player.sendMessage(Messages.line(MessageKey.SLOT_PURCHASE_REJECTED,
                     Messages.of("status", words(result.status())),
                     Messages.of("detail", result.detail())));
-            if (result.status() == SlotPurchaseResult.Status.STALE_QUOTE) open(player, holder.returnPage());
+            Feedback.failure(player, FeedbackEvent.SLOT_PURCHASE_REJECTED);
+            if (result.status() == SlotPurchaseResult.Status.STALE_QUOTE) open(player, holder.origin());
         });
     }
 

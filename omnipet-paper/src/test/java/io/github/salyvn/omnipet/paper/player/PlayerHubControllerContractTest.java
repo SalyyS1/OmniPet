@@ -57,7 +57,11 @@ class PlayerHubControllerContractTest {
 
         assertTrue(source.contains("playerPets.openVault(player, 1)"));
         assertTrue(source.contains("hatchController.open(player)"));
-        assertTrue(source.contains("slotPurchases.open(player, 1)"));
+        // The slot tile must carry its hub origin, or cancelling the purchase relocates the player to
+        // the vault instead of returning them to the hub they opened it from.
+        assertTrue(source.contains("slotPurchases.open(player, SlotPurchaseOrigin.hub())"));
+        assertFalse(source.contains("slotPurchases.open(player, 1)"),
+                "the page-based open silently returns hub visitors to the vault");
         assertTrue(source.contains("player.performCommand(\"pet help\")"));
         // No mutation path lives in the hub. The one storage reference is the limits type import.
         assertFalse(source.contains("storage.snapshot("), "the hub must not read storage itself");

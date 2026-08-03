@@ -17,7 +17,7 @@ class SlotPurchaseInventoryHolderTest {
         UUID transactionId = UUID.randomUUID();
         Map<Integer, SlotPurchaseInventoryHolder.Action> actions = new HashMap<>();
         var holder = new SlotPurchaseInventoryHolder(
-                UUID.randomUUID(), 7, 2, 3, transactionId,
+                UUID.randomUUID(), 7, 2, SlotPurchaseOrigin.vault(3), transactionId,
                 SlotPurchaseInventoryHolder.Stage.CONFIRM, actions);
         actions.put(11, SlotPurchaseInventoryHolder.Action.confirm(EconomyAmount.playerPoints(50)));
 
