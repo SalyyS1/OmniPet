@@ -1,7 +1,7 @@
 ---
 title: "OmniPet feature depth: feedback, vault usability, pet click, internal cleanup"
 description: "Second-tier UX and logic work on shipped features: audible/visual feedback, an operator-owned gui config surface, vault search and sort, right-click pet interaction, and the DRY/test debt left by the first overhaul."
-status: pending
+status: complete
 priority: P1
 effort: "4-6d"
 tags: [ux, paper, gui, config, interaction, cleanup]
@@ -62,7 +62,7 @@ Also corrected: the hardcoded-value count (3 → **14 literals**, six `Duration`
 | 3 | [Phase 3: Vault usability at scale](./phase-03-vault-usability-at-scale.md) | Complete | 2 |
 | 4 | [Phase 4: Pet click interaction](./phase-04-pet-click-interaction.md) | Complete | 2 |
 | 5 | [Phase 5: Internal cleanup and test gaps](./phase-05-internal-cleanup-and-test-gaps.md) | Complete | 2, 3 |
-| 6 | [Phase 6: Docs and verification](./phase-06-docs-and-verification.md) | Pending | 2, 3, 4, 5 |
+| 6 | [Phase 6: Docs and verification](./phase-06-docs-and-verification.md) | Complete | 2, 3, 4, 5 |
 
 Phase 2 lands as **two commits** (2a config, 2b feedback) — it is too large for one.
 

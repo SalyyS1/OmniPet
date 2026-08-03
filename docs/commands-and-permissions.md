@@ -1,13 +1,13 @@
 # Commands and permissions
 
-The Gradle-built Paper runtime registers the player hub, the player vault, Admin Pet Studio, the durable hatch view, live pet rendering, per-pet management and cultivation, active skills, and release reward administration. Riding and entity click interaction are not implemented.
+The Gradle-built Paper runtime registers the player hub, the player vault, Admin Pet Studio, the durable hatch view, live pet rendering, right-click pet interaction, per-pet management and cultivation, active skills, and release reward administration. Riding is not implemented.
 
 ## Command entry point
 
 | Command | Alias | Permission | Current behavior |
 | --- | --- | --- | --- |
 | `/pet` | `/pets` | `omnipet.general` | Opens the player hub: Vault, Hatch, Active slots, Help, and (for staff) Studio tiles. |
-| `/pet vault [page]` | `/pets vault [page]` | `omnipet.general` | Opens the paginated player vault. Left-click toggles persisted desired-active intent; right-click opens per-pet management. |
+| `/pet vault [page]` | `/pets vault [page]` | `omnipet.general` | Opens the paginated player vault. Left-click toggles persisted desired-active intent; right-click opens per-pet management. Slot 46 cycles the sort order (favorites-first, level, rarity, name, recent) and slot 47 cycles the filter (all, favorites, active, stored); both reset to page 1 and to their defaults when the vault is reopened from a command. |
 | `/pet <page>` | `/pets <page>` | `omnipet.general` | Opens the vault directly on the given page. |
 | `/pet help [page]` | `/pets help [page]` | `omnipet.general` | Lists the commands the sender may use, paged. Tab-complete on `/pet ` is permission-filtered. |
 | `/pet slot` | `/pets slot` | `omnipet.general` | Opens explicit Vault/PlayerPoints choices for the next configured active slot. |
@@ -37,7 +37,7 @@ Reducer and instant-hatch items redeem through the same durable rule as egg star
 
 ## Pet management and release
 
-Right-clicking a vault pet opens management: favorite, lock, reorder, EXP candy, breakthrough, and release. Every rendered inventory carries viewer, owner, pet UUID, session, inventory generation, and expected revision; drags touching the top inventory are cancelled and stale views cannot act.
+Right-clicking a vault pet opens management: favorite, lock, reorder, EXP candy, breakthrough, and release. Right-clicking your own **rendered** pet in the world opens the same screen; another player's pet does nothing, and a non-OmniPet entity behaves normally. Every rendered inventory carries viewer, owner, pet UUID, session, inventory generation, and expected revision; drags touching the top inventory are cancelled and stale views cannot act.
 
 Cultivation removes the exact item before applying progression under a journal receipt, so a restart cannot reapply experience and a rejected mutation refunds the exact item. Release freezes a reward preview, then removes the pet and appends the internal outbox entry in one player-state write. Internal rewards deliver through a durable mailbox that is idempotent across restart; ambiguous external Vault/PlayerPoints outcomes persist as `UNKNOWN_COMMIT` and require `/pet admin release` reconciliation rather than automatic retry.
 

@@ -2,7 +2,18 @@
 
 Current compatibility evidence consists of Java/Gradle tests and Paper API compile probes. It does not include a live Paper server smoke test, gameplay certification, or vendor-plugin certification.
 
-Verification snapshot: 2026-08-02. The clean JDK 21 Gradle build passed all 18 tasks and 132 suites/461 tests with zero failures, errors, or skips. Compatibility probes were not rerun for this checkpoint.
+Verification snapshot: 2026-08-03. The clean JDK 21 Gradle build passed all 18 tasks and 157 suites/688 tests with zero failures, errors, or skips. The `1.21` and `1.21.1` compile probes were rerun for this checkpoint because two new Paper API surfaces were introduced; the remaining rows were not rerun.
+
+## Newly relied-upon Paper API surfaces
+
+Two surfaces entered the compile boundary in the feedback and pet-click work. Both are named here because `Sound`'s shape in particular is the kind of thing that shifts across Paper lines, and a silent dependency on it would be discovered by an operator rather than by a probe.
+
+| Surface | Used by | Shape verified against `1.21` and `1.21.1` |
+| --- | --- | --- |
+| `org.bukkit.Sound` | `feedback/FeedbackSettings`, `feedback/BukkitFeedbackOutput` | An enum on both probes, so names resolve through `Sound.valueOf` at load. An unknown name warns and silences one feedback category rather than failing. |
+| `PlayerInteractEntityEvent` | `gui/pet/PetInteractListener` | `PlayerInteractAtEntityEvent` extends it but overrides `getHandlers()` with its own `HandlerList` on both probes, so a handler registered for the plain event never receives the At-variant. Only the plain event is registered. |
+
+Neither adds a bundled dependency: both are Paper/Adventure API already on the compile classpath, and `checkDistributionArtifact` confirms the JAR gained no new entries.
 
 ## Java baseline
 
@@ -12,7 +23,8 @@ OmniPet compiles with Java 21 and emits Java 21 bytecode. Paper 1.21.x probes us
 
 | Paper API coordinate | Probe Java | Status | Claim allowed |
 | --- | ---: | --- | --- |
-| `1.21-R0.1-SNAPSHOT` | 21 | Passed | Primary compile baseline only. |
+| `1.21-R0.1-SNAPSHOT` | 21 | Passed | Primary compile baseline. Rerun 2026-08-03. |
+| `1.21.1-R0.1-SNAPSHOT` | 21 | Passed | Rerun 2026-08-03 for the two new API surfaces. |
 | `1.21.11-R0.1-SNAPSHOT` | 21 | Passed | Additional 1.21.x compile probe only. |
 | `26.1.1.build.29-alpha` | 25 | Passed | Preview/alpha compile evidence for this exact coordinate. |
 | `26.1.2.build.74-stable` | 25 | Passed | Experimental compile evidence for this exact coordinate. |

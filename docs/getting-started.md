@@ -43,7 +43,7 @@ Verified release metrics: 1,589,478 bytes; SHA-256 `0DC987AED51CD28775627DE74918
 3. Put the release JAR in `plugins/`.
 4. Start Paper with the Java runtime required by that exact server build.
 5. Confirm the log contains `OmniPet enabled with Pet Studio and <count> definitions.` or a clear fail-closed initialization error.
-6. Run `/pet` or `/pets` to open the hub, then pick a tile, or jump straight in with `/pet vault` (or `/pet 2` for another page), `/pet slot`, or `/pet hatch`. `/pet help` lists every command you can use, paged and permission-filtered; Tab after `/pet ` offers the same list. Staff with `omnipet.admin.managepet` can run `/pet admin browse` to open the D/C/B/A/S Studio.
+6. Run `/pet` or `/pets` to open the hub, then pick a tile, or jump straight in with `/pet vault` (or `/pet 2` for another page), `/pet slot`, or `/pet hatch`. In the vault, the two controls left of the status item cycle sort and filter, which is how you find one pet among a hundred. Once a pet is out in the world, right-clicking it opens its management screen directly. `/pet help` lists every command you can use, paged and permission-filtered; Tab after `/pet ` offers the same list. Staff with `omnipet.admin.managepet` can run `/pet admin browse` to open the D/C/B/A/S Studio.
 
 The player command requires `omnipet.general`, which defaults to `true`; Studio also requires `omnipet.admin.managepet`. Vault clicks change persisted desired-active intent only. Slot purchases and the hatch GUI are implemented but still require live certification against the exact Vault/PlayerPoints/LuckPerms/Paper builds. Hatch start is escrow-gated, countdown advances only online, and a READY result remains pending until vault capacity allows claim. Visible pet runtime behavior is not shipped yet.
 
@@ -57,7 +57,7 @@ eggs/                         # schema 1 catalog consumed by Paper hatch start
 data/players/                 # versioned player state repository
 data/egg-escrow/              # durable exact-hand egg escrow and recovery journal
 migration/legacy-eggs-v1.yml  # created only when legacy eggs.yml is present
-config.yml                    # vault and active-slot limits
+config.yml                    # vault and active-slot limits, plus the optional gui: section
 ```
 
 OmniPet does not copy the old PassivePet folder or expose a complete pet lifecycle. Legacy two-key slot config is migrated in place with a backup; player and definition migration still belongs on a staging copy. Follow [Migration](migration.md).

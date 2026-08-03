@@ -80,6 +80,32 @@ Console use must include a target when the syntax otherwise defaults to the exec
 - Unreadable transaction files are listed separately. Reads stop at 16 KiB per file; output includes at most 20 issue details plus omission/truncation summaries. Preserve entries and their `.bak` files; do not delete the whole `data/purchases` folder.
 - The adapters are not live-certified yet. Reproduce on staging with exact provider versions before treating a failure as an OmniPet data problem.
 
+## Feedback is silent
+
+- Check `gui.feedback.enabled` in `config.yml`. `false` is the master switch and silences every category at once.
+- Check the individual category. An operator may have set only `blocked` or only `progress`.
+- A sound name this Paper version does not have logs a warning at startup naming the key and the name, then leaves **that one category** silent. Search the startup log for `OmniPet feedback:`.
+- Sounds play to the acting player only, by design. If you are watching someone else click, you will hear nothing — that is not a fault, it is what stops a spammable click becoming an audible griefing vector.
+- Repeated clicks inside `gui.feedback.minIntervalMillis` are deliberately silent. Raise the value to hear less, lower it to hear more; `0` disables the limit.
+- Client-side volume still applies. A player with Master or Players volume at zero hears nothing regardless of config.
+- Chat messages are unaffected either way: feedback is additive, so silence never means lost information.
+
+## A `gui:` value did not take effect
+
+- `gui.vault.petsPerPage`, `gui.help.linesPerPage`, and `gui.studio.promptTimeoutSeconds` are **restart only**. `/pet admin reload` will not apply them. This is documented behaviour, not a bug; see [Configuration](configuration.md).
+- `gui.feedback.*` does reload live.
+- An out-of-range page size is clamped with a warning naming the applied value: `petsPerPage: 99` becomes 45 because the 54-slot layout reserves the bottom row for controls.
+- An unknown key inside `gui` warns and is ignored rather than failing the config, so check the startup log for `OmniPet config.yml:` before assuming the key works.
+- Deleting the whole `gui:` section is supported and restores the built-in values.
+
+## Right-clicking a pet does nothing
+
+- You can only open your own pet. Another player's pet is intentionally silent — it reports nothing at all, since a message would confirm whose pet it is.
+- Only the main hand counts. The off-hand event is filtered so one right-click opens exactly one screen.
+- A pet that was recalled and re-summoned leaves no clickable leftover: a stale entity resolves as not-ours and is ignored.
+- Left-click and shift-click are unbound. Riding is not implemented.
+- If the screen never opens for your own visible pet, the vault row's right-click still works and is the supported path; report it with the Paper build, since live confirmation that a Paper `Interaction` entity delivers this event is still an open gate.
+
 ## A deferred gameplay feature does nothing
 
 Egg/item distribution, reducer/instant-hatch item gameplay, a separately versioned public hatch API, summoned/rendered companions, movement, triggers, runtime MythicLib buffs, MythicMobs execution, hard MMOItems integration, and progression are not shipped. The in-repo core hatch listener reports persisted state only; it is not payment settlement or a public vendor event bus. The current hatch command/GUI does not activate those later runtime systems. Definition metadata or legacy files may be preserved without an owning runtime; check [Roadmap](roadmap.md) instead.

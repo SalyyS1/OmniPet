@@ -154,7 +154,53 @@ integrations:
 - `overflowPolicy` is `CARRY` or `DISCARD` and decides what happens to experience granted at `maxLevel`.
 - `items` defines the standalone material identities for EXP candy and breakthrough stones. MMOItems identities are not supported yet.
 - `integrations` records the vendor builds the linkage-safe adapters target. These values are documentation only; they do not gate loading.
-- Unknown root or section keys fail closed before the live snapshot changes.
+- `gui` is optional and owns menu behaviour and player feedback. Deleting the whole section reproduces the behaviour OmniPet had before it existed. See below.
+- Unknown root **sections** fail closed before the live snapshot changes. The one exception is inside `gui`, which is lenient on purpose.
+
+### `gui`
+
+```yaml
+gui:
+  feedback:
+    enabled: true              # master switch; false silences every sound and action bar
+    minIntervalMillis: 150     # floor between two sounds from the same player
+    actionBar: true            # action-bar text alongside the sound; chat is unaffected
+    success:  { sound: "ENTITY_EXPERIENCE_ORB_PICKUP", volume: 0.6, pitch: 1.2 }
+    failure:  { sound: "BLOCK_NOTE_BLOCK_BASS",        volume: 0.6, pitch: 0.8 }
+    blocked:  { sound: "BLOCK_CHEST_LOCKED",           volume: 0.6, pitch: 1.0 }
+    progress: { sound: "UI_BUTTON_CLICK",              volume: 0.4, pitch: 1.0 }
+  vault:
+    petsPerPage: 45            # RESTART ONLY, capped at 45
+  help:
+    linesPerPage: 8            # RESTART ONLY, capped at 20
+  studio:
+    promptTimeoutSeconds: 120  # RESTART ONLY
+```
+
+Unlike `storage`, this section is **lenient**, following the `messages.yml` precedent: an unknown key
+warns and is ignored, a bad value falls back to that key's default, and an out-of-range page size is
+clamped with a warning. A typo in a display setting must never stop players using their pets.
+
+Feedback plays **to the acting player only** — never to nearby players — and is rate-limited per
+player, so holding down a menu click cannot become an audible nuisance. Sound names resolve once at
+startup; a name this Paper version does not have logs a warning and silences that one category
+instead of failing. Sounds are additive: every cue sits beside its existing chat message, so
+`enabled: false` removes noise, never information.
+
+`petsPerPage` is capped at 45 because the 54-slot vault layout reserves the bottom row for paging,
+sort, filter, status, hub, and slot-purchase controls.
+
+#### Which keys reload
+
+| Setting | `/pet admin reload` |
+| --- | --- |
+| `gui.feedback.*` | **Live.** Settings are resolved before anything is swapped, so a config whose sound names fail to resolve leaves the previous settings active. |
+| `gui.vault.petsPerPage` | **Restart only.** The vault renderer is constructed once and reads its page size then. |
+| `gui.help.linesPerPage` | **Restart only.** |
+| `gui.studio.promptTimeoutSeconds` | **Restart only.** The Studio's chat-input service is built at startup and reload does not rebuild it. |
+
+Editing a restart-only key and running `/pet admin reload` is silently ineffective by design; restart
+the server to apply it.
 
 ## Provider lifecycle
 

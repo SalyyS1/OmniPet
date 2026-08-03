@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Docs and verification"
-status: pending
+status: complete
 priority: P1
 effort: "0.5d"
 dependencies: [2, 3, 4, 5]
