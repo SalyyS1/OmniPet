@@ -14,12 +14,12 @@ tasks.
 | Metric | Baseline (pre-plan) | Now | Delta |
 | --- | --- | --- | --- |
 | omnipet-core | 63 suites / 256 tests | 63 suites / 256 tests | — |
-| omnipet-paper | 84 suites / 349 tests | 94 suites / 432 tests | +10 suites, +83 tests |
-| **Total** | **147 / 605** | **157 / 688** | **+83 tests** |
+| omnipet-paper | 84 suites / 349 tests | 95 suites / 435 tests | +11 suites, +86 tests |
+| **Total** | **147 / 605** | **158 / 691** | **+86 tests** |
 | Failures / errors / skips | 0 / 0 / 0 | 0 / 0 / 0 | — |
-| `OmniPet-3.0.0-SNAPSHOT.jar` | 1,674,717 B | 1,724,718 B | +50,001 B |
-| JAR sha256 | `485ac4c6…4299a9` | `6087903b33300d605e97db30b6db715d494c2aa0889fe6528d2c431c61237c5b` | — |
-| JAR entries / classes | 1015 / 925 | 1049 / 957 | +34 / +32 |
+| `OmniPet-3.0.0-SNAPSHOT.jar` | 1,674,717 B | 1,726,005 B | +51,288 B |
+| JAR sha256 | `485ac4c6…4299a9` | `2df199b16b0ccd1de52db3f30de066bf2579a9e23212238587e50a3c51832732` | — |
+| JAR entries / classes | 1015 / 925 | 1050 / 958 | +35 / +33 |
 
 No existing test was weakened, skipped, or deleted.
 
@@ -65,13 +65,37 @@ automated coverage stands in for it, so the gap is explicit rather than implied.
 | 5 | `gui.vault.petsPerPage: 99` clamps to 45 with a warning | **UNRUN** | *Strong.* `GuiConfigLoaderTest.anOversizedVaultPageIsCappedToTheLayoutWithAWarning`. |
 | 6 | A restart-only key does **not** change on `/pet admin reload` | **UNRUN** | *Weak.* Restart-only-ness follows from the renderer and `ChatInputService` reading their values in constructors, which review confirms, but no test drives a reload against a live renderer. Documented in `configuration.md` and `troubleshooting.md`. |
 | 7 | Deleting the `gui:` section matches the pre-plan baseline | **UNRUN** | *Strong.* `OmniPetConfigGuiSectionTest.deletingTheSectionEntirelyLeavesBehaviorIdenticalToTheHardcodedDefaults` parses the shipped config with the section removed and asserts equality with `GuiConfig.defaults()`. |
-| 8 | Cycle every sort and filter on a 100+ pet vault; no pet duplicates or vanishes | **UNRUN** | *Strong.* `VaultPetViewTest` asserts each comparator is idempotent, order-independent, and preserves the multiset; a paged test walks three pages of twelve tie-identical pets and fails if any pet is seen twice or lost. |
+| 8 | Cycle every sort and filter on a 100+ pet vault; no pet duplicates or vanishes | **UNRUN** | *Strong.* `VaultPetViewTest` asserts each comparator is idempotent, order-independent, and preserves the multiset; a paged test walks three pages of twelve tie-identical pets and fails if any pet is seen twice or lost. `VaultSortCostTest` additionally bounds the cost (see below). |
 | 9 | Right-click own pet; another player's pet; a vanilla mob | **UNRUN** | *Strong.* All three are direct tests, including that the vanilla mob case does not cancel. |
 | 10 | Open slot purchase from the hub, cancel, return to the hub | **UNRUN** | *Medium.* `SlotPurchaseOriginTest` asserts the origin's return command and that all three return points dispatch on it, at source level — the return points run inside scheduler callbacks a unit test cannot drive. |
 | 11 | A legacy config migration preserves `gui:` | **UNRUN** | *Strong.* `aLegacyMigrationRoundTripDoesNotDropTheGuiSection` round-trips through `encode`. |
 
 Items 1 and 2 remain the release gate for the pet-click feature. Item 6 is the weakest coverage and is
 the one most worth running first on a live server.
+
+## A real bug found during verification, not by the plan
+
+Phase 6 measurement caught something the plan's risk table had assumed away. Its Phase 3 row said
+filtering was "in-memory over a loaded snapshot, off a click" and therefore acceptable, "bounded by
+`effectiveVaultCapacity`, which is capped at 100,000; a linear scan of that is acceptable".
+
+The scan was not linear. Every comparator called `VaultPetSummary.of` **inside the comparison**, so
+each pet's component and extension maps were re-parsed on every one of the `n log n` comparisons.
+Measured:
+
+| Vault size | Before (worst order) | After derive-once |
+| ---: | ---: | ---: |
+| 1,000 | ~90 ms | **< 5 ms** |
+| 10,000 | ~286 ms | ~90 ms |
+| 100,000 (the cap) | **~1,432 ms** | ~250–560 ms |
+
+1.4 seconds on Paper's main thread is roughly 28 dropped ticks from one sort click. Fixed by deriving
+each pet's sort keys once into a `Ranked` carrier and sorting those. Ordering is unchanged — the
+existing totality, stability, and tie-break assertions pass untouched.
+
+`VaultSortCostTest` guards it two ways: it counts element reads during a 4,000-pet sort and requires
+exactly one read per pet, so a return to per-comparison derivation appears as a read explosion rather
+than as a slow server, and it bounds a realistic 1,000-pet sort at 100 ms.
 
 ## Docs updated
 

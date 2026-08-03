@@ -22,6 +22,7 @@
 
 ### Changed
 
+- **Fixed** a main-thread stall in vault sorting found during verification. The comparators re-derived each pet's summary on every comparison rather than once per pet, which at the 100,000-pet vault capacity was a 1.4-second freeze — roughly 28 ticks — from one sort click. Sort keys now derive once; the same case drops to about 250ms and a realistic 1,000-pet vault to under 5ms, with ordering unchanged.
 - **Fixed** the hub slot tile returning to the wrong screen. A slot purchase opened from the hub replayed `pet <returnPage>` on cancel, on success, and on a stale quote, silently relocating the player to vault page 1 instead of back to the hub. The return command now belongs to an explicit origin carried on the purchase holder, so all three return points agree.
 - The hub gained the concurrent-open guard its four sibling controllers already had, released on every failure path so a failed open cannot lock it.
 - Collapsed duplicated formatters into `text/Durations`: the countdown existed twice (hatch menu and hub tile) and the decimal formatter twice (management screen and Studio stat screens). Output is unchanged and pinned by a test written against the pre-migration behaviour. Seven copies of enum-to-text conversion — two more than an earlier audit found — now route through `Displays`; operator and audit strings keep their raw enum form.
