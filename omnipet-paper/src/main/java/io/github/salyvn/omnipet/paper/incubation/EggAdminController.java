@@ -266,9 +266,11 @@ public final class EggAdminController {
 
     private static List<Integer> emptySlots(Player target, int wanted) {
         List<Integer> free = new ArrayList<>();
-        var inventory = target.getInventory();
-        for (int slot = 0; slot < inventory.getStorageContents().length && free.size() < wanted; slot++) {
-            ItemStack existing = inventory.getItem(slot);
+        // Snapshotted once: getStorageContents() copies the whole inventory on every call, so reading
+        // it in the loop condition would clone it once per slot examined.
+        ItemStack[] contents = target.getInventory().getStorageContents();
+        for (int slot = 0; slot < contents.length && free.size() < wanted; slot++) {
+            ItemStack existing = contents[slot];
             if (existing == null || existing.getType() == Material.AIR) free.add(slot);
         }
         return free;
