@@ -29,6 +29,8 @@ import io.github.salyvn.omnipet.core.skill.SkillCastResult;
 import io.github.salyvn.omnipet.core.skill.SkillProvider;
 import io.github.salyvn.omnipet.core.skill.SkillTrigger;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
+import io.github.salyvn.omnipet.paper.feedback.Feedback;
+import io.github.salyvn.omnipet.paper.feedback.FeedbackEvent;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -127,7 +129,8 @@ public final class PaperActiveSkillController {
                 return;
             }
             if (Math.random() >= binding.chance()) {
-                finish(playerId, Messages.line(MessageKey.SKILL_CHANCE_MISSED));
+                finish(playerId, Messages.line(MessageKey.SKILL_CHANCE_MISSED),
+                        FeedbackEvent.SKILL_CHANCE_MISSED);
                 return;
             }
             UUID actionId = UUID.randomUUID();
@@ -138,7 +141,7 @@ public final class PaperActiveSkillController {
             if (prepared.status() != RepositorySkillActionResult.Status.PREPARED
                     && prepared.status() != RepositorySkillActionResult.Status.ALREADY_PREPARED) {
                 finish(playerId, Messages.line(MessageKey.SKILL_REJECTED,
-                        Messages.of("status", words(prepared.status()))));
+                        Messages.of("status", words(prepared.status()))), FeedbackEvent.SKILL_REJECTED);
                 return;
             }
             runMain(playerId, () -> castPrepared(playerId, petId, binding, actionId));
@@ -180,7 +183,7 @@ public final class PaperActiveSkillController {
             RepositorySkillActionResult result = actions.complete(
                     playerId, current.revision(), petId, actionId, System.currentTimeMillis(), progression.maxStamina());
             if (result.status() == RepositorySkillActionResult.Status.COMPLETED) {
-                finish(playerId, Messages.line(MessageKey.SKILL_SUCCEEDED));
+                finish(playerId, Messages.line(MessageKey.SKILL_SUCCEEDED), FeedbackEvent.SKILL_SUCCEEDED);
             } else {
                 finish(playerId, Messages.line(MessageKey.SKILL_COMPLETION_NEEDS_REVIEW,
                         Messages.of("status", words(result.status()))));
@@ -261,10 +264,21 @@ public final class PaperActiveSkillController {
     }
 
     private void finish(UUID playerId, Component text) {
+        finish(playerId, text, null);
+    }
+
+    /**
+     * Every skill outcome funnels through here, so the cue attaches once rather than at each of the
+     * dozen call sites that report a status.
+     */
+    private void finish(UUID playerId, Component text, FeedbackEvent event) {
         inFlight.remove(playerId);
         runMain(playerId, () -> {
             Player player = Bukkit.getPlayer(playerId);
-            if (player != null && player.isOnline()) player.sendMessage(text);
+            if (player != null && player.isOnline()) {
+                player.sendMessage(text);
+                Feedback.emit(player, event);
+            }
         });
     }
 

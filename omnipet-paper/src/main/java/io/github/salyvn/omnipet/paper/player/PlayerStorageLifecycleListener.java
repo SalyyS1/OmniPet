@@ -14,6 +14,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.entity.Player;
 
+import io.github.salyvn.omnipet.paper.feedback.Feedback;
 import io.github.salyvn.omnipet.paper.runtime.PaperPetRuntimeCoordinator;
 
 public final class PlayerStorageLifecycleListener implements Listener {
@@ -91,6 +92,9 @@ public final class PlayerStorageLifecycleListener implements Listener {
 
     private void ownerQuit(java.util.UUID ownerId) {
         if (runtime != null) runtime.ownerQuit(ownerId);
+        // Without this the rate limiter retains one entry per player who has ever clicked, for the
+        // server's lifetime. Fires on kick as well as quit, since both paths reach here.
+        Feedback.release(ownerId);
         ownerCleanup.accept(ownerId);
     }
 

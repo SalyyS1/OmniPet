@@ -18,6 +18,8 @@ import io.github.salyvn.omnipet.core.domain.PetDefinition;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository;
 import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
 import io.github.salyvn.omnipet.core.progression.ProgressionMutationContext;
+import io.github.salyvn.omnipet.paper.feedback.Feedback;
+import io.github.salyvn.omnipet.paper.feedback.FeedbackEvent;
 import io.github.salyvn.omnipet.paper.gui.player.PetManagementInventoryHolder;
 import io.github.salyvn.omnipet.paper.gui.player.PetManagementMenuRenderer;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
@@ -164,6 +166,10 @@ final class PetManagementMenuSupport {
                     ? outcome.status().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ')
                     : outcome.detail();
             message(player, text, color);
+            // The colour already encodes the distinction: yellow means "try again", red means refused.
+            Feedback.emit(player, color == NamedTextColor.YELLOW
+                    ? FeedbackEvent.PET_REQUEST_IN_FLIGHT
+                    : FeedbackEvent.PET_TOGGLE_REJECTED);
             if (outcome.status() == PetManagementOutcome.Status.STALE_SESSION
                     || outcome.status() == PetManagementOutcome.Status.PET_NOT_FOUND) {
                 retireAndClose(player, request);

@@ -18,6 +18,8 @@ import io.github.salyvn.omnipet.core.storage.PetStorageResult;
 import io.github.salyvn.omnipet.core.storage.PetStorageSnapshot;
 import io.github.salyvn.omnipet.core.storage.RepositoryPetStorageService;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetInventoryHolder;
+import io.github.salyvn.omnipet.paper.feedback.Feedback;
+import io.github.salyvn.omnipet.paper.feedback.FeedbackEvent;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuRenderer;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
@@ -163,6 +165,7 @@ public final class PlayerPetController {
         UUID playerId = player.getUniqueId();
         if (!mutationsInFlight.add(playerId)) {
             player.sendMessage(Messages.line(MessageKey.VAULT_CHANGE_IN_FLIGHT));
+            Feedback.blocked(player, FeedbackEvent.PET_REQUEST_IN_FLIGHT);
             return;
         }
         PetStorageLimits limits;
@@ -184,7 +187,7 @@ public final class PlayerPetController {
                             : storage.activate(playerId, holder.expectedRevision(), action.petId(), limits);
                     publishSnapshot(result.snapshot());
                     completeUi(player, playerId, request, expectedTop, true,
-                            () -> showMutationResult(player, holder.page(), result));
+                            () -> showMutationResult(player, holder.page(), result, action.active()));
                 } catch (StaleRevisionException stale) {
                     completeUi(player, playerId, request, expectedTop, true, () -> {
                         player.sendMessage(Messages.line(MessageKey.VAULT_REFRESHED));
@@ -236,10 +239,14 @@ public final class PlayerPetController {
         }
     }
 
-    private void showMutationResult(Player player, int page, PetStorageResult result) {
+    private void showMutationResult(Player player, int page, PetStorageResult result, boolean wasActive) {
         if (!result.succeeded()) {
             player.sendMessage(Messages.line(MessageKey.VAULT_MUTATION_REJECTED,
                     Messages.of("status", words(result.status()))));
+            Feedback.failure(player, FeedbackEvent.PET_TOGGLE_REJECTED);
+        } else {
+            // Activating and recalling previously differed only by a silent re-render.
+            Feedback.success(player, wasActive ? FeedbackEvent.PET_RECALLED : FeedbackEvent.PET_ACTIVATED);
         }
         player.openInventory(renderer.render(player, result.snapshot(), page));
     }

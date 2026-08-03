@@ -36,6 +36,12 @@ import io.github.salyvn.omnipet.paper.catalog.PaperStatCatalogContext;
 import io.github.salyvn.omnipet.paper.catalog.ReflectiveMythicLibStatCatalogSource;
 import io.github.salyvn.omnipet.paper.catalog.StatCatalogLifecycleListener;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfig;
+import io.github.salyvn.omnipet.paper.config.GuiConfig;
+import io.github.salyvn.omnipet.paper.config.GuiSettings;
+import io.github.salyvn.omnipet.paper.feedback.BukkitFeedbackOutput;
+import io.github.salyvn.omnipet.paper.feedback.Feedback;
+import io.github.salyvn.omnipet.paper.feedback.FeedbackService;
+import io.github.salyvn.omnipet.paper.feedback.FeedbackSettings;
 import io.github.salyvn.omnipet.paper.config.OmniPetConfig;
 import io.github.salyvn.omnipet.paper.config.OmniPetConfigLoader;
 import io.github.salyvn.omnipet.paper.economy.EconomyProviderLifecycleListener;
@@ -97,6 +103,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private SlotTransactionAdminController transactionAdmin;
     private Path configFile;
     private OmniPetConfig activeConfig;
+    private FeedbackService feedback;
     private PaperMythicMobsSkillContext skillProviders;
     private PaperActiveSkillController activeSkills;
     private OmniPetManagementServices managementServices;
@@ -117,6 +124,12 @@ public final class OmniPetPlugin extends JavaPlugin {
             }
             if (!Files.exists(configFile, LinkOption.NOFOLLOW_LINKS)) saveResource("config.yml", false);
             activeConfig = loadConfig();
+            // Bound before any renderer or the Studio is constructed: those read their page sizes and
+            // prompt timeout once, which is what makes those keys restart-only.
+            GuiSettings.bind(activeConfig.gui());
+            feedback = new FeedbackService(
+                    new BukkitFeedbackOutput(), resolveFeedback(activeConfig.gui().feedback()));
+            Feedback.bind(feedback);
             messagesFile = dataRoot.resolve("messages.yml");
             MessageCatalogFile.writeDefaultsIfAbsent(messagesFile);
             Messages.bind(loadMessages());
@@ -271,6 +284,9 @@ public final class OmniPetPlugin extends JavaPlugin {
         if (transactionAdmin != null) transactionAdmin.close();
         if (studio != null) studio.onDisable();
         Messages.unbind();
+        GuiSettings.unbind();
+        if (feedback != null) feedback.clear();
+        Feedback.unbind();
     }
 
     private void migrateLegacyEggDefinitions(Path dataRoot) throws IOException {
@@ -311,6 +327,9 @@ public final class OmniPetPlugin extends JavaPlugin {
         try {
             OmniPetConfig staged = loadConfig();
             MessageCatalog stagedMessages = loadMessages();
+            // Resolved before anything is swapped: an unknown sound name in the new config must not
+            // leave feedback half-applied.
+            FeedbackSettings stagedFeedback = resolveFeedback(staged.gui().feedback());
             Phase4PaperConfig stagedConfig = staged.storage();
             if (!studio.reload()) return false;
             PaperStorageLimitsResolver nextLimits = new PaperStorageLimitsResolver(stagedConfig);
@@ -328,6 +347,8 @@ public final class OmniPetPlugin extends JavaPlugin {
                 getLogger().warning("Runtime scheduler settings changed; restart the server to activate them safely.");
             }
             activeConfig = staged;
+            GuiSettings.bind(staged.gui());
+            feedback.apply(stagedFeedback);
             Messages.bind(stagedMessages);
             petRuntime.reload(registry.current());
             getServer().getOnlinePlayers().forEach(playerPets::reconcile);
@@ -338,10 +359,19 @@ public final class OmniPetPlugin extends JavaPlugin {
         }
     }
 
-    private OmniPetConfig loadConfig() throws IOException {
-        if (Files.isSymbolicLink(configFile)) throw new IOException("OmniPet config.yml cannot be a symbolic link");
+    /**
+     * Resolves configured sound names against this server. Unknown names warn and silence one
+     * category rather than failing, so an operator's typo on an unexpected Paper version costs a
+     * noise, not the plugin.
+     */
+    private FeedbackSettings resolveFeedback(GuiConfig.Feedback config) {
+        return FeedbackSettings.resolve(config, warning -> getLogger().warning("OmniPet feedback: " + warning));
+    }
+
+    private OmniPetConfig loadConfig() throws IOException {        if (Files.isSymbolicLink(configFile)) throw new IOException("OmniPet config.yml cannot be a symbolic link");
         OmniPetConfigLoader loader = new OmniPetConfigLoader();
-        OmniPetConfigLoader.LoadResult result = loader.load(configFile);
+        OmniPetConfigLoader.LoadResult result = loader.load(
+                configFile, warning -> getLogger().warning("OmniPet config.yml: " + warning));
         if (result.migratedLegacy()) {
             new AtomicFileStore().write(configFile, loader.encode(result.config()).getBytes(StandardCharsets.UTF_8));
             getLogger().info("Migrated legacy config to the OmniPet aggregate schema; original kept as config.yml.bak.");

@@ -25,6 +25,8 @@ import io.github.salyvn.omnipet.paper.incubation.action.IncubationActionItemCont
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
+import io.github.salyvn.omnipet.paper.feedback.Feedback;
+import io.github.salyvn.omnipet.paper.feedback.FeedbackEvent;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -165,12 +167,14 @@ public final class PlayerHatchController {
         Inventory expectedTop = player.getOpenInventory().getTopInventory();
         if (!mutations.add(playerId)) {
             message(player, MessageKey.HATCH_ACTION_IN_FLIGHT);
+            Feedback.blocked(player, FeedbackEvent.PET_REQUEST_IN_FLIGHT);
             return;
         }
         long actionRequest = mutationRequests.begin(playerId);
         try {
             boolean accepted = coordinator.start(player, hand);
             message(player, accepted ? MessageKey.HATCH_START_QUEUED : MessageKey.HATCH_START_NOT_QUEUED);
+            Feedback.emit(player, accepted ? FeedbackEvent.HATCH_QUEUED : FeedbackEvent.HATCH_REJECTED);
             if (!accepted) {
                 mutations.remove(playerId);
                 mutationRequests.invalidate(playerId);
@@ -182,6 +186,7 @@ public final class PlayerHatchController {
             mutations.remove(playerId);
             mutationRequests.invalidate(playerId);
             message(player, MessageKey.HATCH_START_FAILED);
+            Feedback.failure(player, FeedbackEvent.HATCH_REJECTED);
             plugin.getLogger().warning("Egg start failed for " + playerId + ": " + failure.getMessage());
         }
     }
@@ -304,14 +309,19 @@ public final class PlayerHatchController {
             if (player.getOpenInventory().getTopInventory() != expectedTop) return;
             if (failure != null) {
                 player.sendMessage(failure);
+                Feedback.failure(player, FeedbackEvent.HATCH_REJECTED);
             } else if (result.status() == HatchResult.Status.CLAIMED) {
                 message(player, MessageKey.HATCH_CLAIMED);
+                Feedback.success(player, FeedbackEvent.HATCH_CLAIMED);
             } else {
                 player.sendMessage(Messages.line(
                         result.succeeded()
                                 ? MessageKey.HATCH_CLAIM_RESULT
                                 : MessageKey.HATCH_CLAIM_RESULT_REJECTED,
                         Messages.of("status", words(result.status()))));
+                Feedback.emit(player, result.succeeded()
+                        ? FeedbackEvent.HATCH_CLAIMED
+                        : FeedbackEvent.HATCH_REJECTED);
             }
             open(player);
         });
