@@ -36,37 +36,46 @@ public final class PlayerPetMenuRenderer {
     }
 
     public Inventory render(Player player, PetStorageSnapshot snapshot, int requestedPage) {
-        int pages = Math.max(1, (snapshot.pets().size() + petsPerPage - 1) / petsPerPage);
-        int page = Math.max(1, Math.min(requestedPage, pages));
+        return render(player, snapshot, VaultViewState.page(requestedPage));
+    }
+
+    public Inventory render(Player player, PetStorageSnapshot snapshot, VaultViewState requested) {
+        VaultPetView view = VaultPetView.of(snapshot, requested, petsPerPage);
+        VaultViewState state = requested.withPage(view.page());
         Map<Integer, PlayerPetInventoryHolder.Action> actions = new HashMap<>();
         PlayerPetInventoryHolder holder = new PlayerPetInventoryHolder(
-                player.getUniqueId(), snapshot.revision(), page, actions);
+                player.getUniqueId(), snapshot.revision(), state, actions);
         Inventory inventory = Bukkit.createInventory(holder, 54, Messages.line(
-                MessageKey.GUI_TITLE_VAULT, Messages.of("page", page), Messages.of("pages", pages)));
+                MessageKey.GUI_TITLE_VAULT,
+                Messages.of("page", view.page()), Messages.of("pages", view.pages())));
         holder.bind(inventory);
         fill(inventory);
 
-        int start = (page - 1) * petsPerPage;
-        for (int index = start; index < Math.min(start + petsPerPage, snapshot.pets().size()); index++) {
-            PetInstance pet = snapshot.pets().get(index);
+        List<PetInstance> pets = view.pets();
+        for (int index = 0; index < pets.size(); index++) {
+            PetInstance pet = pets.get(index);
             boolean active = snapshot.desiredActivePetIds().contains(pet.id());
-            int slot = index - start;
-            actions.put(slot, PlayerPetInventoryHolder.Action.pet(pet.id(), active));
-            inventory.setItem(slot, petRow(pet, active));
+            actions.put(index, PlayerPetInventoryHolder.Action.pet(pet.id(), active));
+            inventory.setItem(index, petRow(pet, active));
         }
+        VaultMenuControls.paintEmptyState(inventory, state, view);
 
-        if (page > 1) {
+        if (!view.firstPage()) {
             actions.put(45, PlayerPetInventoryHolder.Action.previous());
             inventory.setItem(45, GuiItems.of(Material.ARROW,
                     Messages.line(MessageKey.GUI_VAULT_PREVIOUS), List.of()));
         }
-        if (page < pages) {
+        if (view.lastPage()) {
+            // A vanishing arrow reads as a glitch, so the last page says it is the last page.
+            VaultMenuControls.paintLastPage(inventory, view);
+        } else {
             actions.put(53, PlayerPetInventoryHolder.Action.next());
             inventory.setItem(53, GuiItems.of(Material.ARROW,
                     Messages.line(MessageKey.GUI_VAULT_NEXT), List.of()));
         }
+        VaultMenuControls.paint(inventory, actions, state, view);
         inventory.setItem(49, vaultStatus(snapshot));
-        // Slot 48 is free: 45/49/50/53 are taken by paging, status, and slot purchase.
+        // 45/49/50/53 are paging, status, and slot purchase; 48 is the hub; 46/47 are sort and filter.
         actions.put(48, PlayerPetInventoryHolder.Action.hub());
         inventory.setItem(48, GuiItems.of(Material.COMPASS,
                 Messages.line(MessageKey.HUB_BACK), List.of()));
@@ -88,6 +97,7 @@ public final class PlayerPetMenuRenderer {
     private static ItemStack petRow(PetInstance pet, boolean active) {
         VaultPetSummary summary = VaultPetSummary.of(pet);
         List<Component> lore = new ArrayList<>();
+        if (summary.favorite()) lore.add(Messages.line(MessageKey.GUI_VAULT_PET_FAVORITE));
         summary.level().ifPresent(level -> lore.add(
                 Messages.line(MessageKey.GUI_VAULT_PET_LEVEL, Messages.of("level", level))));
         summary.rarity().ifPresent(rarity -> lore.add(Messages.line(
@@ -115,9 +125,9 @@ public final class PlayerPetMenuRenderer {
                 Messages.of("amount", snapshot.desiredActivePetIds().size()),
                 Messages.of("total", snapshot.effectiveActiveSlotCount())));
         lore.add(Component.empty());
-        lore.add(Messages.line(overflow
-                ? MessageKey.GUI_VAULT_OVERFLOW
-                : MessageKey.GUI_VAULT_PROVIDER_NOTE));
+        // Overflow names both remedies rather than reporting a bare count the player cannot act on.
+        if (overflow) lore.addAll(VaultMenuControls.overflowLore());
+        else lore.add(Messages.line(MessageKey.GUI_VAULT_PROVIDER_NOTE));
         return GuiItems.of(
                 overflow ? Material.RED_STAINED_GLASS : Material.ENDER_CHEST,
                 Messages.line(MessageKey.GUI_VAULT_STATUS).color(GuiColors.availability(!overflow)),

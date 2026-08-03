@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import io.github.salyvn.omnipet.core.domain.PetInstance;
+import io.github.salyvn.omnipet.core.management.PetManagementMetadata;
 
 /**
  * Null-safe read of the few pet values a vault row shows.
@@ -21,10 +22,12 @@ import io.github.salyvn.omnipet.core.domain.PetInstance;
 public final class VaultPetSummary {
     private final Integer level;
     private final String rarity;
+    private final boolean favorite;
 
-    private VaultPetSummary(Integer level, String rarity) {
+    private VaultPetSummary(Integer level, String rarity, boolean favorite) {
         this.level = level;
         this.rarity = rarity;
+        this.favorite = favorite;
     }
 
     public static VaultPetSummary of(PetInstance pet) {
@@ -32,7 +35,10 @@ public final class VaultPetSummary {
         Map<String, Object> components = pet.rawComponents();
         return new VaultPetSummary(
                 readLevel(nested(components, "progression")),
-                readRarity(nested(components, "hatching")));
+                readRarity(nested(components, "hatching")),
+                // Pure and I/O-free: read off the already-loaded instance's extensions, and safe on a
+                // pet that has no management node at all.
+                PetManagementMetadata.read(pet).favorite());
     }
 
     /** The pet's level, or empty when absent or not an exact integer. */
@@ -43,6 +49,11 @@ public final class VaultPetSummary {
     /** The pet's rarity ID, or empty when absent or blank. */
     public Optional<String> rarity() {
         return Optional.ofNullable(rarity);
+    }
+
+    /** Whether the player marked this pet a favorite. */
+    public boolean favorite() {
+        return favorite;
     }
 
     private static Map<?, ?> nested(Map<String, Object> components, String key) {

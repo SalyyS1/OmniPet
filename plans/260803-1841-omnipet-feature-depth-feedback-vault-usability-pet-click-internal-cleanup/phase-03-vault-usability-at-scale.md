@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Vault usability at scale"
-status: pending
+status: complete
 priority: P1
 effort: "1d"
 dependencies: [2]

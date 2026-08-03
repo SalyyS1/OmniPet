@@ -12,16 +12,31 @@ public final class PlayerPetInventoryHolder implements InventoryHolder {
     private final UUID viewerId;
     private final long expectedRevision;
     private final int page;
+    private final VaultViewState view;
     private final Map<Integer, Action> actions;
     private Inventory inventory;
 
+    /** Retained so existing callers and their tests keep working; the view defaults to page-only. */
     public PlayerPetInventoryHolder(UUID viewerId, long expectedRevision, int page, Map<Integer, Action> actions) {
+        // Validated here rather than after conversion: VaultViewState clamps a page so that paging
+        // arithmetic cannot walk off the front, but a caller passing a page directly is stating a fact
+        // and a nonsense value is a bug worth surfacing.
+        this(viewerId, expectedRevision, requireOneBased(page), actions);
+    }
+
+    public PlayerPetInventoryHolder(
+            UUID viewerId, long expectedRevision, VaultViewState view, Map<Integer, Action> actions) {
         this.viewerId = Objects.requireNonNull(viewerId, "viewerId");
         if (expectedRevision < 0) throw new IllegalArgumentException("expected revision cannot be negative");
-        if (page < 1) throw new IllegalArgumentException("page must be one-based");
+        this.view = Objects.requireNonNull(view, "vault view state");
         this.expectedRevision = expectedRevision;
-        this.page = page;
+        this.page = view.page();
         this.actions = Collections.unmodifiableMap(actions == null ? Map.of() : actions);
+    }
+
+    private static VaultViewState requireOneBased(int page) {
+        if (page < 1) throw new IllegalArgumentException("page must be one-based");
+        return VaultViewState.page(page);
     }
 
     public void bind(Inventory inventory) {
@@ -34,6 +49,9 @@ public final class PlayerPetInventoryHolder implements InventoryHolder {
     public long expectedRevision() { return expectedRevision; }
 
     public int page() { return page; }
+
+    /** Sort, filter, and page, so a re-render can preserve what the player was looking at. */
+    public VaultViewState view() { return view; }
 
     public Action action(int rawSlot) { return actions.get(rawSlot); }
 
@@ -56,7 +74,11 @@ public final class PlayerPetInventoryHolder implements InventoryHolder {
         public static Action purchaseSlot() { return new Action(Type.PURCHASE_SLOT, null, false); }
 
         public static Action hub() { return new Action(Type.HUB, null, false); }
+
+        public static Action sort() { return new Action(Type.SORT, null, false); }
+
+        public static Action filter() { return new Action(Type.FILTER, null, false); }
     }
 
-    public enum Type { PET, PREVIOUS, NEXT, PURCHASE_SLOT, HUB }
+    public enum Type { PET, PREVIOUS, NEXT, PURCHASE_SLOT, HUB, SORT, FILTER }
 }

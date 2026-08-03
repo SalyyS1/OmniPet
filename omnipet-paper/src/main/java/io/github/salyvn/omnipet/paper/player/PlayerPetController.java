@@ -21,6 +21,7 @@ import io.github.salyvn.omnipet.paper.gui.player.PlayerPetInventoryHolder;
 import io.github.salyvn.omnipet.paper.feedback.Feedback;
 import io.github.salyvn.omnipet.paper.feedback.FeedbackEvent;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuRenderer;
+import io.github.salyvn.omnipet.paper.gui.player.VaultViewState;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerRequestTracker;
@@ -69,7 +70,12 @@ public final class PlayerPetController {
     }
 
     public void openVault(Player player, int page) {
+        openVault(player, VaultViewState.page(page));
+    }
+
+    public void openVault(Player player, VaultViewState view) {
         Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(view, "vault view state");
         if (shuttingDown) return;
         UUID playerId = player.getUniqueId();
         PetStorageLimits limits;
@@ -88,7 +94,7 @@ public final class PlayerPetController {
                     var snapshot = storage.snapshot(playerId, limits);
                     publishSnapshot(snapshot);
                     completeUi(player, playerId, request, expectedTop, false, () ->
-                            player.openInventory(renderer.render(player, snapshot, page)));
+                            player.openInventory(renderer.render(player, snapshot, view)));
                 } catch (IOException | RuntimeException failure) {
                     failAsync(player, playerId, request, "vault could not be loaded", failure);
                 }
@@ -112,8 +118,10 @@ public final class PlayerPetController {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (!isCurrentVault(player, holder)) return;
             switch (action.type()) {
-                case PREVIOUS -> openVault(player, holder.page() - 1);
-                case NEXT -> openVault(player, holder.page() + 1);
+                case PREVIOUS -> openVault(player, holder.view().withPage(holder.page() - 1));
+                case NEXT -> openVault(player, holder.view().withPage(holder.page() + 1));
+                case SORT -> cycleView(player, holder.view().cycleSort());
+                case FILTER -> cycleView(player, holder.view().cycleFilter());
                 case PET -> toggle(player, holder, action);
                 case PURCHASE_SLOT -> player.performCommand("pet slot " + holder.page());
                 case HUB -> {
@@ -161,6 +169,11 @@ public final class PlayerPetController {
         mutationsInFlight.clear();
     }
 
+    private void cycleView(Player player, VaultViewState next) {
+        Feedback.progress(player, FeedbackEvent.VAULT_VIEW_CHANGED);
+        openVault(player, next);
+    }
+
     private void toggle(Player player, PlayerPetInventoryHolder holder, PlayerPetInventoryHolder.Action action) {
         UUID playerId = player.getUniqueId();
         if (!mutationsInFlight.add(playerId)) {
@@ -187,11 +200,11 @@ public final class PlayerPetController {
                             : storage.activate(playerId, holder.expectedRevision(), action.petId(), limits);
                     publishSnapshot(result.snapshot());
                     completeUi(player, playerId, request, expectedTop, true,
-                            () -> showMutationResult(player, holder.page(), result, action.active()));
+                            () -> showMutationResult(player, holder.view(), result, action.active()));
                 } catch (StaleRevisionException stale) {
                     completeUi(player, playerId, request, expectedTop, true, () -> {
                         player.sendMessage(Messages.line(MessageKey.VAULT_REFRESHED));
-                        openVault(player, holder.page());
+                        openVault(player, holder.view());
                     });
                 } catch (IOException | RuntimeException failure) {
                     failAsync(player, playerId, request, true, "pet state could not be changed", failure);
@@ -239,7 +252,8 @@ public final class PlayerPetController {
         }
     }
 
-    private void showMutationResult(Player player, int page, PetStorageResult result, boolean wasActive) {
+    private void showMutationResult(
+            Player player, VaultViewState view, PetStorageResult result, boolean wasActive) {
         if (!result.succeeded()) {
             player.sendMessage(Messages.line(MessageKey.VAULT_MUTATION_REJECTED,
                     Messages.of("status", words(result.status()))));
@@ -248,7 +262,9 @@ public final class PlayerPetController {
             // Activating and recalling previously differed only by a silent re-render.
             Feedback.success(player, wasActive ? FeedbackEvent.PET_RECALLED : FeedbackEvent.PET_ACTIVATED);
         }
-        player.openInventory(renderer.render(player, result.snapshot(), page));
+        // Re-rendered at the player's own sort and filter: activating a pet must not silently
+        // reset the view they arranged.
+        player.openInventory(renderer.render(player, result.snapshot(), view));
     }
 
     private void completeUi(
