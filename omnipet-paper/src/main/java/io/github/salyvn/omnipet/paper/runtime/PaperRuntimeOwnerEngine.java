@@ -120,6 +120,12 @@ final class PaperRuntimeOwnerEngine {
         return activation.activeCount();
     }
 
+    /** Live renderers for one owner, used to reject a stale interaction-index entry. */
+    java.util.List<io.github.salyvn.omnipet.core.runtime.ActiveRendererSnapshot> activeRenderers(
+            java.util.UUID ownerId) {
+        return activation.activeRenderers(ownerId);
+    }
+
     private void reportInvalid(PaperRuntimeOwnerSnapshot snapshot) {
         SnapshotKey key = new SnapshotKey(snapshot.storageRevision(), snapshot.registryGeneration());
         if (key.equals(reportedInvalidSnapshots.get(snapshot.ownerId()))) return;

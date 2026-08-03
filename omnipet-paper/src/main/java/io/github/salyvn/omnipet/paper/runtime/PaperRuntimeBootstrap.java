@@ -24,15 +24,19 @@ public final class PaperRuntimeBootstrap {
         HeadFallbackRendererResolver renderers = new HeadFallbackRendererResolver(
                 new PaperModelEngineRendererResolver(plugin),
                 head);
+        // Retained rather than discarded: this index is already populated on spawn and purged on
+        // remove, so exposing it is all that stood between a rendered pet and a right-click.
+        InteractionIndex interactions = new InteractionIndex();
         return new PaperPetRuntimeCoordinator(
                 new BukkitPaperRuntimeScheduler(plugin),
                 settings,
-                new PetActivationService(new InteractionIndex()),
+                new PetActivationService(interactions),
                 new MovementController(),
                 renderers,
                 new BukkitPaperRuntimeOwnerPoseSource(),
                 System::nanoTime,
-                failure -> plugin.getLogger().warning(format(failure)));
+                failure -> plugin.getLogger().warning(format(failure)),
+                interactions);
     }
 
     private static String format(PaperRuntimeFailure failure) {

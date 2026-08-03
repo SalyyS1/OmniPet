@@ -49,6 +49,7 @@ import io.github.salyvn.omnipet.paper.economy.PaperEconomyProviderRegistry;
 import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
 import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegistry;
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
+import io.github.salyvn.omnipet.paper.gui.pet.PetInteractListener;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hub.HubMenuListener;
@@ -227,6 +228,10 @@ public final class OmniPetPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(
                     new PlayerPetMenuListener(playerPets, slotPurchases, managementServices.menu()), this);
             getServer().getPluginManager().registerEvents(managementServices.listener(), this);
+            // Only the plain interact event: PlayerInteractAtEntityEvent has its own HandlerList
+            // despite extending it, so registering both would deliver two events for one click.
+            getServer().getPluginManager().registerEvents(
+                    new PetInteractListener(petRuntime::petFor, managementServices.menu()::open), this);
             getServer().getPluginManager().registerEvents(
                     new PlayerStorageLifecycleListener(
                             playerPets, petRuntime, ownerBuffs::ownerQuit, managementServices::onJoin), this);

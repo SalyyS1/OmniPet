@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Pet click interaction"
-status: pending
+status: complete
 priority: P2
 effort: "0.5d"
 dependencies: [2]

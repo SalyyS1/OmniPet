@@ -6,12 +6,15 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshot;
 import io.github.salyvn.omnipet.core.runtime.ActivationRendererResolver;
+import io.github.salyvn.omnipet.core.runtime.InteractionIdentity;
+import io.github.salyvn.omnipet.core.runtime.InteractionIndex;
 import io.github.salyvn.omnipet.core.runtime.MovementController;
 import io.github.salyvn.omnipet.core.runtime.PetActivationService;
 import io.github.salyvn.omnipet.core.storage.PetStorageSnapshot;
@@ -22,6 +25,7 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
     private final PaperRuntimeSettings settings;
     private final PaperRuntimeFailureSink failures;
     private final PaperRuntimeOwnerEngine engine;
+    private final InteractionIndex interactions;
     private final Map<UUID, PaperRuntimeOwnerSnapshot> snapshots = new LinkedHashMap<>();
     private final Set<UUID> cleanupOwners = new LinkedHashSet<>();
     private PaperRuntimeScheduler.ScheduledTask task;
@@ -36,9 +40,28 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
             PaperRuntimeOwnerPoseSource poses,
             LongSupplier nanoTime,
             PaperRuntimeFailureSink failures) {
+        this(scheduler, settings, activation, movement, renderers, poses, nanoTime, failures, null);
+    }
+
+    /**
+     * @param interactions the same index handed to {@code activation}, so {@link #petFor(UUID)} can
+     *     answer entity lookups. Null when the caller does not need reverse lookup, in which case
+     *     {@code petFor} is always empty rather than throwing.
+     */
+    public PaperPetRuntimeCoordinator(
+            PaperRuntimeScheduler scheduler,
+            PaperRuntimeSettings settings,
+            PetActivationService activation,
+            MovementController movement,
+            ActivationRendererResolver renderers,
+            PaperRuntimeOwnerPoseSource poses,
+            LongSupplier nanoTime,
+            PaperRuntimeFailureSink failures,
+            InteractionIndex interactions) {
         this.scheduler = Objects.requireNonNull(scheduler, "runtime scheduler");
         this.settings = Objects.requireNonNull(settings, "runtime settings");
         this.failures = Objects.requireNonNull(failures, "runtime failure sink");
+        this.interactions = interactions;
         this.engine = new PaperRuntimeOwnerEngine(
                 Objects.requireNonNull(activation, "pet activation service"),
                 Objects.requireNonNull(movement, "movement controller"),
@@ -117,6 +140,28 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
 
     public int activePetCount() {
         return engine.activeCount();
+    }
+
+    /**
+     * Which pet, if any, a clicked entity belongs to.
+     *
+     * <p>Pure delegation to {@link InteractionIndex#resolve} plus a staleness check — deliberately no
+     * state of its own, so there is no second copy that could disagree with the index the activation
+     * service maintains. {@code resolve} is already {@code synchronized}, so this is not synchronized
+     * again.
+     *
+     * <p>An identity whose renderer generation no longer matches a live renderer is a leftover from a
+     * re-render and resolves to empty, so a click on it is treated as a click on someone else's entity.
+     */
+    public Optional<InteractionIdentity> petFor(UUID entityId) {
+        if (interactions == null || entityId == null) return Optional.empty();
+        return interactions.resolve(entityId).filter(this::isLive);
+    }
+
+    private boolean isLive(InteractionIdentity identity) {
+        return engine.activeRenderers(identity.ownerId()).stream()
+                .anyMatch(active -> active.petInstanceId().equals(identity.petInstanceId())
+                        && active.rendererGeneration() == identity.rendererGeneration());
     }
 
     public synchronized boolean started() {
