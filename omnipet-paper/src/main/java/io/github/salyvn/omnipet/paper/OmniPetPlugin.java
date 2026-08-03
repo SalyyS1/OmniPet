@@ -197,7 +197,9 @@ public final class OmniPetPlugin extends JavaPlugin {
                     registry,
                     new RepositoryPetStorageService(playerStates),
                     new PaperEggItemCodec(this),
-                    limitsResolver);
+                    limitsResolver,
+                    playerTasks,
+                    this);
             // Saving a definition in the Studio now also writes its egg, so a new pet is reachable.
             studio.bindEggs(eggAdmin);
             incubationCoordinator = new PaperIncubationCoordinator(

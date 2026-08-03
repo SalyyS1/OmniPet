@@ -236,6 +236,8 @@ Current required fields are `classification.tier`, `icon.head.source`, `icon.hea
 
 Admin Pet Studio can also persist bounded `stats`, `rarity.bands`, `progression`, `skills`, `behavior`, and `release` metadata. The editor validates these fields and preserves unknown raw nodes, but no hatching, progression, skill execution, release gameplay, or owner-stat application consumes them yet.
 
+`rarity.bands` is optional. A definition with no `rarity` node hatches against a single implicit full-range band (`standard`, quality 0-100, hatch multiplier 1.0), so a pet saved in the Studio without authoring a rarity profile is still obtainable. An explicit `rarity` node that is malformed is still rejected — only genuine absence defaults.
+
 ## Egg definition schema 1
 
 Save one file per egg, for example `plugins/OmniPet/eggs/tier_d_egg.yml`:

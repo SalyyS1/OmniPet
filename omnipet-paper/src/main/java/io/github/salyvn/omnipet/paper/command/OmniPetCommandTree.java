@@ -130,7 +130,8 @@ public final class OmniPetCommandTree {
                                 .permission("omnipet.admin.petgive"));
     }
 
-    private static CommandSpec.Builder adminHatch() {        return CommandSpec.of("hatch", "Inspect and administer incubation state")
+    private static CommandSpec.Builder adminHatch() {
+        return CommandSpec.of("hatch", "Inspect and administer incubation state")
                 .group()
                 .child(
                         CommandSpec.of("inspect", "Show durable incubation state for a player")

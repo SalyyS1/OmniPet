@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
@@ -14,6 +15,7 @@ import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import net.kyori.adventure.text.Component;
 
@@ -25,9 +27,12 @@ import io.github.salyvn.omnipet.core.domain.incubation.HatchCandidate;
 import io.github.salyvn.omnipet.core.incubation.IncubationDurationParser;
 import io.github.salyvn.omnipet.core.persistence.EggDefinitionRepository;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository;
+import io.github.salyvn.omnipet.core.persistence.StaleRevisionException;
+import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
 import io.github.salyvn.omnipet.core.storage.PetStorageResult;
 import io.github.salyvn.omnipet.core.storage.RepositoryPetStorageService;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
+import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
@@ -46,11 +51,22 @@ public final class EggAdminController {
     /** The default incubation time for an auto-created egg. */
     public static final String DEFAULT_DURATION = "1h";
 
+    /**
+     * How many times a grant re-reads the revision after losing a race.
+     *
+     * <p>Matches the vault's reconcile retry. A grant races anything that bumps the player's revision —
+     * a vault toggle, a hatch tick, a slot purchase — and each attempt re-reads, so a bounded retry
+     * converges without looping against a genuinely conflicting workload.
+     */
+    private static final int GRANT_ATTEMPTS = 3;
+
     private final EggDefinitionRepository eggs;
     private final RegistrySnapshotRepository registry;
     private final RepositoryPetStorageService storage;
     private final PaperEggItemCodec codec;
     private final PaperStorageLimitsResolver limits;
+    private final PerPlayerTaskQueue tasks;
+    private final Consumer<Runnable> mainDispatcher;
     private final Supplier<UUID> petIds;
 
     public EggAdminController(
@@ -58,8 +74,11 @@ public final class EggAdminController {
             RegistrySnapshotRepository registry,
             RepositoryPetStorageService storage,
             PaperEggItemCodec codec,
-            PaperStorageLimitsResolver limits) {
-        this(eggs, registry, storage, codec, limits, UUID::randomUUID);
+            PaperStorageLimitsResolver limits,
+            PerPlayerTaskQueue tasks,
+            JavaPlugin plugin) {
+        this(eggs, registry, storage, codec, limits, tasks,
+                task -> plugin.getServer().getScheduler().runTask(plugin, task), UUID::randomUUID);
     }
 
     EggAdminController(
@@ -68,12 +87,16 @@ public final class EggAdminController {
             RepositoryPetStorageService storage,
             PaperEggItemCodec codec,
             PaperStorageLimitsResolver limits,
+            PerPlayerTaskQueue tasks,
+            Consumer<Runnable> mainDispatcher,
             Supplier<UUID> petIds) {
         this.eggs = Objects.requireNonNull(eggs, "egg definition repository");
         this.registry = Objects.requireNonNull(registry, "pet registry");
         this.storage = Objects.requireNonNull(storage, "pet storage service");
         this.codec = Objects.requireNonNull(codec, "egg item codec");
         this.limits = Objects.requireNonNull(limits, "storage limits resolver");
+        this.tasks = Objects.requireNonNull(tasks, "player task queue");
+        this.mainDispatcher = Objects.requireNonNull(mainDispatcher, "main-thread dispatcher");
         this.petIds = Objects.requireNonNull(petIds, "pet id supplier");
     }
 
@@ -95,6 +118,8 @@ public final class EggAdminController {
         this.storage = null;
         this.codec = null;
         this.limits = null;
+        this.tasks = null;
+        this.mainDispatcher = null;
         this.petIds = UUID::randomUUID;
     }
 
@@ -124,28 +149,86 @@ public final class EggAdminController {
             sender.sendMessage("OmniPet: use /pet admin pet give <online-player> <definition-id>.");
             return;
         }
+        Player target;
+        PetDefinition definition;
         try {
-            Player target = requireOnline(values.get(1));
-            PetDefinition definition = requireDefinition(values.get(2));
-            grant(sender, target, definition);
-        } catch (IOException | IllegalArgumentException failure) {
+            // Resolved here, on the main thread: player lookup and permission checks are Bukkit calls
+            // and must not follow the repository work onto a worker.
+            target = requireOnline(values.get(1));
+            definition = requireDefinition(values.get(2));
+        } catch (IllegalArgumentException failure) {
             sender.sendMessage("OmniPet: pet grant failed - " + detail(failure) + ".");
+            return;
+        }
+        UUID playerId = target.getUniqueId();
+        String targetName = target.getName();
+        var resolved = limits.resolve(target::hasPermission).limits();
+        if (!tasks.submit(playerId, () -> {
+            try {
+                PetStorageResult result = grant(playerId, definition, resolved);
+                onMain(() -> {
+                    if (!result.succeeded()) {
+                        sender.sendMessage("OmniPet: pet not granted - " + Displays.words(result.status()) + ".");
+                        return;
+                    }
+                    sender.sendMessage("OmniPet: granted " + definition.id() + " to " + targetName + ".");
+                    Player online = Bukkit.getPlayer(playerId);
+                    if (online != null) online.sendMessage(Messages.line(MessageKey.VAULT_REFRESHED));
+                });
+            } catch (StaleRevisionException stale) {
+                // Exhausted the retries: another accepted task keeps winning the revision. Reporting a
+                // retryable conflict is honest; a raw IllegalStateException here would unwind into the
+                // command dispatcher and read as a plugin crash.
+                onMain(() -> sender.sendMessage(
+                        "OmniPet: pet not granted - " + targetName + "'s data changed during the grant; try again."));
+            } catch (IOException | RuntimeException failure) {
+                onMain(() -> sender.sendMessage("OmniPet: pet grant failed - " + detail(failure) + "."));
+            }
+        })) {
+            sender.sendMessage("OmniPet: pet grant could not be queued; service is shutting down.");
         }
     }
 
     /**
      * Creates the egg that lets a freshly-saved definition be obtained in game.
      *
-     * <p>Returns the ID when one was written, or empty when a catalog entry already existed. An
-     * existing entry is never overwritten: an operator may have tuned its duration or candidate pool
-     * by hand, and clobbering that to re-add a single candidate would destroy their work.
+     * <p>An existing entry is never overwritten: an operator may have tuned its duration or candidate
+     * pool by hand, and clobbering that to re-add a single candidate would destroy their work.
+     *
+     * <p>Tier is the exception, because it is a consistency constraint rather than tuning — the hatch
+     * roller refuses an egg whose tier disagrees with its candidate. Changing a pet's tier after its
+     * egg exists therefore makes that egg unhatchable, and the failure would otherwise surface only
+     * when a player tried to use it, as a queued hatch that never completes. That case is reported
+     * back to the operator instead of being silently skipped.
+     *
+     * @return what happened, so the caller can tell the operator
      */
-    public java.util.Optional<String> createCompanionEgg(PetDefinition definition) throws IOException {
+    public CompanionEgg createCompanionEgg(PetDefinition definition) throws IOException {
         Objects.requireNonNull(definition, "pet definition");
         String eggId = companionEggId(definition.id());
-        if (eggs.read(eggId).isPresent()) return java.util.Optional.empty();
+        var existing = eggs.read(eggId);
+        if (existing.isPresent()) {
+            return existing.get().definition().tier() == definition.tier()
+                    ? new CompanionEgg(eggId, CompanionEgg.Outcome.ALREADY_PRESENT)
+                    : new CompanionEgg(eggId, CompanionEgg.Outcome.TIER_MISMATCH);
+        }
         eggs.save(envelope(eggId, definition, IncubationDurationParser.parseMillis(DEFAULT_DURATION)));
-        return java.util.Optional.of(eggId);
+        return new CompanionEgg(eggId, CompanionEgg.Outcome.CREATED);
+    }
+
+    /** What {@link #createCompanionEgg} did, and which egg it was about. */
+    public record CompanionEgg(String eggId, Outcome outcome) {
+        public enum Outcome {
+            /** A new catalog entry was written. */
+            CREATED,
+            /** An entry already existed and is consistent with the definition. */
+            ALREADY_PRESENT,
+            /**
+             * An entry exists but its tier no longer matches the definition, so the hatch roller will
+             * refuse it. The operator has to re-create it with {@code /pet admin egg create}.
+             */
+            TIER_MISMATCH
+        }
     }
 
     /** The catalog ID an auto-created egg uses for a pet definition. */
@@ -194,31 +277,47 @@ public final class EggAdminController {
                 + ". Give it with /pet admin egg give <player> " + eggId + ".");
     }
 
-    private void grant(CommandSender sender, Player target, PetDefinition definition) throws IOException {
-        UUID playerId = target.getUniqueId();
-        var resolved = limits.resolve(target::hasPermission).limits();
-        var snapshot = storage.snapshot(playerId, resolved);
-        PetStorageResult result = storage.admit(playerId, snapshot.revision(), pet(definition), resolved);
-        if (!result.succeeded()) {
-            sender.sendMessage("OmniPet: pet not granted - " + Displays.words(result.status()) + ".");
-            return;
+    /**
+     * Admits the pet, re-reading the revision when it loses a race.
+     *
+     * <p>Runs on the player's task queue, so it is serialized against that player's other accepted
+     * work rather than competing with it for the file lock. Reading the revision and admitting under
+     * it are two separate lock acquisitions, so anything that bumps the revision in between — a vault
+     * toggle, a hatch tick, a slot purchase — makes the admit stale; each attempt observes again.
+     */
+    private PetStorageResult grant(UUID playerId, PetDefinition definition, PetStorageLimits resolved)
+            throws IOException {
+        StaleRevisionException lastConflict = null;
+        for (int attempt = 0; attempt < GRANT_ATTEMPTS; attempt++) {
+            try {
+                var snapshot = storage.snapshot(playerId, resolved);
+                return storage.admit(playerId, snapshot.revision(), pet(definition), resolved);
+            } catch (StaleRevisionException stale) {
+                lastConflict = stale;
+            }
         }
-        sender.sendMessage("OmniPet: granted " + definition.id() + " to " + target.getName() + ".");
-        target.sendMessage(Messages.line(MessageKey.VAULT_REFRESHED));
+        throw lastConflict;
+    }
+
+    private void onMain(Runnable task) {
+        mainDispatcher.accept(task);
     }
 
     /**
      * Builds the instance an admin grant produces.
      *
-     * <p>Shaped to match what {@code IncubationPetFactory} writes for a hatched pet, so a granted pet
-     * renders and cultivates identically. It has no {@code incubationId} because no incubation
-     * happened; {@code source} records that, so the difference is visible in the data instead of
-     * looking like a hatch that lost its ID.
+     * <p>Shaped like what {@code IncubationPetFactory} writes for a hatched pet, so a granted pet
+     * renders and cultivates the same way, with two deliberate omissions. There is no
+     * {@code incubationId} because no incubation happened, and no {@code rarityId} because that field
+     * holds a rarity <em>band</em> ID drawn from a roll that never ran — a pet tier is a different
+     * namespace, so writing one there would be read as an unknown band and scored as the weakest
+     * rarity, making an S-tier grant level at common-pet cost. Both readers already treat the field as
+     * optional. {@code source} records the provenance, so the difference is visible in the data rather
+     * than looking like a hatch that lost its ID.
      */
     private PetInstance pet(PetDefinition definition) {
         Map<String, Object> hatching = new java.util.LinkedHashMap<>();
         hatching.put("eggId", companionEggId(definition.id()));
-        hatching.put("rarityId", definition.tier().name());
         hatching.put("source", "admin-grant");
         Map<String, Object> components = new java.util.LinkedHashMap<>();
         components.put("hatching", hatching);

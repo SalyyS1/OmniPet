@@ -95,4 +95,42 @@ class DeterministicHatchRollServiceTest {
         assertThrows(IllegalArgumentException.class, () -> rolls.roll(
                 UUID.randomUUID(), IncubationTestFixtures.egg(1000), invalid, 1));
     }
+    @Test
+    void aPetWithNoAuthoredRarityStillHatches() {
+        // The Studio starts a new draft with no rarity bands and accepts a save that leaves it that
+        // way, and the generated raw node never synthesises a rarity node. Treating that absence as an
+        // error made every such pet unhatchable: its egg was minted and accepted, then the roll threw,
+        // so the player was told the hatch was queued and nothing ever happened.
+        RegistrySnapshot studioShaped = new RegistrySnapshot(1, Map.of("ember_fox", new PetDefinition(
+                "ember_fox",
+                1,
+                PetTier.D,
+                new HeadIcon("BASE64", "texture"),
+                new DisplayDefinition(DisplayDefinition.Provider.HEAD, null),
+                Map.of())));
+
+        var outcome = rolls.roll(UUID.randomUUID(), IncubationTestFixtures.egg(10_000), studioShaped, 42L)
+                .outcome();
+
+        assertEquals("ember_fox", outcome.definitionId());
+        assertTrue(outcome.qualityScore() >= 0 && outcome.qualityScore() <= 100);
+        assertEquals(10_000, outcome.totalActiveMillis(), "an implicit band must not scale duration");
+        assertTrue(outcome.rarityId() != null && !outcome.rarityId().isBlank(),
+                "the hatched pet still needs a band id, since the vault and progression views read it");
+    }
+
+    @Test
+    void anExplicitButMalformedRarityNodeIsStillRejected() {
+        // Only genuine absence defaults; a typo must not be silently swallowed into a default band.
+        RegistrySnapshot malformed = new RegistrySnapshot(1, Map.of("ember_fox", new PetDefinition(
+                "ember_fox",
+                1,
+                PetTier.D,
+                new HeadIcon("BASE64", "texture"),
+                new DisplayDefinition(DisplayDefinition.Provider.HEAD, null),
+                Map.of("rarity", "not-a-map"))));
+
+        assertThrows(IllegalArgumentException.class, () -> rolls.roll(
+                UUID.randomUUID(), IncubationTestFixtures.egg(1000), malformed, 1));
+    }
 }

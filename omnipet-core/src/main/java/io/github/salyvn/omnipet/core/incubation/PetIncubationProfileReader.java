@@ -14,10 +14,37 @@ import io.github.salyvn.omnipet.core.studio.StatRange;
 import io.github.salyvn.omnipet.core.studio.StudioStat;
 
 final class PetIncubationProfileReader {
+    /**
+     * The band used when a definition authors no rarity profile at all.
+     *
+     * <p>Full quality range and weight one, so it is selected unconditionally and rolls the same
+     * spread a single hand-authored band would. Named rather than blank because the ID is persisted on
+     * the hatched pet and read back by the vault and progression views.
+     */
+    private static final HatchRarityBand IMPLICIT_BAND =
+            new HatchRarityBand("standard", 0.0, 100.0, 1.0, 1.0, Map.of());
+
     PetIncubationProfile read(PetDefinition definition) {
         if (definition == null) throw new IllegalArgumentException("pet definition is required");
         Map<String, Object> raw = definition.rawNode();
-        return new PetIncubationProfile(definition, stats(raw.get("stats")), rarity(nested(raw, "rarity", "bands")));
+        return new PetIncubationProfile(definition, stats(raw.get("stats")), rarity(raw.get("rarity")));
+    }
+
+    /**
+     * Reads {@code rarity.bands}, defaulting to a single full-range band when the node is absent.
+     *
+     * <p>Rarity is optional for authoring: the Studio starts a new draft with no bands and accepts a
+     * save that leaves it that way. Treating that as a hard error made every such pet unhatchable —
+     * the egg minted for it was delivered and accepted, then the hatch threw deep in the roller, so
+     * the player was told the hatch was queued and nothing ever happened. An explicit but malformed
+     * node is still rejected; only genuine absence defaults.
+     */
+    private static List<HatchRarityBand> rarity(Object rarityNode) {
+        if (rarityNode == null) return List.of(IMPLICIT_BAND);
+        Object bands = objectMap(rarityNode, "rarity").get("bands");
+        if (bands == null) return List.of(IMPLICIT_BAND);
+        List<HatchRarityBand> parsed = bands(bands);
+        return parsed.isEmpty() ? List.of(IMPLICIT_BAND) : parsed;
     }
 
     private static List<StudioStat> stats(Object value) {
@@ -37,7 +64,7 @@ final class PetIncubationProfileReader {
         return List.copyOf(result);
     }
 
-    private static List<HatchRarityBand> rarity(Object value) {
+    private static List<HatchRarityBand> bands(Object value) {
         List<Map<String, Object>> nodes = listOfMaps(value, "rarity.bands");
         List<HatchRarityBand> result = new ArrayList<>(nodes.size());
         for (int index = 0; index < nodes.size(); index++) {
@@ -54,10 +81,6 @@ final class PetIncubationProfileReader {
                     extensions(node, "id", "qualityMin", "qualityMax", "weight", "hatchMultiplier")));
         }
         return List.copyOf(result);
-    }
-
-    private static Object nested(Map<String, Object> source, String parent, String child) {
-        return objectMap(source.get(parent), parent).get(child);
     }
 
     private static List<Map<String, Object>> listOfMaps(Object value, String path) {

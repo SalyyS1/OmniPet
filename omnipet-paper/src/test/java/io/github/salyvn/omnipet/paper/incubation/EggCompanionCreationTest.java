@@ -41,9 +41,10 @@ class EggCompanionCreationTest {
     void savingAPetCreatesAnEggThatHatchesExactlyThatPet() throws IOException {
         EggDefinitionRepository eggs = new YamlEggDefinitionRepository(root);
 
-        Optional<String> created = controller(eggs).createCompanionEgg(pet("ember_fox", PetTier.B));
+        var created = controller(eggs).createCompanionEgg(pet("ember_fox", PetTier.B));
 
-        assertEquals(Optional.of("ember_fox_egg"), created);
+        assertEquals("ember_fox_egg", created.eggId());
+        assertEquals(EggAdminController.CompanionEgg.Outcome.CREATED, created.outcome());
         EggDefinition definition = eggs.read("ember_fox_egg").orElseThrow().definition();
         assertEquals(List.of("ember_fox"), definition.candidates().stream()
                 .map(HatchCandidate::definitionId).toList());
@@ -65,9 +66,9 @@ class EggCompanionCreationTest {
                         new HatchCandidate("stone_wolf", 1.0, Map.of())),
                 Map.of())));
 
-        Optional<String> created = controller(eggs).createCompanionEgg(pet("ember_fox", PetTier.B));
+        var created = controller(eggs).createCompanionEgg(pet("ember_fox", PetTier.S));
 
-        assertTrue(created.isEmpty(), "an existing entry must be reported as not created");
+        assertEquals(EggAdminController.CompanionEgg.Outcome.ALREADY_PRESENT, created.outcome());
         EggDefinition kept = eggs.read("ember_fox_egg").orElseThrow().definition();
         assertEquals(2, kept.candidates().size(), "the operator's candidate pool must survive");
         assertEquals(Duration.ofDays(2).toMillis(), kept.baseActiveMillis());
@@ -80,8 +81,10 @@ class EggCompanionCreationTest {
         EggAdminController controller = controller(eggs);
         PetDefinition definition = pet("ember_fox", PetTier.D);
 
-        assertTrue(controller.createCompanionEgg(definition).isPresent());
-        assertTrue(controller.createCompanionEgg(definition).isEmpty(), "the second save must be a no-op");
+        assertEquals(EggAdminController.CompanionEgg.Outcome.CREATED,
+                controller.createCompanionEgg(definition).outcome());
+        assertEquals(EggAdminController.CompanionEgg.Outcome.ALREADY_PRESENT,
+                controller.createCompanionEgg(definition).outcome(), "the second save must be a no-op");
 
         assertEquals(1, eggs.list().size());
     }
@@ -128,6 +131,49 @@ class EggCompanionCreationTest {
         assertTrue(source.indexOf("service.save(state.draft") < source.indexOf("createCompanionEgg(player"),
                 "the egg is written after the definition, so its failure cannot affect the pet");
         assertTrue(source.contains("if (eggs == null"), "an unbound controller must be a no-op");
+    }
+
+    @Test
+    void retieringAPetReportsThatItsExistingEggCanNoLongerHatchIt() throws IOException {
+        // The hatch roller refuses an egg whose tier disagrees with its candidate, so a tier change
+        // after the egg exists makes it unhatchable. Silently keeping the stale egg turned that into a
+        // hatch the player is told was queued and that never completes.
+        EggDefinitionRepository eggs = new YamlEggDefinitionRepository(root);
+        EggAdminController controller = controller(eggs);
+        controller.createCompanionEgg(pet("ember_fox", PetTier.D));
+
+        var retiered = controller.createCompanionEgg(pet("ember_fox", PetTier.S));
+
+        assertEquals(EggAdminController.CompanionEgg.Outcome.TIER_MISMATCH, retiered.outcome());
+        assertEquals(PetTier.D, eggs.read("ember_fox_egg").orElseThrow().definition().tier(),
+                "reporting the mismatch must not overwrite the operator's egg");
+    }
+
+    @Test
+    void theStudioTellsTheOperatorWhenAnEggNoLongerMatchesItsPet() throws IOException {
+        String source = Files.readString(Path.of(
+                "src/main/java/io/github/salyvn/omnipet/paper/studio/bukkit/PetStudioController.java"));
+
+        assertTrue(source.contains("TIER_MISMATCH"),
+                "a stale egg is only fixable by the operator, so it must not be silent");
+    }
+
+    @Test
+    void theGrantPathDoesItsRepositoryWorkOffTheMainThread() throws IOException {
+        // A grant reads and writes player state through FilePlayerStateRepository, which takes a
+        // ReentrantLock plus an OS file lock and fsyncs. Doing that on the main thread parked the
+        // server for every online player whenever the target had a vault toggle in flight.
+        String source = Files.readString(Path.of(
+                "src/main/java/io/github/salyvn/omnipet/paper/incubation/EggAdminController.java"));
+
+        assertTrue(source.contains("tasks.submit(playerId"),
+                "the grant must be serialized on the player's queue like every other admin mutation");
+        assertTrue(source.indexOf("limits.resolve(target::hasPermission)") < source.indexOf("tasks.submit(playerId"),
+                "the permission check is a Bukkit call and must stay on the main thread");
+        // Losing the revision race is retryable, not a crash: StaleRevisionException extends
+        // IllegalStateException, so an uncaught one unwound into the command dispatcher.
+        assertTrue(source.contains("catch (StaleRevisionException"),
+                "a lost revision race must be reported as retryable, not escape into Brigadier");
     }
 
     private static EggAdminController controller(EggDefinitionRepository eggs) {

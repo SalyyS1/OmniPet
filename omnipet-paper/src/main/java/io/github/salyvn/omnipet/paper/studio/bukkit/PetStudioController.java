@@ -400,14 +400,21 @@ public final class PetStudioController {
      * obscure the definition write — the pet is the point, the egg is a convenience.
      *
      * <p>Never overwrites an existing entry, since an operator may have tuned its duration or
-     * candidate pool by hand.
+     * candidate pool by hand. A tier change is still reported, because the hatch roller rejects an egg
+     * whose tier disagrees with its pet and the operator is the only one who can fix it.
      */
     private void createCompanionEgg(Player player, PetDefinition definition) {
         if (eggs == null || !GuiSettings.gui().studioAutoCreateEgg()) return;
         try {
-            eggs.createCompanionEgg(definition).ifPresent(eggId -> player.sendMessage(
-                    "OmniPet: created egg " + eggId + "; give it with /pet admin egg give <player> "
-                            + eggId + "."));
+            var result = eggs.createCompanionEgg(definition);
+            switch (result.outcome()) {
+                case CREATED -> player.sendMessage("OmniPet: created egg " + result.eggId()
+                        + "; give it with /pet admin egg give <player> " + result.eggId() + ".");
+                case TIER_MISMATCH -> player.sendMessage("OmniPet: egg " + result.eggId()
+                        + " is still on the previous tier and will not hatch this pet. Re-create it with "
+                        + "/pet admin egg create " + result.eggId() + " " + definition.id() + ".");
+                case ALREADY_PRESENT -> { }
+            }
         } catch (IOException | RuntimeException failure) {
             plugin.getLogger().log(Level.WARNING,
                     "OmniPet could not create a companion egg for " + definition.id()

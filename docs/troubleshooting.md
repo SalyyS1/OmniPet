@@ -108,6 +108,11 @@ Saving a definition creates the pet's *blueprint*, not a pet in anyone's vault. 
   copied with a plugin that drops persistent data, will not work — mint it with `egg give`.
 - Each egg needs its own inventory slot. If delivery reports fewer slots than requested, free some
   space; eggs are deliberately not stackable because each carries a unique nonce.
+- If you changed a pet's tier after its companion egg existed, the Studio says the egg is still on the
+  previous tier. The hatch roller refuses that pairing, so re-create the egg with
+  `/pet admin egg create <definitionId>_egg <definitionId>`. Tier is the one field the Studio will not
+  silently leave stale, because the mismatch would otherwise appear only as a hatch that never
+  completes.
 
 ## Feedback is silent
 
