@@ -27,6 +27,7 @@ import io.github.salyvn.omnipet.core.persistence.PetReferenceScanner;
 import io.github.salyvn.omnipet.core.persistence.YamlPetDefinitionRepository;
 import io.github.salyvn.omnipet.core.studio.FileStudioAuditSink;
 import io.github.salyvn.omnipet.core.studio.PetDefinitionStudioService;
+import io.github.salyvn.omnipet.core.studio.StatModifierType;
 import io.github.salyvn.omnipet.core.studio.StudioPetDraft;
 import io.github.salyvn.omnipet.core.studio.input.StudioInputParsers;
 import io.github.salyvn.omnipet.paper.studio.input.ChatInputFailure;
@@ -149,26 +150,43 @@ public final class PetStudioController {
                 render(state, holder.screen());
             }
             case BACK -> {
-                if (holder.screen() == StudioInventoryHolder.Screen.STAT_PICKER) render(state, StudioInventoryHolder.Screen.EDITOR);
-                else openBrowse(player, state.tier, holder.screen() != StudioInventoryHolder.Screen.LIST);
+                if (holder.screen() == StudioInventoryHolder.Screen.STAT_MODIFIER) {
+                    // Abandoning the modifier choice must not leave it staged for the next stat.
+                    state.clearPendingStat();
+                    render(state, StudioInventoryHolder.Screen.STAT_PICKER);
+                } else if (holder.screen() == StudioInventoryHolder.Screen.STAT_PICKER) {
+                    state.clearPendingStat();
+                    render(state, StudioInventoryHolder.Screen.EDITOR);
+                } else {
+                    openBrowse(player, state.tier, holder.screen() != StudioInventoryHolder.Screen.LIST);
+                }
             }
             case EDIT_TIER -> editTier(state);
-            case EDIT_ICON -> awaitField(player, state, "icon.head", StudioDraftInputParsers::icon, state.draft::withIcon);
-            case EDIT_DISPLAY -> awaitField(player, state, "display", StudioDraftInputParsers::display, state.draft::withDisplay);
+            case EDIT_ICON -> awaitField(player, state, StudioFieldPrompt.ICON,
+                    StudioDraftInputParsers::icon, state.draft::withIcon);
+            case EDIT_DISPLAY -> awaitField(player, state, StudioFieldPrompt.DISPLAY,
+                    StudioDraftInputParsers::display, state.draft::withDisplay);
             case EDIT_STATS -> openStats(state);
             case CLONE -> awaitCloneId(player, state);
-            case EDIT_RARITY -> awaitField(player, state, "rarity", StudioDraftInputParsers::rarity, state.draft::withRarityBands);
-            case EDIT_PROGRESSION -> awaitField(player, state, "progression", StudioDraftInputParsers::progression, state.draft::withProgression);
-            case EDIT_SKILLS -> awaitField(player, state, "skills", StudioDraftInputParsers::skills, state.draft::withSkills);
-            case EDIT_BEHAVIOR -> awaitField(player, state, "behavior", StudioDraftInputParsers::behavior, state.draft::withBehaviorExtensions);
-            case EDIT_RELEASE -> awaitField(player, state, "release", StudioDraftInputParsers::release, state.draft::withReleasePolicy);
+            case EDIT_RARITY -> awaitField(player, state, StudioFieldPrompt.RARITY,
+                    StudioDraftInputParsers::rarity, state.draft::withRarityBands);
+            case EDIT_PROGRESSION -> awaitField(player, state, StudioFieldPrompt.PROGRESSION,
+                    StudioDraftInputParsers::progression, state.draft::withProgression);
+            case EDIT_SKILLS -> awaitField(player, state, StudioFieldPrompt.SKILLS,
+                    StudioDraftInputParsers::skills, state.draft::withSkills);
+            case EDIT_BEHAVIOR -> awaitField(player, state, StudioFieldPrompt.BEHAVIOR,
+                    StudioDraftInputParsers::behavior, state.draft::withBehaviorExtensions);
+            case EDIT_RELEASE -> awaitField(player, state, StudioFieldPrompt.RELEASE,
+                    StudioDraftInputParsers::release, state.draft::withReleasePolicy);
             case SAVE -> save(player, state);
             case CANCEL -> openBrowse(player, state.tier, true);
             case CONFIRM_ARCHIVE -> archive(player, state);
             case CANCEL_ARCHIVE -> render(state, StudioInventoryHolder.Screen.LIST);
             case HARD_DELETE -> awaitHardDelete(player, state);
-            case STAT -> awaitStat(player, state, action.value());
-            case STAT_MANUAL -> awaitField(player, state, "stats", StudioDraftInputParsers::stats, state.draft::withStats);
+            case STAT -> openStatModifiers(player, state, action.value());
+            case STAT_MODIFIER -> awaitStatRange(player, state, action.value());
+            case STAT_MANUAL -> awaitField(player, state, StudioFieldPrompt.STATS_MANUAL,
+                    StudioDraftInputParsers::stats, state.draft::withStats);
             case STAT_SEARCH -> awaitStatSearch(player, state);
             case STAT_REFRESH -> { statCatalog.invalidate(); openStats(state); }
         }
@@ -177,26 +195,82 @@ public final class PetStudioController {
     private void openStats(StudioState state) {
         state.statSnapshot = statCatalog.snapshot(registry.current().generation());
         state.statPage = 0;
+        state.clearPendingStat();
         render(state, StudioInventoryHolder.Screen.STAT_PICKER);
     }
 
-    private void awaitStat(Player player, StudioState state, String statId) {
+    /** First half of the stat flow: remember the stat and show the explained modifier choices. */
+    private void openStatModifiers(Player player, StudioState state, String statId) {
         state.statSnapshot = statCatalog.snapshot(registry.current().generation());
-        StatCatalogEntry entry = state.statSnapshot.entries().stream()
-                .filter(candidate -> candidate.id().equals(statId)).findFirst().orElse(null);
+        StatCatalogEntry entry = statEntry(state, statId);
         if (entry == null) {
+            state.clearPendingStat();
             player.sendMessage("OmniPet: selected stat is no longer in the catalog; reopen the picker.");
             return;
         }
-        awaitField(player, state, "stats." + entry.id(), raw -> StudioDraftInputParsers.catalogStat(raw, entry),
-                value -> state.draft.withStats(StudioDraftInputParsers.upsertStat(state.draft.stats(), value)),
+        if (entry.supportedModifierTypes().isEmpty()) {
+            state.clearPendingStat();
+            player.sendMessage("OmniPet: " + entry.displayName() + " declares no supported modifiers.");
+            return;
+        }
+        state.pendingStatId = entry.id();
+        state.pendingModifier = null;
+        render(state, StudioInventoryHolder.Screen.STAT_MODIFIER);
+    }
+
+    /**
+     * Second half: the modifier is chosen, so the prompt asks only for {@code min max}.
+     *
+     * <p>The parser still accepts the full {@code FLAT 10 50} form, so an operator who knows the
+     * syntax is not forced through the screen.
+     */
+    private void awaitStatRange(Player player, StudioState state, String modifierName) {
+        StatCatalogEntry entry = pendingStatEntry(state);
+        if (entry == null) {
+            state.clearPendingStat();
+            player.sendMessage("OmniPet: selected stat is no longer in the catalog; reopen the picker.");
+            return;
+        }
+        StatModifierType modifier;
+        try {
+            modifier = StatModifierType.valueOf(modifierName);
+        } catch (IllegalArgumentException invalid) {
+            state.clearPendingStat();
+            player.sendMessage("OmniPet: unknown stat modifier; reopen the picker.");
+            return;
+        }
+        if (!entry.supportedModifierTypes().contains(modifier)) {
+            player.sendMessage("OmniPet: " + entry.displayName() + " does not support "
+                    + StatModifierPresentation.label(modifier) + ".");
+            return;
+        }
+        state.pendingModifier = modifier;
+        awaitField(player, state, "stats." + entry.id(),
+                () -> StudioFieldPrompt.sendStatRange(player, entry.displayName(), modifier),
+                raw -> StudioDraftInputParsers.catalogStat(raw, entry, modifier),
+                value -> {
+                    state.clearPendingStat();
+                    return state.draft.withStats(
+                            StudioDraftInputParsers.upsertStat(state.draft.stats(), value));
+                },
                 StudioInventoryHolder.Screen.STAT_PICKER);
+    }
+
+    private StatCatalogEntry pendingStatEntry(StudioState state) {
+        return state.pendingStatId == null ? null : statEntry(state, state.pendingStatId);
+    }
+
+    private StatCatalogEntry statEntry(StudioState state, String statId) {
+        if (state.statSnapshot == null) return null;
+        return state.statSnapshot.entries().stream()
+                .filter(candidate -> candidate.id().equals(statId)).findFirst().orElse(null);
     }
 
     private void awaitStatSearch(Player player, StudioState state) {
         StudioViewToken inputToken = sessions.nextView(state.token);
         state.token = inputToken;
         sessions.setPendingInput(inputToken, true);
+        StudioFieldPrompt.STAT_SEARCH.send(player);
         player.closeInventory();
         PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "stats.search",
                 Duration.ofMinutes(2), raw -> {
@@ -255,6 +329,7 @@ public final class PetStudioController {
         StudioViewToken inputToken = sessions.nextView(state.token);
         state.token = inputToken;
         sessions.setPendingInput(inputToken, true);
+        StudioFieldPrompt.CLONE_ID.send(player);
         player.closeInventory();
         PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "clone.definition.id",
                 Duration.ofMinutes(2), raw -> {
@@ -326,9 +401,9 @@ public final class PetStudioController {
         StudioViewToken inputToken = sessions.nextView(state.token);
         state.token = inputToken;
         sessions.setPendingInput(inputToken, true);
-        player.closeInventory();
         player.sendMessage("OmniPet: type the exact definition ID '" + expectedId
                 + "' to permanently delete it, or type cancel.");
+        player.closeInventory();
         PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "hard-delete.confirmation",
                 Duration.ofMinutes(2), raw -> StudioDraftInputParsers.exactDefinitionId(raw, expectedId),
                 typedId -> hardDelete(player, state, inputToken, typedId),
@@ -358,6 +433,7 @@ public final class PetStudioController {
         StudioViewToken inputToken = sessions.nextView(state.token);
         state.token = inputToken;
         sessions.setPendingInput(inputToken, true);
+        StudioFieldPrompt.DEFINITION_ID.send(player);
         player.closeInventory();
         PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "definition.id", Duration.ofMinutes(2),
                 StudioInputParsers::parseStableId,
@@ -379,6 +455,7 @@ public final class PetStudioController {
         StudioViewToken inputToken = sessions.nextView(state.token);
         state.token = inputToken;
         sessions.setPendingInput(inputToken, true);
+        StudioFieldPrompt.LIST_SEARCH.send(player);
         player.closeInventory();
         PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "search", Duration.ofMinutes(2),
                 raw -> raw.trim().equalsIgnoreCase("none") ? "" : StudioInputParsers.parseStableId(raw.trim()),
@@ -392,16 +469,31 @@ public final class PetStudioController {
                 () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
     }
 
-    private <T> void awaitField(Player player, StudioState state, String path, ChatInputParser<T> parser,
-                                Function<T, StudioPetDraft> apply) {
-        awaitField(player, state, path, parser, apply, StudioInventoryHolder.Screen.EDITOR);
+    private <T> void awaitField(Player player, StudioState state, StudioFieldPrompt prompt,
+                                ChatInputParser<T> parser, Function<T, StudioPetDraft> apply) {
+        awaitField(player, state, prompt, parser, apply, StudioInventoryHolder.Screen.EDITOR);
     }
 
-    private <T> void awaitField(Player player, StudioState state, String path, ChatInputParser<T> parser,
-                                Function<T, StudioPetDraft> apply, StudioInventoryHolder.Screen resumeScreen) {
+    private <T> void awaitField(Player player, StudioState state, StudioFieldPrompt prompt,
+                                ChatInputParser<T> parser, Function<T, StudioPetDraft> apply,
+                                StudioInventoryHolder.Screen resumeScreen) {
+        awaitField(player, state, prompt.path(), () -> prompt.send(player), parser, apply, resumeScreen);
+    }
+
+    /**
+     * Closes the inventory and captures one chat line.
+     *
+     * <p>{@code sendPrompt} is required: this path used to close the inventory and wait silently, so
+     * the operator was given no format, no example, and no hint that {@code cancel} works. The prompt
+     * is sent immediately before the inventory closes so it is the last thing left on screen.
+     */
+    private <T> void awaitField(Player player, StudioState state, String path, Runnable sendPrompt,
+                                ChatInputParser<T> parser, Function<T, StudioPetDraft> apply,
+                                StudioInventoryHolder.Screen resumeScreen) {
         StudioViewToken inputToken = sessions.nextView(state.token);
         state.token = inputToken;
         sessions.setPendingInput(inputToken, true);
+        sendPrompt.run();
         player.closeInventory();
         PendingChatInput<T> input = inputs.await(player.getUniqueId(), inputToken, path, Duration.ofMinutes(2), parser,
                 value -> {
@@ -422,6 +514,8 @@ public final class PetStudioController {
             return;
         }
         sessions.setPendingInput(token, false);
+        // A cancelled or expired input leaves no staged modifier behind.
+        state.clearPendingStat();
         if (sessions.isCurrent(token)) render(state, resumeScreen);
     }
 
@@ -439,7 +533,9 @@ public final class PetStudioController {
         if (player == null || !sessions.isCurrent(state.token)) return;
         if (!sessions.touch(state.token)) return;
         state.token = sessions.nextView(state.token);
-        if (screen == StudioInventoryHolder.Screen.EDITOR || screen == StudioInventoryHolder.Screen.STAT_PICKER) {
+        if (screen == StudioInventoryHolder.Screen.EDITOR
+                || screen == StudioInventoryHolder.Screen.STAT_PICKER
+                || screen == StudioInventoryHolder.Screen.STAT_MODIFIER) {
             state.statSnapshot = statCatalog.snapshot(registry.current().generation());
         }
         Inventory inventory = switch (screen) {
@@ -448,6 +544,16 @@ public final class PetStudioController {
             case EDITOR -> renderer.editor(player, state);
             case ARCHIVE_CONFIRM -> renderer.archiveConfirm(player, state);
             case STAT_PICKER -> renderer.stats(player, state);
+            case STAT_MODIFIER -> {
+                StatCatalogEntry pending = pendingStatEntry(state);
+                // A refreshed catalog can drop the stat between the two clicks; fall back to the
+                // picker rather than rendering a modifier screen for something that no longer exists.
+                if (pending == null) {
+                    state.clearPendingStat();
+                    yield renderer.stats(player, state);
+                }
+                yield renderer.statModifiers(player, state, pending);
+            }
         };
         player.openInventory(inventory);
     }

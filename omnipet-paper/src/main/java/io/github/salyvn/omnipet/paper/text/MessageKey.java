@@ -115,7 +115,18 @@ public enum MessageKey {
     HELP_LINE("help.line", "<yellow><usage></yellow> <dark_gray>-</dark_gray> <gray><description></gray>"),
     HELP_FOOTER("help.footer", "<gray>More on <yellow>/pet help <page></yellow></gray>"),
     HELP_EMPTY("help.empty", "<yellow>OmniPet: You have no available commands.</yellow>"),
-    HELP_PAGE_INVALID("help.page-invalid", "<red>OmniPet: Help page must be a positive integer.</red>");
+    HELP_PAGE_INVALID("help.page-invalid", "<red>OmniPet: Help page must be a positive integer.</red>"),
+
+    // --- Studio chat prompts -----------------------------------------------------------------
+    // Every prompt states what is being edited, the format, an example, and how to abort. The
+    // Studio previously captured chat silently, which is why operators reported that nothing worked.
+    STUDIO_PROMPT_FIELD("studio.prompt.field", "<gold>OmniPet Studio</gold> <gray>-</gray> <yellow><field></yellow>"),
+    STUDIO_PROMPT_FORMAT("studio.prompt.format", "<gray>Format:</gray> <white><format></white>"),
+    STUDIO_PROMPT_EXAMPLE("studio.prompt.example", "<gray>Example:</gray> <white><example></white>"),
+    STUDIO_PROMPT_CANCEL("studio.prompt.cancel", "<gray>Type <yellow>cancel</yellow> to abort.</gray>"),
+    STUDIO_MODIFIER_PROMPT("studio.modifier.prompt",
+            "<gold>OmniPet Studio</gold> <gray>-</gray> <yellow><stat></yellow> <gray>(<modifier>)</gray>"),
+    STUDIO_MODIFIER_RANGE("studio.modifier.range", "<gray>Values:</gray> <white><detail></white>");
 
     private final String path;
     private final String defaultValue;

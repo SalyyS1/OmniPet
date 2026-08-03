@@ -10,6 +10,7 @@ import java.util.Map;
 import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
 import io.github.salyvn.omnipet.core.domain.DisplayDefinition;
 import io.github.salyvn.omnipet.core.domain.HeadIcon;
+import io.github.salyvn.omnipet.core.studio.HeadIconSources;
 import io.github.salyvn.omnipet.core.studio.ProgressionFields;
 import io.github.salyvn.omnipet.core.studio.RarityBand;
 import io.github.salyvn.omnipet.core.studio.ReleasePolicy;
@@ -24,14 +25,14 @@ import io.github.salyvn.omnipet.core.studio.input.StudioInputParsers;
 final class StudioDraftInputParsers {
     private StudioDraftInputParsers() {}
 
+    /**
+     * Accepts a pasted base64 payload, a texture URL, a bare 64-hex texture hash, or the legacy
+     * {@code <SOURCE> <value>} form. Detection and the authoritative rules both live in core, so a
+     * value accepted here cannot be rejected at Save.
+     */
     static HeadIcon icon(String input) {
-        String[] parts = required(input).split("\\s+", 2);
-        if (parts.length != 2) throw new IllegalArgumentException("expected: <TEXTURE_URL|BASE64|HEAD_CATALOG> <value>");
-        String source = parts[0].toUpperCase(Locale.ROOT);
-        if (!List.of("TEXTURE_URL", "BASE64", "HEAD_CATALOG").contains(source)) {
-            throw new IllegalArgumentException("unsupported head source: " + parts[0]);
-        }
-        return new HeadIcon(source, parts[1]);
+        HeadIconSources.Detected detected = HeadIconSources.detect(input);
+        return new HeadIcon(detected.source(), detected.value());
     }
 
     static DisplayDefinition display(String input) {
@@ -63,20 +64,45 @@ final class StudioDraftInputParsers {
         return List.copyOf(result);
     }
 
+    /** The legacy three-token form, kept so existing callers and tests are unaffected. */
     static StudioStat catalogStat(String input, StatCatalogEntry entry) {
+        return catalogStat(input, entry, null);
+    }
+
+    /**
+     * Parses a catalog stat range, optionally with the modifier already chosen by click.
+     *
+     * <p>Two tokens use {@code preselected}; three tokens read the modifier from the input and
+     * ignore it. The full form stays valid so an operator who knows the syntax can keep typing it.
+     */
+    static StudioStat catalogStat(String input, StatCatalogEntry entry, StatModifierType preselected) {
         String[] parts = required(input).split("\\s+");
-        if (parts.length != 3) throw new IllegalArgumentException("expected: <modifier> <min> <max>");
         StatModifierType modifier;
-        try {
-            modifier = StatModifierType.valueOf(parts[0].toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException error) {
-            throw new IllegalArgumentException("unknown modifier: " + parts[0], error);
+        String minimum;
+        String maximum;
+        if (parts.length == 2) {
+            if (preselected == null) throw new IllegalArgumentException("expected: <modifier> <min> <max>");
+            modifier = preselected;
+            minimum = parts[0];
+            maximum = parts[1];
+        } else if (parts.length == 3) {
+            try {
+                modifier = StatModifierType.valueOf(parts[0].toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException("unknown modifier: " + parts[0], error);
+            }
+            minimum = parts[1];
+            maximum = parts[2];
+        } else {
+            throw new IllegalArgumentException(preselected == null
+                    ? "expected: <modifier> <min> <max>"
+                    : "expected: <min> <max>");
         }
         if (!entry.supportedModifierTypes().contains(modifier)) {
             throw new IllegalArgumentException("modifier is not supported by " + entry.displayName());
         }
         return new StudioStat(entry.id(), modifier,
-                StudioInputParsers.parseRange(parts[1] + " " + parts[2]), entry.extensions());
+                StudioInputParsers.parseRange(minimum + " " + maximum), entry.extensions());
     }
 
     static List<StudioStat> upsertStat(List<StudioStat> current, StudioStat replacement) {

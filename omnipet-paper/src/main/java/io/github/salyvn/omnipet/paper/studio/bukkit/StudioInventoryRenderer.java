@@ -134,60 +134,24 @@ final class StudioInventoryRenderer {
     }
 
     Inventory stats(Player player, StudioState state) {
-        Map<Integer, StudioAction> actions = new HashMap<>();
-        StudioInventoryHolder holder = holder(state, StudioInventoryHolder.Screen.STAT_PICKER, actions);
-        Inventory inventory = create(holder, 54, "OmniPet Studio | Stats");
+        return StudioStatScreens.picker(state, StudioInventoryRenderer::screen);
+    }
+
+    Inventory statModifiers(Player player, StudioState state, StatCatalogEntry entry) {
+        return StudioStatScreens.modifiers(state, entry, StudioInventoryRenderer::screen);
+    }
+
+    /** Creates a bound, filled screen. Shared with {@link StudioStatScreens}. */
+    @FunctionalInterface
+    interface ScreenFactory {
+        Inventory create(StudioState state, StudioInventoryHolder.Screen screen,
+                         Map<Integer, StudioAction> actions, int size, String title);
+    }
+
+    private static Inventory screen(StudioState state, StudioInventoryHolder.Screen screen,
+                                    Map<Integer, StudioAction> actions, int size, String title) {
+        Inventory inventory = create(holder(state, screen, actions), size, title);
         fill(inventory);
-
-        List<StatCatalogEntry> entries = state.statSnapshot == null ? List.of() : state.statSnapshot.entries().stream()
-                .filter(entry -> state.statFilter.isBlank()
-                        || entry.id().toLowerCase(Locale.ROOT).contains(state.statFilter)
-                        || entry.displayName().toLowerCase(Locale.ROOT).contains(state.statFilter))
-                .sorted(Comparator.comparing(StatCatalogEntry::displayName).thenComparing(StatCatalogEntry::id))
-                .toList();
-        int pages = Math.max(1, (entries.size() + 44) / 45);
-        state.statPage = Math.max(0, Math.min(state.statPage, pages - 1));
-        int start = state.statPage * 45;
-        for (int index = start; index < Math.min(start + 45, entries.size()); index++) {
-            StatCatalogEntry entry = entries.get(index);
-            String logicalKey = StatLogicalIdentity.key(entry.id(), entry.extensions());
-            boolean selected = state.draft.stats().stream()
-                    .anyMatch(stat -> StatLogicalIdentity.key(stat).equals(logicalKey));
-            int slot = index - start;
-            actions.put(slot, new StudioAction(StudioActionType.STAT, entry.id()));
-            inventory.setItem(slot, item(selected ? Material.LIME_DYE : Material.PAPER,
-                    entry.displayName(), selected ? NamedTextColor.GREEN : NamedTextColor.AQUA,
-                    entry.id(), "Provider: " + entry.provider(),
-                    "Modifiers: " + entry.supportedModifierTypes(),
-                    selected ? "Selected - click to replace" : "Click to configure"));
-        }
-
-        if (state.statSnapshot == null || state.statSnapshot.health() != CatalogHealth.AVAILABLE) {
-            String detail = state.statSnapshot == null ? "Catalog snapshot is unavailable" : state.statSnapshot.detail();
-            inventory.setItem(22, item(Material.RED_STAINED_GLASS_PANE, "Dynamic catalog unavailable",
-                    NamedTextColor.RED, detail, "Manual stat IDs remain supported"));
-        } else if (entries.isEmpty()) {
-            inventory.setItem(22, item(Material.GRAY_DYE, "No matching stats", NamedTextColor.YELLOW,
-                    state.statFilter.isBlank() ? "MythicLib returned no registered stats" : "Change or clear search"));
-        }
-
-        actions.put(45, new StudioAction(StudioActionType.PREVIOUS, ""));
-        actions.put(46, new StudioAction(StudioActionType.STAT_MANUAL, ""));
-        actions.put(47, new StudioAction(StudioActionType.STAT_REFRESH, ""));
-        actions.put(49, new StudioAction(StudioActionType.BACK, ""));
-        actions.put(50, new StudioAction(StudioActionType.STAT_SEARCH, ""));
-        actions.put(53, new StudioAction(StudioActionType.NEXT, ""));
-        inventory.setItem(45, item(Material.ARROW, "Previous", NamedTextColor.YELLOW,
-                "Page " + (state.statPage + 1) + "/" + pages));
-        inventory.setItem(46, item(Material.WRITABLE_BOOK, "Manual stat list", NamedTextColor.GOLD,
-                "Supports legacy/bare IDs", "Format: id MODIFIER min max;..."));
-        inventory.setItem(47, item(Material.CLOCK, "Refresh provider catalog", NamedTextColor.YELLOW,
-                "Use after MythicLib or MMOItems reloads"));
-        inventory.setItem(49, item(Material.ARROW, "Back to editor", NamedTextColor.YELLOW));
-        inventory.setItem(50, item(Material.COMPASS, "Search stats", NamedTextColor.AQUA,
-                state.statFilter.isBlank() ? "No filter" : "Filter: " + state.statFilter));
-        inventory.setItem(53, item(Material.ARROW, "Next", NamedTextColor.YELLOW,
-                "Page " + (state.statPage + 1) + "/" + pages));
         return inventory;
     }
 
@@ -226,7 +190,8 @@ final class StudioInventoryRenderer {
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, pane);
     }
 
-    private static ItemStack item(Material material, String name, NamedTextColor color, String... lore) {
+    /** Shared with {@link StudioStatScreens} so every Studio item is built identically. */
+    static ItemStack item(Material material, String name, NamedTextColor color, String... lore) {
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();
         meta.displayName(Component.text(name, color));

@@ -52,7 +52,7 @@ class MessageKeyDefaultsTest {
         Set<String> allowed = Set.of(
                 "pet", "player", "amount", "page", "pages", "status", "reason",
                 "detail", "provider", "cost", "balance", "level", "exp", "remaining",
-                "usage", "description");
+                "usage", "description", "field", "format", "example", "stat", "modifier");
         Pattern placeholder = Pattern.compile("<([a-z]+)>");
 
         for (MessageKey key : MessageKey.values()) {

@@ -24,6 +24,7 @@ public enum StudioActionType {
     CANCEL_ARCHIVE,
     HARD_DELETE,
     STAT,
+    STAT_MODIFIER,
     STAT_MANUAL,
     STAT_SEARCH,
     STAT_REFRESH,

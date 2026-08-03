@@ -2,6 +2,7 @@ package io.github.salyvn.omnipet.paper.text;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -80,14 +81,27 @@ class MigratedControllerTextContractTest {
     }
 
     @Test
-    void studioTextIsNotYetMigratedAndIsNotClaimedByAnyKey() throws IOException {
-        assertFalse(read("studio/bukkit/PetStudioController.java").contains(
-                        "io.github.salyvn.omnipet.paper.text.Messages"),
-                "Studio text migrates in Phase 4, together with the prompt rewrite");
+    void studioPromptsResolveThroughTheCatalogAndKeepTheirDiagnosticSuffixes() throws IOException {
+        // The prompt text lives in StudioFieldPrompt, which the controller delegates to; the
+        // controller itself keeps only its operator-facing diagnostics.
+        assertTrue(read("studio/bukkit/StudioFieldPrompt.java").contains("Messages.line("),
+                "Studio prompts must resolve through the catalog");
+        assertTrue(read("studio/bukkit/PetStudioController.java").contains("StudioErrorMessages.forAdmin"),
+                "Studio diagnostics keep their Java-side detail");
+    }
+
+    @Test
+    void everyStudioPromptKeyNamesFieldFormatOrCancel() {
         for (MessageKey key : MessageKey.values()) {
-            assertFalse(key.path().startsWith("studio."),
-                    () -> key.path() + " exists before its Phase 4 owner does");
+            if (!key.path().startsWith("studio.")) continue;
+            String value = key.defaultValue();
+            assertFalse(value.isBlank(), () -> key.path() + " has a blank default");
         }
+        // The prompt block must be able to state all four things the old silent capture omitted.
+        assertNotNull(MessageKey.byPath("studio.prompt.field"));
+        assertNotNull(MessageKey.byPath("studio.prompt.format"));
+        assertNotNull(MessageKey.byPath("studio.prompt.example"));
+        assertNotNull(MessageKey.byPath("studio.prompt.cancel"));
     }
 
     private static String read(String relative) throws IOException {

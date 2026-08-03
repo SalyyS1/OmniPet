@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.salyvn.omnipet.core.catalog.CatalogHealth;
 import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
+import io.github.salyvn.omnipet.core.domain.HeadIcon;
 import io.github.salyvn.omnipet.core.studio.StatModifierType;
 import io.github.salyvn.omnipet.core.studio.StatRange;
 import io.github.salyvn.omnipet.core.studio.StudioStat;
@@ -64,5 +65,80 @@ class StudioDraftInputParsersTest {
                 () -> StudioDraftInputParsers.exactDefinitionId("Wolf", "wolf"));
         assertThrows(IllegalArgumentException.class,
                 () -> StudioDraftInputParsers.exactDefinitionId(" wolf ", "wolf"));
+    }
+
+    @Test
+    void aPastedBase64HeadIsAcceptedAsASingleToken() {
+        String pasted = java.util.Base64.getEncoder().encodeToString(
+                ("{\"textures\":{\"SKIN\":{\"url\":\"https://textures.minecraft.net/texture/"
+                        + "a".repeat(64) + "\"}}}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        HeadIcon icon = StudioDraftInputParsers.icon(pasted);
+
+        assertEquals("BASE64", icon.source());
+        assertEquals(pasted, icon.value());
+    }
+
+    @Test
+    void aBareTextureUrlAndHashAreDetectedWithoutASourceKeyword() {
+        assertEquals("TEXTURE_URL",
+                StudioDraftInputParsers.icon("https://textures.minecraft.net/texture/x").source());
+        assertEquals("https://textures.minecraft.net/texture/" + "b".repeat(64),
+                StudioDraftInputParsers.icon("b".repeat(64)).value());
+    }
+
+    @Test
+    void bothTheTwoTokenAndThreeTokenStatFormsProduceTheSameStat() {
+        StatCatalogEntry entry = entry(StatModifierType.FLAT);
+
+        StudioStat preselected = StudioDraftInputParsers.catalogStat("10 50", entry, StatModifierType.FLAT);
+        StudioStat fullForm = StudioDraftInputParsers.catalogStat("FLAT 10 50", entry, StatModifierType.FLAT);
+
+        assertEquals(fullForm, preselected);
+        assertEquals(new StatRange(10, 50), preselected.range());
+        assertEquals(StatModifierType.FLAT, preselected.modifierType());
+    }
+
+    @Test
+    void anExplicitModifierOverridesTheClickedOne() {
+        StatCatalogEntry entry = entry(StatModifierType.FLAT, StatModifierType.RELATIVE);
+
+        StudioStat parsed = StudioDraftInputParsers.catalogStat("RELATIVE 10 50", entry, StatModifierType.FLAT);
+
+        assertEquals(StatModifierType.RELATIVE, parsed.modifierType());
+    }
+
+    @Test
+    void twoTokensWithoutAPreselectedModifierAskForTheFullForm() {
+        StatCatalogEntry entry = entry(StatModifierType.FLAT);
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> StudioDraftInputParsers.catalogStat("10 50", entry, null));
+
+        assertEquals("expected: <modifier> <min> <max>", failure.getMessage());
+    }
+
+    @Test
+    void aPreselectedModifierTheStatDoesNotSupportIsStillRejected() {
+        StatCatalogEntry entry = entry(StatModifierType.FLAT);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> StudioDraftInputParsers.catalogStat("10 50", entry, StatModifierType.RELATIVE));
+    }
+
+    @Test
+    void aWrongTokenCountReportsTheFormatTheOperatorIsActuallyIn() {
+        StatCatalogEntry entry = entry(StatModifierType.FLAT);
+
+        assertEquals("expected: <min> <max>", assertThrows(IllegalArgumentException.class,
+                () -> StudioDraftInputParsers.catalogStat("10", entry, StatModifierType.FLAT)).getMessage());
+        assertEquals("expected: <modifier> <min> <max>", assertThrows(IllegalArgumentException.class,
+                () -> StudioDraftInputParsers.catalogStat("FLAT 10 50 90", entry, null)).getMessage());
+    }
+
+    private static StatCatalogEntry entry(StatModifierType... supported) {
+        return new StatCatalogEntry("mythiclib:attack_damage", "Attack Damage",
+                Set.of(supported), "MythicLib", CatalogHealth.AVAILABLE, 4,
+                Map.of("vendorStatId", "ATTACK_DAMAGE"));
     }
 }
