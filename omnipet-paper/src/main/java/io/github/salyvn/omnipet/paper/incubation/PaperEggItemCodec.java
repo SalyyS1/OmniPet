@@ -1,5 +1,6 @@
 package io.github.salyvn.omnipet.paper.incubation;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+
+import net.kyori.adventure.text.Component;
 
 import io.github.salyvn.omnipet.core.domain.StableId;
 import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
@@ -120,6 +123,51 @@ public final class PaperEggItemCodec {
             throw new IllegalArgumentException("Paper egg item snapshot identity does not match escrow identity");
         }
         return restored;
+    }
+
+    /**
+     * Mints a fresh, unstarted egg item for {@code eggId}.
+     *
+     * <p>Until this existed there was no way to obtain an egg in-game at all: the codec could read and
+     * restore an egg but never sign a new one, and no command distributed them, so a pet created in the
+     * Studio could not be reached.
+     *
+     * <p>Writes the same three keys and {@code ITEM_SCHEMA} that {@link #observe} validates, so a minted
+     * egg is accepted by {@link #capture} by construction. It deliberately does not precompute a
+     * fingerprint: that is derived at capture time from the serialized stack, and duplicating it here
+     * would create a second source of truth that could disagree.
+     *
+     * @param material the egg's item type
+     * @param name display name, already coloured by the caller
+     * @param lore description lines, already coloured by the caller
+     */
+    public ItemStack create(String eggId, Material material, Component name, List<Component> lore) {
+        Objects.requireNonNull(material, "egg material");
+        if (material == Material.AIR) throw new IllegalArgumentException("egg material cannot be air");
+        // Always one: each egg carries its own nonce, so a stack of two would share an identity and the
+        // escrow saga could not tell the paid egg from its neighbour.
+        return sign(new ItemStack(material, 1), eggId, name, lore);
+    }
+
+    /**
+     * Stamps egg identity onto an existing stack.
+     *
+     * <p>Split out from {@link #create} because {@code new ItemStack(...)} needs a live server and so
+     * cannot run in a unit test, while this — the part that actually decides whether
+     * {@link #capture} will accept the result — can be driven against a fake stack.
+     */
+    ItemStack sign(ItemStack stack, String eggId, Component name, List<Component> lore) {
+        String id = StableId.requireValid(eggId);
+        ItemMeta meta = requireMeta(stack);
+        if (name != null) meta.displayName(name);
+        if (lore != null && !lore.isEmpty()) meta.lore(List.copyOf(lore));
+        PersistentDataContainer data = meta.getPersistentDataContainer();
+        data.set(eggKey, PersistentDataType.STRING, id);
+        data.set(nonceKey, PersistentDataType.STRING,
+                Objects.requireNonNull(nonceSupplier.get(), "item nonce").toString());
+        data.set(schemaKey, PersistentDataType.INTEGER, ITEM_SCHEMA);
+        stack.setItemMeta(meta);
+        return stack;
     }
 
     private Optional<UUID> readNonce(PersistentDataContainer data) {

@@ -19,6 +19,7 @@ public final class YamlEggDefinitionRepository implements EggDefinitionRepositor
     public static final int MAX_LIST_FILES = 10_000;
     private final SafeRepositoryPaths paths;
     private final EggDefinitionYamlCodec codec;
+    private final AtomicFileStore fileStore = new AtomicFileStore();
 
     public YamlEggDefinitionRepository(Path root) {
         paths = new SafeRepositoryPaths(root);
@@ -35,6 +36,23 @@ public final class YamlEggDefinitionRepository implements EggDefinitionRepositor
         long size = Files.size(path);
         if (size > MAX_FILE_BYTES) throw new IOException("egg definition exceeds 64 KiB: " + id);
         return Optional.of(codec.decode(id, Files.readString(path, StandardCharsets.UTF_8)));
+    }
+
+    @Override
+    public void save(EggDefinitionEnvelope envelope) throws IOException {
+        if (envelope == null) throw new IllegalArgumentException("egg definition envelope is required");
+        String id = envelope.definition().id();
+        Path path = paths.resolveId(id, ".yml");
+        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)
+                && !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("egg definition is not a regular file: " + path);
+        }
+        byte[] content = codec.encode(envelope).getBytes(StandardCharsets.UTF_8);
+        // Checked before writing, so an oversized definition never lands on disk in a state that
+        // read() would then refuse to load.
+        if (content.length > MAX_FILE_BYTES) throw new IOException("egg definition exceeds 64 KiB: " + id);
+        Files.createDirectories(paths.root());
+        fileStore.write(path, content);
     }
 
     @Override

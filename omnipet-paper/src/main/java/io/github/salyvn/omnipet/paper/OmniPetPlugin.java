@@ -50,6 +50,8 @@ import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
 import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegistry;
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.pet.PetInteractListener;
+import io.github.salyvn.omnipet.paper.incubation.EggAdminController;
+import io.github.salyvn.omnipet.paper.incubation.PaperEggItemCodec;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hub.HubMenuListener;
@@ -109,6 +111,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PaperActiveSkillController activeSkills;
     private OmniPetManagementServices managementServices;
     private PlayerHubController hubController;
+    private EggAdminController eggAdmin;
     private Path messagesFile;
 
     @Override
@@ -189,6 +192,14 @@ public final class OmniPetPlugin extends JavaPlugin {
                     });
             managementServices = OmniPetManagementServices.open(
                     this, dataRoot, playerStates, registry, activeConfig, economyProviders, playerPets);
+            eggAdmin = new EggAdminController(
+                    incubation.eggDefinitions(),
+                    registry,
+                    new RepositoryPetStorageService(playerStates),
+                    new PaperEggItemCodec(this),
+                    limitsResolver);
+            // Saving a definition in the Studio now also writes its egg, so a new pet is reachable.
+            studio.bindEggs(eggAdmin);
             incubationCoordinator = new PaperIncubationCoordinator(
                     this, incubation, registry, limitsResolver, playerTasks);
             hatchController = new PlayerHatchController(
@@ -323,6 +334,7 @@ public final class OmniPetPlugin extends JavaPlugin {
                     slotPurchases,
                     this::reloadRuntime);
             command.bindHub(hubController::open);
+            command.bindEggAdmin(eggAdmin);
             event.registrar().register(
                     FoundationCommandContract.NAME, FoundationCommandContract.ALIASES, command);
         });

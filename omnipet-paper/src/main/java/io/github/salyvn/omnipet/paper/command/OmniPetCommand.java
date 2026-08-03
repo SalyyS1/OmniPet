@@ -13,6 +13,7 @@ import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
 import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
+import io.github.salyvn.omnipet.paper.incubation.EggAdminController;
 import io.github.salyvn.omnipet.paper.incubation.HatchAdminController;
 import io.github.salyvn.omnipet.paper.incubation.action.IncubationActionItemController;
 import io.github.salyvn.omnipet.paper.management.PetCultivationItemController;
@@ -48,6 +49,19 @@ public final class OmniPetCommand implements BasicCommand {
     /** Wires the hub. Called once from {@code onEnable}. */
     public void bindHub(HubTarget target) {
         this.hub = target;
+    }
+
+    /**
+     * Egg and direct-pet distribution, set after construction for the same reason as the hub.
+     *
+     * <p>When absent both branches report the feature as unavailable rather than throwing, so the
+     * narrower constructors used by tests need no change.
+     */
+    private volatile EggAdminController eggAdmin;
+
+    /** Wires egg and pet granting. Called once from {@code onEnable}. */
+    public void bindEggAdmin(EggAdminController target) {
+        this.eggAdmin = target;
     }
 
     public OmniPetCommand(
@@ -378,6 +392,28 @@ public final class OmniPetCommand implements BasicCommand {
                 sender.sendMessage("OmniPet: incubation action items are not available yet.");
             } else {
                 actionItems.command(sender, itemArguments);
+            }
+            return;
+        }
+        if (arguments.size() >= 2 && arguments.get(0).equalsIgnoreCase("admin")
+                && arguments.get(1).equalsIgnoreCase("egg")) {
+            if (!sender.hasPermission("omnipet.admin.egg")) {
+                sender.sendMessage("OmniPet: you do not have permission to administer eggs.");
+            } else if (eggAdmin == null) {
+                sender.sendMessage("OmniPet: egg administration is not available yet.");
+            } else {
+                eggAdmin.eggCommand(sender, arguments.subList(2, arguments.size()));
+            }
+            return;
+        }
+        if (arguments.size() >= 2 && arguments.get(0).equalsIgnoreCase("admin")
+                && arguments.get(1).equalsIgnoreCase("pet")) {
+            if (!sender.hasPermission("omnipet.admin.petgive")) {
+                sender.sendMessage("OmniPet: you do not have permission to grant pets directly.");
+            } else if (eggAdmin == null) {
+                sender.sendMessage("OmniPet: pet granting is not available yet.");
+            } else {
+                eggAdmin.petCommand(sender, arguments.subList(2, arguments.size()));
             }
             return;
         }

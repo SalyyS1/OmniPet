@@ -62,7 +62,27 @@ config.yml                    # vault and active-slot limits, plus the optional 
 
 OmniPet does not copy the old PassivePet folder or expose a complete pet lifecycle. Legacy two-key slot config is migrated in place with a backup; player and definition migration still belongs on a staging copy. Follow [Migration](migration.md).
 
-The canonical egg catalog is `plugins/OmniPet/eggs/*.yml`, one schema 1 file per egg. Paper consumes it for hatch start and keeps the loaded snapshot for the plugin lifetime, so stop/restart OmniPet after edits; `/pet admin reload` does not refresh eggs. A valid catalog entry still needs an exact main/off-hand egg item carrying the supported PDC identity. OmniPet does not currently provide a native egg-give/distribution command.
+The canonical egg catalog is `plugins/OmniPet/eggs/*.yml`, one schema 1 file per egg.
+
+**Getting a pet you just created.** Saving a definition in the Pet Studio also writes
+`eggs/<definitionId>_egg.yml`, so the new pet is immediately obtainable:
+
+```
+/pet admin browse                          # create the pet; its egg is written alongside
+/pet admin egg give <player> <id>_egg      # hand out the egg
+/pet hatch main                            # start incubating
+/pet hatch claim                           # once ready, the pet lands in the vault
+/pet vault                                 # left-click to activate it
+```
+
+An existing catalog entry is never overwritten, and `gui.studio.autoCreateEgg: false` turns the
+behaviour off. `/pet admin egg create <egg-id> <definition-id> [duration]` defines an egg by hand, and
+`/pet admin pet give <player> <definition-id>` skips incubation entirely for testing.
+
+Hatch start reads the catalog from disk on each use, so a newly written or edited egg is usable
+without a restart. What *is* fixed at startup is the egg count reported in the enable log and the
+pet-to-egg index the Studio uses to refuse deleting a definition an egg still references — restart to
+refresh those.
 
 ## Compatibility scope
 

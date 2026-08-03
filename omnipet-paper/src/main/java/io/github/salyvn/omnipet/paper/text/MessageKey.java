@@ -181,6 +181,14 @@ public enum MessageKey {
     GUI_HATCH_PREVIOUS("gui.hatch.previous", "<yellow>Previous hatch: <status></yellow>"),
     GUI_HATCH_PREVIOUS_PET("gui.hatch.previous-pet", "<gray>Resolved pet</gray> <white><pet></white>"),
     GUI_HATCH_PREVIOUS_HINT("gui.hatch.previous-hint", "<gray>A new egg can be started below.</gray>"),
+
+    // --- egg item ----------------------------------------------------------------------------
+    GUI_EGG_ITEM_NAME("gui.egg.item-name", "<gold><pet> Egg</gold>"),
+    GUI_EGG_ITEM_TIER("gui.egg.item-tier", "<gray>Tier</gray> <white><status></white>"),
+    GUI_EGG_ITEM_DURATION("gui.egg.item-duration", "<gray>Incubates in</gray> <white><detail></white>"),
+    GUI_EGG_ITEM_HINT("gui.egg.item-hint",
+            "<yellow>Hold and run <white>/pet hatch main</white></yellow> <gray>to start</gray>"),
+
     GUI_HATCH_START_MAIN("gui.hatch.start-main", "<aqua>Start main-hand egg</aqua>"),
     GUI_HATCH_START_MAIN_HINT("gui.hatch.start-main-hint",
             "<gray>Uses the egg in your selected hotbar slot.</gray>"),

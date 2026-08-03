@@ -102,3 +102,7 @@ gui:
     # RESTART ONLY - /pet admin reload will not apply a change here.
     # How long a Studio chat prompt waits for a reply before expiring.
     promptTimeoutSeconds: 120
+    # Saving a pet in the Studio also writes eggs/<definitionId>_egg.yml, so the new pet can be
+    # obtained with /pet admin egg give. An existing catalog entry is never overwritten. Set false
+    # if your egg catalog is hand-designed and you do not want the Studio adding files. Reloads live.
+    autoCreateEgg: true

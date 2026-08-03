@@ -73,6 +73,8 @@ public final class OmniPetCommandTree {
                         CommandSpec.of("reload", "Reload config, messages, and definitions")
                                 .permission("omnipet.admin.reload"),
                         adminItem(),
+                        adminEgg(),
+                        adminPet(),
                         adminHatch(),
                         adminSkill(),
                         adminCultivation(),
@@ -105,8 +107,30 @@ public final class OmniPetCommandTree {
                                 .permission("omnipet.admin.item", "omnipet.admin.cultivation"));
     }
 
-    private static CommandSpec.Builder adminHatch() {
-        return CommandSpec.of("hatch", "Inspect and administer incubation state")
+    private static CommandSpec.Builder adminEgg() {
+        return CommandSpec.of("egg", "Distribute and define hatchable eggs")
+                .group()
+                .child(
+                        CommandSpec.of("give", "Give a hatchable egg to an online player")
+                                .args("<online-player>", "<egg-id>", "[amount]")
+                                .permission("omnipet.admin.egg"),
+                        CommandSpec.of("create", "Define an egg that hatches one pet definition")
+                                .args("<egg-id>", "<definition-id>", "[duration]")
+                                .permission("omnipet.admin.egg"));
+    }
+
+    private static CommandSpec.Builder adminPet() {
+        // Separate from omnipet.admin.egg: granting a pet skips incubation entirely, so it is a
+        // stronger capability than handing out an egg the player still has to hatch.
+        return CommandSpec.of("pet", "Grant a pet directly into a player's vault")
+                .group()
+                .child(
+                        CommandSpec.of("give", "Grant a pet, bypassing incubation")
+                                .args("<online-player>", "<definition-id>")
+                                .permission("omnipet.admin.petgive"));
+    }
+
+    private static CommandSpec.Builder adminHatch() {        return CommandSpec.of("hatch", "Inspect and administer incubation state")
                 .group()
                 .child(
                         CommandSpec.of("inspect", "Show durable incubation state for a player")

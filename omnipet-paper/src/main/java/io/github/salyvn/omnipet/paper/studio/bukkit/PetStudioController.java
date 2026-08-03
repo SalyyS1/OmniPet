@@ -1,5 +1,6 @@
 package io.github.salyvn.omnipet.paper.studio.bukkit;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ import io.github.salyvn.omnipet.paper.studio.session.StudioThreadGuard;
 import io.github.salyvn.omnipet.paper.studio.session.StudioViewToken;
 import io.github.salyvn.omnipet.paper.catalog.PaperStatCatalogContext;
 import io.github.salyvn.omnipet.paper.config.GuiSettings;
+import io.github.salyvn.omnipet.paper.incubation.EggAdminController;
 
 /** Bukkit-facing orchestration for the detached, transaction-backed Pet Studio. */
 public final class PetStudioController {
@@ -57,6 +59,16 @@ public final class PetStudioController {
     private final PaperStatCatalogContext statCatalog;
     private final Duration promptTimeout;
     private final long promptTimeoutTicks;
+    /**
+     * Set after construction so the three existing constructors stay unchanged. When absent, saving a
+     * definition simply creates no egg, which is what the constructors used by tests rely on.
+     */
+    private volatile EggAdminController eggs;
+
+    /** Wires companion-egg creation. Called once from {@code onEnable}. */
+    public void bindEggs(EggAdminController target) {
+        this.eggs = target;
+    }
     private final StudioInventoryRenderer renderer = new StudioInventoryRenderer();
     private final Map<UUID, StudioState> states = new HashMap<>();
 
@@ -370,12 +382,39 @@ public final class PetStudioController {
     private void save(Player player, StudioState state) {
         try {
             validateCatalogSelections(state);
-            service.save(state.draft, state.saveKey);
+            var saved = service.save(state.draft, state.saveKey);
             player.sendMessage("OmniPet: definition saved and registry generation advanced.");
+            createCompanionEgg(player, saved.definition().definition());
             openBrowse(player, state.tier, false);
         } catch (Exception error) {
             plugin.getLogger().log(Level.WARNING, "OmniPet Studio save failed for " + state.draft.id(), error);
             player.sendMessage("OmniPet: save rejected - " + StudioErrorMessages.forAdmin(error));
+        }
+    }
+
+    /**
+     * Writes an egg that hatches the definition just saved, so a new pet is reachable in game.
+     *
+     * <p>Without this a Studio-created pet had no route to a player: the catalog had no entry naming
+     * it, and no command created one. It runs after the save so a failure here cannot roll back or
+     * obscure the definition write — the pet is the point, the egg is a convenience.
+     *
+     * <p>Never overwrites an existing entry, since an operator may have tuned its duration or
+     * candidate pool by hand.
+     */
+    private void createCompanionEgg(Player player, PetDefinition definition) {
+        if (eggs == null || !GuiSettings.gui().studioAutoCreateEgg()) return;
+        try {
+            eggs.createCompanionEgg(definition).ifPresent(eggId -> player.sendMessage(
+                    "OmniPet: created egg " + eggId + "; give it with /pet admin egg give <player> "
+                            + eggId + "."));
+        } catch (IOException | RuntimeException failure) {
+            plugin.getLogger().log(Level.WARNING,
+                    "OmniPet could not create a companion egg for " + definition.id()
+                            + "; the definition was saved and the egg can be added with "
+                            + "/pet admin egg create", failure);
+            player.sendMessage("OmniPet: definition saved, but its egg could not be created - "
+                    + StudioErrorMessages.forAdmin(failure));
         }
     }
 

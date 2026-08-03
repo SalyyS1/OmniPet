@@ -14,6 +14,15 @@ public interface EggDefinitionRepository {
 
     List<String> list() throws IOException;
 
+    /**
+     * Writes one egg definition, creating the catalog directory when absent.
+     *
+     * <p>Overwrites an existing file for the same ID. Callers that must not clobber an operator's
+     * hand-edited catalog entry check {@link #read} first — the decision belongs to them, because a
+     * command that was asked to overwrite and a Studio hook that must not are both legitimate.
+     */
+    void save(EggDefinitionEnvelope envelope) throws IOException;
+
     default Map<String, EggDefinition> loadAll() throws IOException {
         LinkedHashMap<String, EggDefinition> result = new LinkedHashMap<>();
         for (String id : list()) result.put(id, read(id).orElseThrow().definition());

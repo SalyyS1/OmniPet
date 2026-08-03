@@ -13,7 +13,12 @@ import java.util.Objects;
  * <p>Values are clamped rather than rejected. A bad page size must not stop players using their pets,
  * which is why this follows the lenient message-catalog precedent instead of the strict storage one.
  */
-public record GuiConfig(Feedback feedback, int vaultPetsPerPage, int helpLinesPerPage, Duration studioPromptTimeout) {
+public record GuiConfig(
+        Feedback feedback,
+        int vaultPetsPerPage,
+        int helpLinesPerPage,
+        Duration studioPromptTimeout,
+        boolean studioAutoCreateEgg) {
     /** A vault page cannot exceed this: the 54-slot layout reserves the bottom row for controls. */
     public static final int MAX_VAULT_PETS_PER_PAGE = 45;
     public static final int MAX_HELP_LINES_PER_PAGE = 20;
@@ -28,9 +33,12 @@ public record GuiConfig(Feedback feedback, int vaultPetsPerPage, int helpLinesPe
         }
     }
 
-    /** The values the plugin used before {@code gui:} existed. */
+    /**
+     * The values the plugin used before {@code gui:} existed, plus companion-egg creation on, which is
+     * what makes a Studio-created pet reachable in game without a second command.
+     */
     public static GuiConfig defaults() {
-        return new GuiConfig(Feedback.defaults(), MAX_VAULT_PETS_PER_PAGE, 8, Duration.ofMinutes(2));
+        return new GuiConfig(Feedback.defaults(), MAX_VAULT_PETS_PER_PAGE, 8, Duration.ofMinutes(2), true);
     }
 
     /**

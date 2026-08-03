@@ -18,6 +18,7 @@ import java.util.function.Consumer;
  */
 public final class GuiConfigLoader {
     private static final Set<String> ROOT = Set.of("feedback", "vault", "help", "studio");
+    private static final Set<String> STUDIO = Set.of("promptTimeoutSeconds", "autoCreateEgg");
     private static final Set<String> FEEDBACK =
             Set.of("enabled", "actionBar", "minIntervalMillis", "success", "failure", "blocked", "progress");
     private static final Set<String> CUE = Set.of("sound", "volume", "pitch");
@@ -38,9 +39,13 @@ public final class GuiConfigLoader {
         int linesPerPage = integer(
                 map(values.get("help"), "gui.help", warn).get("linesPerPage"),
                 defaults.helpLinesPerPage(), "gui.help.linesPerPage", warn);
+        Map<String, Object> studio = map(values.get("studio"), "gui.studio", warn);
+        warnUnknown(studio, STUDIO, "gui.studio", warn);
         long promptSeconds = integer(
-                map(values.get("studio"), "gui.studio", warn).get("promptTimeoutSeconds"),
+                studio.get("promptTimeoutSeconds"),
                 (int) defaults.studioPromptTimeout().toSeconds(), "gui.studio.promptTimeoutSeconds", warn);
+        boolean autoCreateEgg = bool(studio.get("autoCreateEgg"),
+                defaults.studioAutoCreateEgg(), "gui.studio.autoCreateEgg", warn);
         if (promptSeconds <= 0) {
             warn.accept("gui.studio.promptTimeoutSeconds must be positive; using "
                     + defaults.studioPromptTimeout().toSeconds());
@@ -50,7 +55,8 @@ public final class GuiConfigLoader {
         warnClamp(petsPerPage, 1, GuiConfig.MAX_VAULT_PETS_PER_PAGE, "gui.vault.petsPerPage", warn);
         warnClamp(linesPerPage, 1, GuiConfig.MAX_HELP_LINES_PER_PAGE, "gui.help.linesPerPage", warn);
         // The record clamps; warning here keeps the operator informed of what was actually applied.
-        return new GuiConfig(feedback, petsPerPage, linesPerPage, Duration.ofSeconds(promptSeconds));
+        return new GuiConfig(
+                feedback, petsPerPage, linesPerPage, Duration.ofSeconds(promptSeconds), autoCreateEgg);
     }
 
     /** Serialises the section so a legacy migration round-trip cannot silently drop it. */
@@ -67,7 +73,10 @@ public final class GuiConfigLoader {
         root.put("feedback", feedback);
         root.put("vault", Map.of("petsPerPage", config.vaultPetsPerPage()));
         root.put("help", Map.of("linesPerPage", config.helpLinesPerPage()));
-        root.put("studio", Map.of("promptTimeoutSeconds", config.studioPromptTimeout().toSeconds()));
+        LinkedHashMap<String, Object> studio = new LinkedHashMap<>();
+        studio.put("promptTimeoutSeconds", config.studioPromptTimeout().toSeconds());
+        studio.put("autoCreateEgg", config.studioAutoCreateEgg());
+        root.put("studio", studio);
         return root;
     }
 

@@ -175,6 +175,7 @@ gui:
     linesPerPage: 8            # RESTART ONLY, capped at 20
   studio:
     promptTimeoutSeconds: 120  # RESTART ONLY
+    autoCreateEgg: true        # write eggs/<id>_egg.yml when the Studio saves a pet
 ```
 
 Unlike `storage`, this section is **lenient**, following the `messages.yml` precedent: an unknown key
@@ -198,6 +199,7 @@ sort, filter, status, hub, and slot-purchase controls.
 | `gui.vault.petsPerPage` | **Restart only.** The vault renderer is constructed once and reads its page size then. |
 | `gui.help.linesPerPage` | **Restart only.** |
 | `gui.studio.promptTimeoutSeconds` | **Restart only.** The Studio's chat-input service is built at startup and reload does not rebuild it. |
+| `gui.studio.autoCreateEgg` | **Live.** Read at each save, so toggling it takes effect on the next definition you save. |
 
 Editing a restart-only key and running `/pet admin reload` is silently ineffective by design; restart
 the server to apply it.
@@ -267,7 +269,10 @@ Paper egg identity uses `omnipet:egg`, `omnipet:item_nonce`, and schema-1 `omnip
 
 The live start coordinator, scheduler/checkpoints, recovery executor, commands/GUI, and claim orchestration are wired and unit/compile tested. This evidence does not certify live Paper/server behavior. Bootstrap creates and validates the escrow directory, rejecting a regular file or symbolic-link path before the plugin exposes incubation services.
 
-The egg catalog and pet-reference index are snapshots loaded during plugin bootstrap. Until an atomic egg reload path ships, stop/restart OmniPet after editing `eggs/*.yml`; `/pet admin reload` does not refresh the egg catalog in this checkpoint.
+Hatch start reads `eggs/*.yml` from disk each time it runs, so an egg added or edited while the server
+is up is usable immediately — including the one the Pet Studio writes when you save a definition. Two
+things are still snapshots taken at bootstrap: the egg count in the enable log, and the pet-to-egg
+index the Studio consults before allowing a definition to be deleted. Restart to refresh those.
 
 ## Validation checklist
 

@@ -89,6 +89,26 @@ line, so the old call could not load. Update to a build that resolves sounds thr
 there is no config workaround, because the failure happens while the class is being loaded, before any
 config is read.
 
+## I created a pet in the Studio but cannot get one
+
+Saving a definition creates the pet's *blueprint*, not a pet in anyone's vault. The route is:
+
+```
+/pet admin egg give <you> <definitionId>_egg   # the Studio wrote this egg when you saved
+/pet hatch main                                # start incubating
+/pet hatch claim                               # once ready
+/pet vault                                     # left-click to activate
+```
+
+- If `<definitionId>_egg` is unknown, the Studio's auto-create was off or the write failed. Check the
+  enable log for `could not create a companion egg`, then run
+  `/pet admin egg create <egg-id> <definition-id> [duration]`.
+- For a quick test, `/pet admin pet give <you> <definitionId>` skips incubation entirely.
+- An egg without the OmniPet PDC identity is refused by `/pet hatch`. A vanilla turtle egg, or one
+  copied with a plugin that drops persistent data, will not work — mint it with `egg give`.
+- Each egg needs its own inventory slot. If delivery reports fewer slots than requested, free some
+  space; eggs are deliberately not stackable because each carries a unique nonce.
+
 ## Feedback is silent
 
 - Check `gui.feedback.enabled` in `config.yml`. `false` is the master switch and silences every category at once.
