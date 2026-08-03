@@ -9,12 +9,14 @@ public record OmniPetConfig(
         Phase4PaperConfig storage,
         PaperRuntimeSettings runtime,
         ProgressionConfig progression,
-        CultivationItems cultivationItems) {
+        CultivationItems cultivationItems,
+        GuiConfig gui) {
     public OmniPetConfig {
         storage = Objects.requireNonNull(storage, "storage config");
         runtime = Objects.requireNonNull(runtime, "runtime config");
         progression = Objects.requireNonNull(progression, "progression config");
         cultivationItems = Objects.requireNonNull(cultivationItems, "cultivation item config");
+        gui = gui == null ? GuiConfig.defaults() : gui;
     }
 
     public record CultivationItems(

@@ -15,6 +15,8 @@ import net.kyori.adventure.text.Component;
 
 import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.storage.PetStorageSnapshot;
+import io.github.salyvn.omnipet.paper.config.GuiConfig;
+import io.github.salyvn.omnipet.paper.config.GuiSettings;
 import io.github.salyvn.omnipet.paper.gui.GuiColors;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
 import io.github.salyvn.omnipet.paper.text.Displays;
@@ -22,10 +24,19 @@ import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class PlayerPetMenuRenderer {
-    private static final int PETS_PER_PAGE = 45;
+    private final int petsPerPage;
+
+    /** Reads the operator's page size once. Restart-only: the renderer outlives a reload. */
+    public PlayerPetMenuRenderer() {
+        this(GuiSettings.gui().vaultPetsPerPage());
+    }
+
+    PlayerPetMenuRenderer(int petsPerPage) {
+        this.petsPerPage = Math.max(1, Math.min(GuiConfig.MAX_VAULT_PETS_PER_PAGE, petsPerPage));
+    }
 
     public Inventory render(Player player, PetStorageSnapshot snapshot, int requestedPage) {
-        int pages = Math.max(1, (snapshot.pets().size() + PETS_PER_PAGE - 1) / PETS_PER_PAGE);
+        int pages = Math.max(1, (snapshot.pets().size() + petsPerPage - 1) / petsPerPage);
         int page = Math.max(1, Math.min(requestedPage, pages));
         Map<Integer, PlayerPetInventoryHolder.Action> actions = new HashMap<>();
         PlayerPetInventoryHolder holder = new PlayerPetInventoryHolder(
@@ -35,8 +46,8 @@ public final class PlayerPetMenuRenderer {
         holder.bind(inventory);
         fill(inventory);
 
-        int start = (page - 1) * PETS_PER_PAGE;
-        for (int index = start; index < Math.min(start + PETS_PER_PAGE, snapshot.pets().size()); index++) {
+        int start = (page - 1) * petsPerPage;
+        for (int index = start; index < Math.min(start + petsPerPage, snapshot.pets().size()); index++) {
             PetInstance pet = snapshot.pets().get(index);
             boolean active = snapshot.desiredActivePetIds().contains(pet.id());
             int slot = index - start;

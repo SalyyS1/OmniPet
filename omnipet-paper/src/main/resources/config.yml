@@ -70,3 +70,35 @@ integrations:
   mythicLib: "1.7.1-SNAPSHOT build 106"
   mythicMobs: "5.9.0"
   modelEngine: "R4.0.9"
+
+# Menu behaviour and player feedback. The whole section is optional: delete it and OmniPet behaves
+# exactly as it did before this section existed. Unlike `storage:`, a mistake here is never fatal —
+# an unknown key is ignored with a warning and a bad value falls back to its default, because a typo
+# in a page size must not stop players using their pets.
+gui:
+  feedback:
+    # One master switch. `false` silences every sound and action bar plugin-wide, for servers with
+    # their own sound design and for players using a screen reader. Reloads live.
+    enabled: true
+    # Floor between two sounds from the same player, in milliseconds. Stops a fast-clicking player
+    # becoming an audible nuisance. Reloads live.
+    minIntervalMillis: 150
+    # Action-bar text alongside the sound. Chat messages are unaffected either way. Reloads live.
+    actionBar: true
+    # One cue per outcome, not per event, so adding a feature never requires new config here.
+    # An unknown sound name warns at load and silences that one category. Reloads live.
+    success:  { sound: "ENTITY_EXPERIENCE_ORB_PICKUP", volume: 0.6, pitch: 1.2 }
+    failure:  { sound: "BLOCK_NOTE_BLOCK_BASS",        volume: 0.6, pitch: 0.8 }
+    blocked:  { sound: "BLOCK_CHEST_LOCKED",           volume: 0.6, pitch: 1.0 }
+    progress: { sound: "UI_BUTTON_CLICK",              volume: 0.4, pitch: 1.0 }
+  vault:
+    # RESTART ONLY - /pet admin reload will not apply a change here.
+    # Capped at 45: the 54-slot layout reserves the bottom row for paging and controls.
+    petsPerPage: 45
+  help:
+    # RESTART ONLY - /pet admin reload will not apply a change here. Capped at 20.
+    linesPerPage: 8
+  studio:
+    # RESTART ONLY - /pet admin reload will not apply a change here.
+    # How long a Studio chat prompt waits for a reply before expiring.
+    promptTimeoutSeconds: 120

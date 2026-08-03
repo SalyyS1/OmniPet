@@ -5,12 +5,21 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
 
+import io.github.salyvn.omnipet.paper.config.GuiSettings;
+
 /**
  * Paged {@code /pet help} built from the same {@link CommandSpec} tree that drives suggestions.
  *
  * <p>Pure function, no I/O. A branch the sender cannot invoke never appears.
  */
 public final class CommandHelp {
+    /**
+     * The page size used when no operator override applies.
+     *
+     * <p>Kept as a constant rather than becoming mutable static state: {@link #page(List, int)} reads
+     * the operator's value from config, while {@link #page(List, int, int)} takes it explicitly so the
+     * paging logic stays a pure function that tests can drive without binding config.
+     */
     public static final int LINES_PER_PAGE = 8;
 
     private CommandHelp() {}
@@ -40,13 +49,19 @@ public final class CommandHelp {
         }
     }
 
-    /** Clamps a requested page into range and slices the matching lines. */
+    /** Clamps a requested page into range using the operator-configured page size. */
     public static Page page(List<Line> lines, int requestedPage) {
+        return page(lines, requestedPage, GuiSettings.gui().helpLinesPerPage());
+    }
+
+    /** Clamps a requested page into range and slices the matching lines. */
+    public static Page page(List<Line> lines, int requestedPage, int linesPerPage) {
         Objects.requireNonNull(lines, "help lines");
-        int pages = Math.max(1, (lines.size() + LINES_PER_PAGE - 1) / LINES_PER_PAGE);
+        int size = Math.max(1, linesPerPage);
+        int pages = Math.max(1, (lines.size() + size - 1) / size);
         int page = Math.max(1, Math.min(requestedPage, pages));
-        int start = (page - 1) * LINES_PER_PAGE;
-        int end = Math.min(start + LINES_PER_PAGE, lines.size());
+        int start = (page - 1) * size;
+        int end = Math.min(start + size, lines.size());
         return new Page(page, pages, start >= end ? List.of() : List.copyOf(lines.subList(start, end)));
     }
 

@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import io.github.salyvn.omnipet.core.persistence.YamlDocuments;
 import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
@@ -17,14 +18,28 @@ import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeSettings;
 
 /** Aggregate loader that preserves the strict Phase 4 storage contract. */
 public final class OmniPetConfigLoader {
-    private static final Set<String> ROOT_KEYS = Set.of("storage", "runtime", "progression", "items", "integrations");
+    private static final Set<String> ROOT_KEYS =
+            Set.of("storage", "runtime", "progression", "items", "integrations", "gui");
 
     public LoadResult load(Path file) throws IOException {
+        return load(file, warning -> {});
+    }
+
+    /**
+     * Reads the config, routing lenient {@code gui:} warnings to {@code warnings}. The sink follows
+     * the {@code messages.yml} precedent: a typo in a display setting degrades that setting alone and
+     * tells the operator, rather than failing startup.
+     */
+    public LoadResult load(Path file, Consumer<String> warnings) throws IOException {
         if (file == null || !Files.isRegularFile(file)) throw new IOException("OmniPet config is not a regular file: " + file);
-        return parse(Files.readString(file, StandardCharsets.UTF_8));
+        return parse(Files.readString(file, StandardCharsets.UTF_8), warnings);
     }
 
     public LoadResult parse(String yaml) {
+        return parse(yaml, warning -> {});
+    }
+
+    public LoadResult parse(String yaml, Consumer<String> warnings) {
         Map<String, Object> root = YamlDocuments.readMap(yaml);
         boolean legacy = root.keySet().stream().allMatch(Set.of("globalMaxSlots", "slotPermission")::contains);
         if (!legacy) rejectUnknown(root, ROOT_KEYS, "config");
@@ -35,7 +50,8 @@ public final class OmniPetConfigLoader {
         PaperRuntimeSettings runtime = runtime(optionalMap(root.get("runtime"), "runtime"));
         ProgressionConfig progression = progression(optionalMap(root.get("progression"), "progression"));
         OmniPetConfig.CultivationItems items = items(optionalMap(root.get("items"), "items"));
-        return new LoadResult(new OmniPetConfig(storage.config(), runtime, progression, items),
+        GuiConfig gui = new GuiConfigLoader().parse(root.get("gui"), warnings);
+        return new LoadResult(new OmniPetConfig(storage.config(), runtime, progression, items, gui),
                 legacy || storage.migratedLegacy());
     }
 
@@ -71,6 +87,9 @@ public final class OmniPetConfigLoader {
         root.put("progression", progression);
         root.put("items", items);
         root.put("integrations", integrations);
+        // Serialised, not omitted: encode() is what a legacy migration writes back, so leaving gui out
+        // would silently discard the operator's display and feedback settings on upgrade.
+        root.put("gui", new GuiConfigLoader().encode(config.gui()));
         return YamlDocuments.writeMap(root);
     }
 

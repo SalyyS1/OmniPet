@@ -44,6 +44,7 @@ import io.github.salyvn.omnipet.paper.studio.session.StudioScheduler;
 import io.github.salyvn.omnipet.paper.studio.session.StudioThreadGuard;
 import io.github.salyvn.omnipet.paper.studio.session.StudioViewToken;
 import io.github.salyvn.omnipet.paper.catalog.PaperStatCatalogContext;
+import io.github.salyvn.omnipet.paper.config.GuiSettings;
 
 /** Bukkit-facing orchestration for the detached, transaction-backed Pet Studio. */
 public final class PetStudioController {
@@ -54,6 +55,8 @@ public final class PetStudioController {
     private final PetStudioSessionManager sessions;
     private final ChatInputService inputs;
     private final PaperStatCatalogContext statCatalog;
+    private final Duration promptTimeout;
+    private final long promptTimeoutTicks;
     private final StudioInventoryRenderer renderer = new StudioInventoryRenderer();
     private final Map<UUID, StudioState> states = new HashMap<>();
 
@@ -92,6 +95,11 @@ public final class PetStudioController {
                 new FileStudioAuditSink(plugin.getDataFolder().toPath().resolve("data/audit/studio")));
         StudioMainThreadDispatcher dispatcher = task -> plugin.getServer().getScheduler().runTask(plugin, task);
         this.inputs = new ChatInputService(clock, dispatcher, guard, sessions::isCurrent);
+        // Read once, restart-only: ChatInputService is built here and reload() does not rebuild it.
+        this.promptTimeout = GuiSettings.gui().studioPromptTimeout();
+        // Derived, never maintained alongside the Duration. Six call sites previously carried a
+        // hand-written tick count next to their own Duration, which is six chances to disagree.
+        this.promptTimeoutTicks = GuiSettings.gui().studioPromptTimeoutTicks();
     }
 
     public void openBrowse(Player player) {
@@ -273,7 +281,7 @@ public final class PetStudioController {
         StudioFieldPrompt.STAT_SEARCH.send(player);
         player.closeInventory();
         PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "stats.search",
-                Duration.ofMinutes(2), raw -> {
+                promptTimeout, raw -> {
             String value = raw == null ? "" : raw.trim();
             if (value.equalsIgnoreCase("none")) return "";
             if (value.length() > 64 || value.chars().anyMatch(Character::isISOControl)) {
@@ -288,7 +296,7 @@ public final class PetStudioController {
                 }, failure -> inputFailure(player, state, inputToken, failure,
                         StudioInventoryHolder.Screen.STAT_PICKER));
         plugin.getServer().getScheduler().runTaskLater(plugin,
-                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), promptTimeoutTicks);
     }
 
     private void actionPet(Player player, StudioState state, String id) {
@@ -332,7 +340,7 @@ public final class PetStudioController {
         StudioFieldPrompt.CLONE_ID.send(player);
         player.closeInventory();
         PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "clone.definition.id",
-                Duration.ofMinutes(2), raw -> {
+                promptTimeout, raw -> {
                     String id = StudioInputParsers.parseStableId(raw);
                     if (id.equalsIgnoreCase(source.id())) {
                         throw new IllegalArgumentException("clone ID must differ from the source");
@@ -349,7 +357,7 @@ public final class PetStudioController {
                     render(next, StudioInventoryHolder.Screen.EDITOR);
                 }, failure -> inputFailure(player, state, inputToken, failure, StudioInventoryHolder.Screen.EDITOR));
         plugin.getServer().getScheduler().runTaskLater(plugin,
-                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), promptTimeoutTicks);
     }
 
     private void editTier(StudioState state) {
@@ -405,12 +413,12 @@ public final class PetStudioController {
                 + "' to permanently delete it, or type cancel.");
         player.closeInventory();
         PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "hard-delete.confirmation",
-                Duration.ofMinutes(2), raw -> StudioDraftInputParsers.exactDefinitionId(raw, expectedId),
+                promptTimeout, raw -> StudioDraftInputParsers.exactDefinitionId(raw, expectedId),
                 typedId -> hardDelete(player, state, inputToken, typedId),
                 failure -> inputFailure(player, state, inputToken, failure,
                         StudioInventoryHolder.Screen.ARCHIVE_CONFIRM));
         plugin.getServer().getScheduler().runTaskLater(plugin,
-                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), promptTimeoutTicks);
     }
 
     private void hardDelete(Player player, StudioState state, StudioViewToken token, String typedId) {
@@ -435,7 +443,7 @@ public final class PetStudioController {
         sessions.setPendingInput(inputToken, true);
         StudioFieldPrompt.DEFINITION_ID.send(player);
         player.closeInventory();
-        PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "definition.id", Duration.ofMinutes(2),
+        PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "definition.id", promptTimeout,
                 StudioInputParsers::parseStableId,
                 id -> {
                     PetStudioSession session = sessions.open(player.getUniqueId(), id, 0, "", registry.current().generation());
@@ -448,7 +456,7 @@ public final class PetStudioController {
                     render(next, StudioInventoryHolder.Screen.EDITOR);
                 }, failure -> inputFailure(player, state, inputToken, failure, StudioInventoryHolder.Screen.LIST));
         plugin.getServer().getScheduler().runTaskLater(plugin,
-                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), promptTimeoutTicks);
     }
 
     private void awaitSearch(Player player, StudioState state) {
@@ -457,7 +465,7 @@ public final class PetStudioController {
         sessions.setPendingInput(inputToken, true);
         StudioFieldPrompt.LIST_SEARCH.send(player);
         player.closeInventory();
-        PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "search", Duration.ofMinutes(2),
+        PendingChatInput<String> input = inputs.await(player.getUniqueId(), inputToken, "search", promptTimeout,
                 raw -> raw.trim().equalsIgnoreCase("none") ? "" : StudioInputParsers.parseStableId(raw.trim()),
                 filter -> {
                     state.filter = filter;
@@ -466,7 +474,7 @@ public final class PetStudioController {
                     render(state, StudioInventoryHolder.Screen.LIST);
                 }, failure -> inputFailure(player, state, inputToken, failure, StudioInventoryHolder.Screen.LIST));
         plugin.getServer().getScheduler().runTaskLater(plugin,
-                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), promptTimeoutTicks);
     }
 
     private <T> void awaitField(Player player, StudioState state, StudioFieldPrompt prompt,
@@ -495,7 +503,7 @@ public final class PetStudioController {
         sessions.setPendingInput(inputToken, true);
         sendPrompt.run();
         player.closeInventory();
-        PendingChatInput<T> input = inputs.await(player.getUniqueId(), inputToken, path, Duration.ofMinutes(2), parser,
+        PendingChatInput<T> input = inputs.await(player.getUniqueId(), inputToken, path, promptTimeout, parser,
                 value -> {
                     state.draft = apply.apply(value);
                     sessions.setPendingInput(inputToken, false);
@@ -503,7 +511,7 @@ public final class PetStudioController {
                     render(state, resumeScreen);
                 }, failure -> inputFailure(player, state, inputToken, failure, resumeScreen));
         plugin.getServer().getScheduler().runTaskLater(plugin,
-                () -> inputs.expire(player.getUniqueId(), input.inputId()), 2 * 60 * 20L);
+                () -> inputs.expire(player.getUniqueId(), input.inputId()), promptTimeoutTicks);
     }
 
     private void inputFailure(Player player, StudioState state, StudioViewToken token, ChatInputFailure failure,
