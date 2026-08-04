@@ -117,26 +117,22 @@
   box-shadow: var(--shadow);
 }
 
-/* --- page bar -------------------------------------------------------------------------------- */
+/* --- page rail ------------------------------------------------------------------------------- */
 
 /*
- * One horizontal row of tabs, sticky under the header.
+ * A compact vertical rail on the left.
  *
- * Replaces a left sidebar: six pages do not need a rail, and the column it occupied is better spent on
- * the prose the reader came for. Scrolls horizontally on a narrow screen rather than wrapping into a
- * block that pushes the article off the first fold.
+ * Narrower than the original sidebar and stripped of its section headings and per-page summaries: with
+ * six pages the grouping reads from the order alone, and the summary is already the first line of the
+ * page itself. That keeps navigation where it is easy to scan down while giving the article back the
+ * width the old rail spent on secondary text.
  */
 .wiki-nav {
   position: sticky;
-  top: 3.7rem;
-  z-index: 15;
-  margin: 0 auto;
-  width: min(1400px, 100%);
-  padding: 0.55rem clamp(0.8rem, 3vw, 2rem);
-  border-bottom: 1px solid var(--line);
-  background: rgba(243, 240, 231, 0.94);
-  backdrop-filter: blur(14px);
-  overflow-x: auto;
+  top: 5.2rem;
+  max-height: calc(100vh - 7rem);
+  overflow-y: auto;
+  padding-right: 0.2rem;
   scrollbar-width: thin;
 }
 
@@ -144,34 +140,34 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  gap: 0.35rem;
-  /* Keeps the row from collapsing into two lines mid-scroll. */
-  flex-wrap: nowrap;
+  display: grid;
+  gap: 0.15rem;
 }
 
 .wiki-nav a {
   display: block;
-  padding: 0.42rem 0.85rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
+  padding: 0.42rem 0.7rem;
+  /* The marker rail: a transparent edge that the active item colours in, so switching pages shifts
+     nothing horizontally. */
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius) var(--radius) 0;
   text-decoration: none;
+  font-size: 0.88rem;
   font-weight: 600;
-  font-size: 0.9rem;
-  white-space: nowrap;
+  line-height: 1.3;
   color: var(--ink-soft);
 }
 
 .wiki-nav a:hover {
   background: var(--paper-deep);
-  border-color: var(--line);
+  border-left-color: var(--line);
   color: var(--ink);
 }
 
 .wiki-nav a.active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
+  background: var(--mint-light);
+  border-left-color: var(--signal);
+  color: var(--ink);
 }
 
 .wiki-nav .empty {
@@ -187,8 +183,10 @@
   width: min(1400px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(12rem, 15rem);
-  gap: clamp(1rem, 2.5vw, 2.5rem);
+  /* 13rem instead of the original 15-18rem: enough for the longest page name at this size, and no
+     more, since every rem here comes out of the prose. */
+  grid-template-columns: minmax(11rem, 13rem) minmax(0, 1fr) minmax(11rem, 14rem);
+  gap: clamp(0.9rem, 2vw, 2rem);
   padding: clamp(1rem, 3vw, 2.5rem) clamp(0.8rem, 3vw, 2rem);
   align-items: start;
 }
@@ -319,7 +317,7 @@
 
 .wiki-aside {
   position: sticky;
-  top: 7.5rem;
+  top: 5.2rem;
   display: grid;
   gap: 1rem;
   max-height: calc(100vh - 7rem);
@@ -376,20 +374,54 @@
 
 /* --- responsive ------------------------------------------------------------------------------ */
 
-@media (max-width: 1100px) {
-  /* The contents rail is the first thing to go: the page bar already gives orientation. */
-  .wiki-shell { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1180px) {
+  /* The contents rail goes first: the page rail is the one that orients you between pages. */
+  .wiki-shell { grid-template-columns: minmax(11rem, 13rem) minmax(0, 1fr); }
   .wiki-aside { display: none; }
 }
 
-@media (max-width: 760px) {
-  .wiki-shell { padding-top: 1rem; }
+@media (max-width: 820px) {
+  /*
+   * Below this the rail would leave the article too narrow to read, so it becomes a scrolling row
+   * above the text — still one tap per page, without stealing a column that is no longer there.
+   */
+  .wiki-shell {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 1rem;
+  }
+
+  .wiki-nav {
+    position: static;
+    max-height: none;
+    overflow-x: auto;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .wiki-nav ul {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+  }
+
+  .wiki-nav a {
+    white-space: nowrap;
+    border-left: 0;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+  }
+
+  .wiki-nav a:hover { border-color: var(--line); }
+
+  .wiki-nav a.active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+
   .wiki-header { gap: 0.6rem; }
   #wiki-search { width: 100%; }
   .wiki-search-wrap { flex: 1; }
-
-  /* Header wraps to two rows on a phone, so the bar has to start lower to stay visible. */
-  .wiki-nav { top: 6.6rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
