@@ -39,29 +39,58 @@ class OmniPetCommandTreeContractTest {
 
     @Test
     void everyTopLevelLiteralIsMatchedByTheDispatcherOrItsParser() throws IOException {
-        // vault is matched by AdminPetCommandParser rather than inline in the dispatcher.
-        String routing = Files.readString(DISPATCHER) + Files.readString(sibling("AdminPetCommandParser.java"));
+        String routing = routingSources();
 
         for (CommandSpec child : OmniPetCommandTree.root().children()) {
-            assertTrue(routing.contains("equalsIgnoreCase(\"" + child.literal() + "\")"),
+            assertTrue(matches(routing, child.literal()),
                     () -> "the tree advertises /pet " + child.literal() + " but nothing matches it");
         }
     }
 
     @Test
     void everyAdminBranchLiteralIsMatchedByTheDispatcherOrOneOfItsParsers() throws IOException {
-        // The dispatcher matches some admin literals inline and delegates the rest to a parser.
-        // Either is fine; what must not happen is a literal nothing matches.
-        String routing = Files.readString(DISPATCHER)
-                + Files.readString(sibling("AdminPetCommandParser.java"))
-                + Files.readString(sibling("HatchAdminCommandParser.java"))
-                + Files.readString(sibling("SlotTransactionAdminCommandParser.java"));
+        String routing = routingSources();
 
         for (CommandSpec branch : OmniPetCommandTree.root().child("admin").children()) {
-            assertTrue(routing.contains("equalsIgnoreCase(\"" + branch.literal() + "\")"),
+            assertTrue(matches(routing, branch.literal()),
                     () -> "the tree advertises /pet admin " + branch.literal()
-                            + " but no dispatcher or parser matches it");
+                            + " but no router or parser matches it");
         }
+    }
+
+    /**
+     * Every source that can claim a literal.
+     *
+     * <p>Routing is spread across the routers and the parsers by design — a literal whose arguments need
+     * parsing belongs to its parser — so the check reads all of them rather than assuming one file. It is
+     * a grep, so a file missing here shows up as a failing assertion rather than a silent gap.
+     */
+    private static String routingSources() throws IOException {
+        StringBuilder sources = new StringBuilder();
+        for (String name : List.of(
+                "OmniPetCommand.java",
+                "PlayerCommandRouter.java",
+                "AdminCommandRouter.java",
+                "HatchAdminRouter.java",
+                "SlotTransactionAdminRouter.java",
+                "AdminPetCommandParser.java",
+                "HatchAdminCommandParser.java",
+                "SlotTransactionAdminCommandParser.java")) {
+            sources.append(Files.readString(sibling(name)));
+        }
+        return sources.toString();
+    }
+
+    /**
+     * Whether a literal is claimed, by either matching style.
+     *
+     * <p>A branch is matched inline with {@code equalsIgnoreCase}, or declared as an {@link AdminArea}
+     * whose first argument is the literal. Both are real routing; only a literal nothing claims is a bug.
+     */
+    private static boolean matches(String routing, String literal) {
+        return routing.contains("equalsIgnoreCase(\"" + literal + "\")")
+                || routing.contains("case \"" + literal + "\"")
+                || routing.contains("new AdminArea(\"" + literal + "\"");
     }
 
     @Test

@@ -37,6 +37,8 @@ dependencies:
       required: false
       join-classpath: false
 
+# Commands are registered through the Paper lifecycle: /pet (alias /pets) and
+# /petadmin (alias /opadmin), which is the same administration without the second word.
 permissions:
   omnipet.*:
     description: Wildcard permission for OmniPet administrators

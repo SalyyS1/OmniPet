@@ -353,179 +353,21 @@ public final class OmniPetCommand implements BasicCommand {
         CommandSender sender = source.getSender();
         Player player = sender instanceof Player value ? value : null;
         List<String> arguments = Arrays.asList(args == null ? new String[0] : args);
-        // Matched before any numeric parsing so "help" can never be read as a vault page.
-        if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("help")) {
-            CommandHelpRenderer.send(sender, arguments, player != null);
-            return;
-        }
-        if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("hatch")) {
-            if (player == null) {
-                sender.sendMessage("OmniPet: a player is required to hatch an egg.");
-                return;
-            }
-            if (hatches == null) {
-                sender.sendMessage("OmniPet: hatch flow is not available yet.");
-                return;
-            }
-            if (arguments.size() > 2) {
-                sender.sendMessage("OmniPet: use /pet hatch [main|off|claim|refresh|use-main|use-off].");
-                return;
-            }
-            hatches.command(player, arguments.size() == 1 ? null : arguments.get(1));
-            return;
-        }
-        if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("skill")) {
-            if (player == null) {
-                sender.sendMessage("OmniPet: a player is required to cast a pet skill.");
-                return;
-            }
-            if (skills == null) {
-                sender.sendMessage("OmniPet: active pet skills are not available yet.");
-                return;
-            }
-            if (arguments.size() != 3) {
-                sender.sendMessage("OmniPet: use /pet skill <pet-uuid> <binding-id>.");
-                return;
-            }
-            try {
-                skills.cast(player, UUID.fromString(arguments.get(1)), arguments.get(2));
-            } catch (IllegalArgumentException invalid) {
-                sender.sendMessage("OmniPet: pet UUID is invalid.");
-            }
-            return;
-        }
-        if (arguments.size() >= 2 && arguments.get(0).equalsIgnoreCase("admin")
-                && arguments.get(1).equalsIgnoreCase("item")) {
-            List<String> itemArguments = arguments.subList(2, arguments.size());
-            if (!sender.hasPermission("omnipet.admin.item")) {
-                sender.sendMessage("OmniPet: you do not have permission to distribute OmniPet items.");
-            } else if (cultivationItems != null && cultivationItems.supports(itemArguments)) {
-                if (!sender.hasPermission("omnipet.admin.cultivation")) {
-                    sender.sendMessage("OmniPet: you do not have permission to distribute cultivation items.");
-                } else {
-                    cultivationItems.command(sender, itemArguments);
-                }
-            } else if (actionItems == null) {
-                sender.sendMessage("OmniPet: incubation action items are not available yet.");
-            } else {
-                actionItems.command(sender, itemArguments);
-            }
-            return;
-        }
-        if (arguments.size() >= 2 && arguments.get(0).equalsIgnoreCase("admin")
-                && arguments.get(1).equalsIgnoreCase("egg")) {
-            if (!sender.hasPermission("omnipet.admin.egg")) {
-                sender.sendMessage("OmniPet: you do not have permission to administer eggs.");
-            } else if (eggAdmin == null) {
-                sender.sendMessage("OmniPet: egg administration is not available yet.");
-            } else {
-                eggAdmin.eggCommand(sender, arguments.subList(2, arguments.size()));
-            }
-            return;
-        }
-        if (arguments.size() >= 2 && arguments.get(0).equalsIgnoreCase("admin")
-                && arguments.get(1).equalsIgnoreCase("pet")) {
-            if (!sender.hasPermission("omnipet.admin.petgive")) {
-                sender.sendMessage("OmniPet: you do not have permission to grant pets directly.");
-            } else if (eggAdmin == null) {
-                sender.sendMessage("OmniPet: pet granting is not available yet.");
-            } else {
-                eggAdmin.petCommand(sender, arguments.subList(2, arguments.size()));
-            }
-            return;
-        }
-        if (arguments.size() >= 2 && arguments.get(0).equalsIgnoreCase("admin")
-                && arguments.get(1).equalsIgnoreCase("skill")) {
-            if (!sender.hasPermission("omnipet.admin.skill")) {
-                sender.sendMessage("OmniPet: you do not have permission to reconcile pet skills.");
-            } else if (skillAdmin == null) {
-                sender.sendMessage("OmniPet: skill reconciliation is not available yet.");
-            } else {
-                skillAdmin.command(sender, arguments.subList(2, arguments.size()));
-            }
-            return;
-        }
-        if (arguments.size() >= 2 && arguments.get(0).equalsIgnoreCase("admin")
-                && arguments.get(1).equalsIgnoreCase("cultivation")) {
-            if (!sender.hasPermission("omnipet.admin.cultivation")) {
-                sender.sendMessage("OmniPet: you do not have permission to recover cultivation actions.");
-            } else if (cultivationAdmin == null) {
-                sender.sendMessage("OmniPet: cultivation recovery is not available yet.");
-            } else {
-                cultivationAdmin.command(sender, arguments.subList(2, arguments.size()));
-            }
-            return;
-        }
-        if (arguments.size() >= 2 && arguments.get(0).equalsIgnoreCase("admin")
-                && arguments.get(1).equalsIgnoreCase("release")) {
-            if (!sender.hasPermission("omnipet.admin.release")) {
-                sender.sendMessage("OmniPet: you do not have permission to reconcile pet releases.");
-            } else if (releaseAdmin == null) {
-                sender.sendMessage("OmniPet: release administration is not available yet.");
-            } else {
-                releaseAdmin.command(sender, arguments.subList(2, arguments.size()));
-            }
-            return;
-        }
-        if (!arguments.isEmpty() && arguments.getFirst().equalsIgnoreCase("slot")) {
-            if (player == null) {
-                sender.sendMessage("OmniPet: a player is required to buy active slots.");
-                return;
-            }
-            int returnPage = 1;
-            if (arguments.size() == 2) {
-                try {
-                    returnPage = Integer.parseInt(arguments.get(1));
-                } catch (NumberFormatException ignored) {
-                    sender.sendMessage("OmniPet: slot return page must be a positive integer.");
-                    return;
-                }
-            } else if (arguments.size() != 1) {
-                sender.sendMessage("OmniPet: use /pet slot.");
-                return;
-            }
-            if (returnPage < 1) {
-                sender.sendMessage("OmniPet: slot return page must be a positive integer.");
-                return;
-            }
-            slotPurchases.open(player, returnPage);
-            return;
-        }
-        HatchAdminCommandParser.Result hatchAdminCommand =
-                HatchAdminCommandParser.parse(arguments, ONLINE_PLAYERS);
-        if (!(hatchAdminCommand instanceof HatchAdminCommandParser.NotMatched)) {
-            dispatchHatchAdmin(sender, hatchAdminCommand);
-            return;
-        }
-        SlotTransactionAdminCommandParser.Result transactionCommand =
-                SlotTransactionAdminCommandParser.parse(arguments);
-        if (!(transactionCommand instanceof SlotTransactionAdminCommandParser.NotMatched)) {
-            if (!sender.hasPermission(SlotTransactionAdminCommandParser.PERMISSION)) {
-                sender.sendMessage("OmniPet: you do not have permission to reconcile slot transactions.");
-                return;
-            }
-            if (transactionCommand instanceof SlotTransactionAdminCommandParser.ListPending pending) {
-                transactions.list(sender, pending.limit(), pending.cursor());
-            } else if (transactionCommand instanceof SlotTransactionAdminCommandParser.Reconcile reconcile) {
-                transactions.reconcile(sender, reconcile.transactionId(), reconcile.decision());
-            } else {
-                sender.sendMessage("OmniPet: use /pet admin transactions [limit] [cursor] or "
-                        + "/pet admin reconcile <uuid> <charge|no-charge|refund|sync>.");
-            }
-            return;
-        }
-        if (arguments.size() == 2 && arguments.get(0).equalsIgnoreCase("admin")
-                && arguments.get(1).equalsIgnoreCase("reload")) {
-            if (!sender.hasPermission("omnipet.admin.reload")) {
-                sender.sendMessage("OmniPet: you do not have permission to reload definitions.");
-                return;
-            }
-            sender.sendMessage(reloadRuntime.getAsBoolean()
-                    ? "OmniPet: config and definitions reloaded; online player reconciliation queued."
-                    : "OmniPet: reload failed; the previous registry remains active.");
-            return;
-        }
 
+        // Order is load-bearing and unchanged by the split: the player branches include `help`, which
+        // must be matched before anything parses a leading token as a vault page number.
+        if (playerRouter().route(sender, player, arguments)) return;
+        if (adminRouter().route(sender, arguments)) return;
+        openVaultOrHub(sender, player, arguments);
+    }
+
+    /**
+     * What a bare {@code /pet}, {@code /pet <page>}, and {@code /pet admin browse} fall through to.
+     *
+     * <p>Kept here rather than in a router because it is the fall-through itself: every branch above
+     * returns, and anything left is a vault page, the hub, or the Studio.
+     */
+    private void openVaultOrHub(CommandSender sender, Player player, List<String> arguments) {
         UUID playerId = player == null ? null : player.getUniqueId();
         AdminPetCommandParser.Result result = AdminPetCommandParser.parse(new AdminPetCommandParser.Request(
                 "pet", arguments, playerId, sender.hasPermission(AdminPetCommandParser.GENERAL_PERMISSION),
@@ -549,42 +391,81 @@ public final class OmniPetCommand implements BasicCommand {
         }
     }
 
-    private void dispatchHatchAdmin(CommandSender sender, HatchAdminCommandParser.Result result) {
-        if (result instanceof HatchAdminCommandParser.Invalid) {
-            sender.sendMessage("OmniPet: use /pet admin hatch inspect <player-uuid>, "
-                    + "/pet admin hatch reduce|set <player-uuid> <incubation-uuid> <millis> <action-uuid>, "
-                    + "or /pet admin hatch complete|cancel <player-uuid> <incubation-uuid> <action-uuid>.");
-            return;
-        }
-        if (result instanceof HatchAdminCommandParser.Inspect inspect) {
-            if (!sender.hasPermission(HatchAdminCommandParser.INSPECT_PERMISSION)) {
-                sender.sendMessage("OmniPet: you do not have permission to inspect incubation state.");
+    /**
+     * The player branches, built from the fields this command was constructed with.
+     *
+     * <p>Built on demand rather than in the constructor because there are ten constructor overloads, each
+     * wiring a different subset; deriving the routers from the fields means the split needed no change to
+     * any of them.
+     */
+    private PlayerCommandRouter playerRouter() {
+        return new PlayerCommandRouter(hatches, skills,
+                slotPurchases == null ? null : slotPurchases::open);
+    }
+
+    /** Everything under {@code admin}, shared verbatim with the standalone {@code /petadmin}. */
+    AdminCommandRouter adminRouter() {
+        return new AdminCommandRouter(
+                adminAreas(),
+                new HatchAdminRouter(hatchAdmin, ONLINE_PLAYERS),
+                new SlotTransactionAdminRouter(transactions),
+                reloadRuntime);
+    }
+
+    /**
+     * The simple {@code admin <area>} branches.
+     *
+     * <p>Items are one area with an internal fork: a cultivation item additionally requires the
+     * cultivation permission, which is why that branch is a handler rather than two areas.
+     */
+    private List<AdminArea> adminAreas() {
+        return List.of(
+                new AdminArea("item", "omnipet.admin.item",
+                        "OmniPet: you do not have permission to distribute OmniPet items.",
+                        "OmniPet: incubation action items are not available yet.",
+                        this::dispatchItems),
+                new AdminArea("egg", "omnipet.admin.egg",
+                        "OmniPet: you do not have permission to administer eggs.",
+                        "OmniPet: egg administration is not available yet.",
+                        eggAdmin == null ? null : eggAdmin::eggCommand),
+                new AdminArea("pet", "omnipet.admin.petgive",
+                        "OmniPet: you do not have permission to grant pets directly.",
+                        "OmniPet: pet granting is not available yet.",
+                        eggAdmin == null ? null : eggAdmin::petCommand),
+                new AdminArea("skill", "omnipet.admin.skill",
+                        "OmniPet: you do not have permission to reconcile pet skills.",
+                        "OmniPet: skill reconciliation is not available yet.",
+                        skillAdmin == null ? null : skillAdmin::command),
+                new AdminArea("cultivation", "omnipet.admin.cultivation",
+                        "OmniPet: you do not have permission to recover cultivation actions.",
+                        "OmniPet: cultivation recovery is not available yet.",
+                        cultivationAdmin == null ? null : cultivationAdmin::command),
+                new AdminArea("release", "omnipet.admin.release",
+                        "OmniPet: you do not have permission to reconcile pet releases.",
+                        "OmniPet: release administration is not available yet.",
+                        releaseAdmin == null ? null : releaseAdmin::command));
+    }
+
+    /**
+     * Item distribution, where a cultivation item needs a second permission.
+     *
+     * <p>The availability check is deliberately on the action-item target rather than on both: the
+     * cultivation branch reports its own missing permission first, matching the previous behaviour.
+     */
+    private void dispatchItems(CommandSender sender, List<String> arguments) {
+        if (cultivationItems != null && cultivationItems.supports(arguments)) {
+            if (!sender.hasPermission("omnipet.admin.cultivation")) {
+                sender.sendMessage("OmniPet: you do not have permission to distribute cultivation items.");
                 return;
             }
-            if (hatchAdmin == null) {
-                sender.sendMessage("OmniPet: hatch administration is not available yet.");
-                return;
-            }
-            hatchAdmin.inspect(sender, inspect.playerId());
+            cultivationItems.command(sender, arguments);
             return;
         }
-        if (!sender.hasPermission(HatchAdminCommandParser.MANAGE_PERMISSION)) {
-            sender.sendMessage("OmniPet: you do not have permission to manage incubation state.");
+        if (actionItems == null) {
+            sender.sendMessage("OmniPet: incubation action items are not available yet.");
             return;
         }
-        if (hatchAdmin == null) {
-            sender.sendMessage("OmniPet: hatch administration is not available yet.");
-            return;
-        }
-        if (result instanceof HatchAdminCommandParser.Reduce reduce) {
-            hatchAdmin.reduce(sender, reduce.playerId(), reduce.incubationId(), reduce.millis(), reduce.actionId());
-        } else if (result instanceof HatchAdminCommandParser.SetRemaining set) {
-            hatchAdmin.setRemaining(sender, set.playerId(), set.incubationId(), set.millis(), set.actionId());
-        } else if (result instanceof HatchAdminCommandParser.Complete complete) {
-            hatchAdmin.complete(sender, complete.playerId(), complete.incubationId(), complete.actionId());
-        } else if (result instanceof HatchAdminCommandParser.Cancel cancel) {
-            hatchAdmin.cancel(sender, cancel.playerId(), cancel.incubationId(), cancel.actionId());
-        }
+        actionItems.command(sender, arguments);
     }
 
     @Override
@@ -618,36 +499,4 @@ public final class OmniPetCommand implements BasicCommand {
     public interface HubTarget {
         void open(Player player);
     }
-}
-
-@FunctionalInterface
-interface PlayerHatchCommandTarget {
-    void command(Player player, String action);
-}@FunctionalInterface
-interface PlayerSkillCommandTarget {
-    void cast(Player player, UUID petId, String bindingId);
-}
-
-@FunctionalInterface
-interface SkillAdminCommandTarget {
-    void command(CommandSender sender, List<String> arguments);
-}
-
-@FunctionalInterface
-interface ItemCommandTarget {
-    void command(CommandSender sender, List<String> arguments);
-}
-
-interface CultivationItemCommandTarget extends ItemCommandTarget {
-    boolean supports(List<String> arguments);
-}
-
-@FunctionalInterface
-interface ReleaseAdminCommandTarget {
-    void command(CommandSender sender, List<String> arguments);
-}
-
-@FunctionalInterface
-interface CultivationAdminCommandTarget {
-    void command(CommandSender sender, List<String> arguments);
 }

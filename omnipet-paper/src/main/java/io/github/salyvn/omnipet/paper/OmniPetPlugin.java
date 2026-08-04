@@ -29,6 +29,7 @@ import io.github.salyvn.omnipet.core.incubation.IncubationItemActionService;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrationResult;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyEggDefinitionsMigrator;
 import io.github.salyvn.omnipet.paper.command.FoundationCommandContract;
+import io.github.salyvn.omnipet.paper.command.OmniPetAdminCommand;
 import io.github.salyvn.omnipet.paper.command.OmniPetCommand;
 import io.github.salyvn.omnipet.paper.buff.MythicLibBuffLifecycleListener;
 import io.github.salyvn.omnipet.paper.buff.PaperOwnerBuffCoordinator;
@@ -371,6 +372,11 @@ public final class OmniPetPlugin extends JavaPlugin {
             command.bindEggAdmin(eggAdmin);
             event.registrar().register(
                     FoundationCommandContract.NAME, FoundationCommandContract.ALIASES, command);
+            // The same administration without the second word. Routes into the router /pet already
+            // builds, so the two spellings cannot drift apart.
+            event.registrar().register(
+                    OmniPetAdminCommand.NAME, OmniPetAdminCommand.ALIASES,
+                    new OmniPetAdminCommand(command));
         });
     }
 

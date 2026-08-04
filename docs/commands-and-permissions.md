@@ -4,6 +4,16 @@ The Gradle-built Paper runtime registers the player hub, the player vault, Admin
 
 ## Command entry point
 
+OmniPet registers two commands. They are the same feature set:
+
+| Spelling | Alias | Use |
+| --- | --- | --- |
+| `/pet ...` | `/pets` | Everything, players and administration alike. |
+| `/petadmin ...` | `/opadmin` | Administration without the second word: `/petadmin transactions` is `/pet admin transactions`. |
+
+Both route into the same code, so a permission or a behaviour can never differ between them, and `/pet admin ...` keeps working exactly as before — no script, macro, or existing documentation needs changing.
+
+
 | Command | Alias | Permission | Current behavior |
 | --- | --- | --- | --- |
 | `/pet` | `/pets` | `omnipet.general` | Opens the player hub: Vault, Hatch, Active slots, Help, and (for staff) Studio tiles. |
