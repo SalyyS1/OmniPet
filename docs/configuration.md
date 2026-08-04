@@ -284,6 +284,31 @@ candidates:
 - Candidates are unique pet definition IDs with finite non-negative weights and a positive total weight.
 - Each file is capped at 64 KiB and catalog discovery is capped at 10,000 entries.
 
+### Placing an egg to incubate
+
+An egg can also be placed as a block and left to hatch, with a floating countdown above it. An egg definition controls what has to be around it:
+
+```yaml
+extensions:
+  placement:
+    requires: lava        # the preset: a full ring of 8 lava, for a fire-affinity pet
+    # or name your own:
+    # blocks: [ice, packed_ice]
+    # count: 3
+    # describe: "ice"
+    # allowed: false      # this egg can only be hatched from the hand
+```
+
+- With no `placement` node an egg accepts **any one** adjacent heat source: torch, campfire, lantern, fire, lava, magma block, furnace, and the soul variants.
+- `requires: lava` demands all eight surrounding blocks be lava, so "surrounded by lava" means surrounded rather than one lucky neighbour. Intended for dragons, phoenixes, and other fire-affinity pets.
+- `blocks` replaces the default heat list rather than adding to it; `count` is how many are needed; `describe` is the word used when a placement is refused.
+- `allowed: false` refuses placement entirely, so that egg must be hatched with `/pet hatch main`.
+- A malformed `placement` node falls back to ordinary heat rather than making the egg unhatchable.
+- The requirement is re-checked every second, so removing the heat pauses the countdown instead of finishing it.
+- A placed egg is stored at `plugins/OmniPet/data/placed-eggs/*.yml`, one file per block. It is **not** an escrow row: escrow proves a *held* item was paid for, while a placed egg is one the player still owns. Breaking the block consumes the record and returns that exact egg, so a break/place cycle cannot duplicate it.
+- Holograms are rebuilt from the records whenever the chunk loads and are never persisted, so a crash or an unload leaves nothing to clean up.
+- When a placed egg finishes and its owner's vault is full, the egg stays on the ground reading ready rather than being lost.
+
 This is the canonical verified definition contract used by the Paper hatch flow. The Paper bootstrap loads it from `plugins/OmniPet/eggs/*.yml`, binds escrow entries at `plugins/OmniPet/data/egg-escrow/*.yml`, and caches a pet-to-egg reference index used by Studio deletion checks.
 
 Paper egg identity uses `omnipet:egg`, `omnipet:item_nonce`, and schema-1 `omnipet:item_schema`; reads also accept legacy `passivepet:egg`. Capture serializes an amount-one clone as the durable payload, fingerprints it with SHA-256, and rejects payloads over 8 KiB. Inventory capture/removal/refund requires the player to remain online and must run on Paper's main thread. Malformed or unsupported identity, duplicate nonce, material/fingerprint mismatch, or an unexpected split amount fails closed as ambiguous instead of guessing whether the paid egg is present. Escrow entries retain the core 16 KiB file cap and 10,000-file scan bound.

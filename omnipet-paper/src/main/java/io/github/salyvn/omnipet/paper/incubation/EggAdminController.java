@@ -307,6 +307,38 @@ public final class EggAdminController {
      * it are two separate lock acquisitions, so anything that bumps the revision in between — a vault
      * toggle, a hatch tick, a slot purchase — makes the admit stale; each attempt observes again.
      */
+    /**
+     * Grants the pet an egg hatched on the ground, on the owner's task queue.
+     *
+     * <p>Shares the retry and the queue with the admin grant rather than reimplementing them: a placed
+     * egg finishing is the same operation as an operator handing a pet over, so it must serialise against
+     * the owner's other work the same way and survive a lost revision race the same way.
+     *
+     * @param onOutcome receives the result on the main thread, or null when the work could not be queued
+     */
+    public void grantAsync(
+            UUID playerId,
+            PetDefinition definition,
+            PetStorageLimits resolved,
+            Consumer<PetStorageResult> onOutcome) {
+        Objects.requireNonNull(playerId, "player id");
+        Objects.requireNonNull(definition, "pet definition");
+        Objects.requireNonNull(resolved, "resolved limits");
+        Objects.requireNonNull(onOutcome, "outcome handler");
+        if (!tasks.submit(playerId, () -> {
+            PetStorageResult result;
+            try {
+                result = grant(playerId, definition, resolved);
+            } catch (IOException | RuntimeException failure) {
+                result = null;
+            }
+            PetStorageResult delivered = result;
+            onMain(() -> onOutcome.accept(delivered));
+        })) {
+            onMain(() -> onOutcome.accept(null));
+        }
+    }
+
     private PetStorageResult grant(UUID playerId, PetDefinition definition, PetStorageLimits resolved)
             throws IOException {
         StaleRevisionException lastConflict = null;

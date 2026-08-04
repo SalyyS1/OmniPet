@@ -51,7 +51,12 @@ import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegis
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.pet.PetInteractListener;
 import io.github.salyvn.omnipet.paper.incubation.EggAdminController;
-import io.github.salyvn.omnipet.paper.incubation.EggBlockPlacementListener;
+import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggCoordinator;
+import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggHolograms;
+import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggListener;
+import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggRecord;
+import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggStore;
+import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggView;
 import io.github.salyvn.omnipet.paper.incubation.PaperEggItemCodec;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuListener;
@@ -81,6 +86,7 @@ import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerTaskShutdown;
 import io.github.salyvn.omnipet.paper.text.MessageCatalog;
 import io.github.salyvn.omnipet.paper.text.MessageCatalogFile;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 import io.github.salyvn.omnipet.paper.skill.MythicMobsSkillLifecycleListener;
 import io.github.salyvn.omnipet.paper.skill.PaperActiveSkillController;
@@ -114,6 +120,7 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PlayerHubController hubController;
     private EggAdminController eggAdmin;
     private Path messagesFile;
+    private PlacedEggView placedEggs;
 
     @Override
     public void onEnable() {
@@ -257,9 +264,22 @@ public final class OmniPetPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(
                     new IncubationLifecycleListener(incubationCoordinator, hatchController), this);
             getServer().getPluginManager().registerEvents(new HatchMenuListener(hatchController), this);
-            // Placing an egg would convert it to a block and destroy the identity escrow matches on.
+            // Placing an egg incubates it in the world, keeping its identity in a durable block record.
+            // Deliberately its own record rather than an escrow row: escrow proves a held item was paid
+            // for, while a placed egg is one the player still owns.
+            // One coordinator, shared: two would each hold their own store and could disagree about
+            // whether a block still has an egg on it.
+            PlacedEggCoordinator placedEggCoordinator = new PlacedEggCoordinator(
+                    new PlacedEggStore(dataRoot.resolve("data/placed-eggs")),
+                    incubation.eggDefinitions(),
+                    warning -> getLogger().warning("OmniPet placed egg: " + warning));
+            placedEggs = new PlacedEggView(
+                    this, placedEggCoordinator, new PlacedEggHolograms(), this::hatchPlacedEgg);
             getServer().getPluginManager().registerEvents(
-                    new EggBlockPlacementListener(new PaperEggItemCodec(this)), this);
+                    new PlacedEggListener(
+                            new PaperEggItemCodec(this), placedEggCoordinator, placedEggs),
+                    this);
+            placedEggs.start();
             getServer().getPluginManager().registerEvents(new HubMenuListener(hubController), this);
             getServer().getPluginManager().registerEvents(new EconomyProviderLifecycleListener(
                     this,
@@ -293,6 +313,9 @@ public final class OmniPetPlugin extends JavaPlugin {
                         if (playerPets != null) playerPets.closeAll();
                         if (ownerBuffs != null) ownerBuffs.close();
                         if (petRuntime != null) petRuntime.disable();
+                        // Stops the tick and despawns every hologram. The records stay: a placed egg is
+                        // an item the player owns, and the holograms are rebuilt from them on enable.
+                        if (placedEggs != null) placedEggs.stop();
                         if (slotPurchases != null) slotPurchases.close();
                     },
                     () -> {
@@ -392,6 +415,46 @@ public final class OmniPetPlugin extends JavaPlugin {
      * category rather than failing, so an operator's typo on an unexpected Paper version costs a
      * noise, not the plugin.
      */
+    /**
+     * Turns a placed egg that has finished into a pet in its owner's vault.
+     *
+     * <p>The record is consumed only once the pet is admitted. A full vault leaves the egg on the ground
+     * reading ready, so the reward waits for the player rather than being destroyed by bad timing — the
+     * same rule the held-egg claim already follows.
+     */
+    private void hatchPlacedEgg(java.util.UUID ownerId, PlacedEggRecord record) {
+        var owner = getServer().getPlayer(ownerId);
+        if (owner == null || !owner.isOnline()) return;
+        var definition = registry.current().definitions().get(placedEggDefinitionId(record));
+        if (definition == null) return;
+        var limits = new PaperStorageLimitsResolver(activeConfig.storage())
+                .resolve(owner::hasPermission).limits();
+        eggAdmin.grantAsync(ownerId, definition, limits, result -> {
+            if (result == null || !result.succeeded()) {
+                owner.sendMessage(Messages.line(MessageKey.EGG_PLACED_VAULT_FULL));
+                return;
+            }
+            placedEggs.remove(record.key());
+            placedEggs.consume(record);
+            owner.sendMessage(Messages.line(MessageKey.EGG_PLACED_HATCHED,
+                    Messages.of("pet", definition.id())));
+        });
+    }
+
+    /** The pet a placed egg hatches: its catalog entry's single candidate. */
+    private String placedEggDefinitionId(PlacedEggRecord record) {
+        try {
+            return incubation.eggDefinitions().read(record.eggId())
+                    .map(envelope -> envelope.definition().candidates().isEmpty()
+                            ? null
+                            : envelope.definition().candidates().getFirst().definitionId())
+                    .orElse(null);
+        } catch (IOException | RuntimeException failure) {
+            getLogger().warning("OmniPet could not read the placed egg's definition: " + failure.getMessage());
+            return null;
+        }
+    }
+
     private FeedbackSettings resolveFeedback(GuiConfig.Feedback config) {
         return FeedbackSettings.resolve(config, warning -> getLogger().warning("OmniPet feedback: " + warning));
     }
