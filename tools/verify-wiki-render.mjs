@@ -9,7 +9,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -113,6 +113,19 @@ const withImage = renderMarkdown('![Alt text](img/hatch-flow.svg)');
 check(withImage.html.includes('<img'), 'image syntax renders an img element');
 check(withImage.html.includes('alt="Alt text"'), 'image alt text is preserved');
 check(!withImage.html.includes('](') , 'image syntax is fully consumed');
+
+console.log('image weight');
+// A documentation page that takes seconds to load is a page people stop reading, and generated art is
+// the one asset here that can quietly grow by megabytes.
+const MAX_IMAGE_KIB = 400;
+let totalKib = 0;
+for (const src of referenced) {
+  const bytes = statSync(join(docs, src)).size;
+  const kib = Math.round(bytes / 1024);
+  totalKib += kib;
+  check(kib <= MAX_IMAGE_KIB, `${src} is ${kib} KiB (limit ${MAX_IMAGE_KIB})`);
+}
+check(totalKib <= 1024, `all page images total ${totalKib} KiB (limit 1024)`);
 
 console.log('escaping');
 const hostile = renderMarkdown('## <script>alert(1)</script>\n\nA <img src=x onerror=y> line.');

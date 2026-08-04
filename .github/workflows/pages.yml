@@ -7,6 +7,7 @@ on:
       - 'docs/**'
       - 'tools/build-wiki-diagrams.mjs'
       - 'tools/verify-wiki-render.mjs'
+      - 'tools/build-wiki-art.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 

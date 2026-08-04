@@ -98,6 +98,8 @@
 
 /* --- banner ---------------------------------------------------------------------------------- */
 
+.wiki-banner-frame { display: block; }
+
 .wiki-banner {
   display: block;
   width: min(1400px, calc(100% - clamp(1.6rem, 6vw, 4rem)));

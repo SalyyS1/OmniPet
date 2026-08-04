@@ -40,7 +40,14 @@
     </div>
   </header>
 
-  <img class="wiki-banner" src="img/wiki-banner.svg" alt="OmniPet field manual" width="1200" height="300">
+  <!--
+    The illustration is decoration and the SVG is the fallback: if the generated art is ever missing, the
+    committed vector masthead still renders, so the page is never broken by an absent binary.
+  -->
+  <picture class="wiki-banner-frame">
+    <source srcset="img/wiki-hero.webp" type="image/webp">
+    <img class="wiki-banner" src="img/wiki-banner.svg" alt="A glowing dragon egg on a stone pedestal between two lit torches" width="1600" height="686" loading="eager" decoding="async">
+  </picture>
 
   <div class="wiki-shell">
     <nav id="wiki-nav" class="wiki-nav" aria-label="Wiki pages"></nav>

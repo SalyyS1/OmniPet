@@ -136,7 +136,9 @@ Chạy \`/pet\`. Hub sẽ mở với Vault, Hatch, Active slots và Help. Nhân 
         vi: 'Ấp trứng, cho pet ra, lên cấp và phóng thích.',
       },
       body: {
-        en: `## One command to remember
+        en: `![Companion and treasure](img/art-player.webp)
+
+## One command to remember
 
 \`/pet\` opens the hub. Everything else is reachable from there.
 
@@ -147,6 +149,8 @@ Chạy \`/pet\`. Hub sẽ mở với Vault, Hatch, Active slots và Help. Nhân 
 There are two ways, and both work.
 
 **From your hand.** Hold the egg and run \`/pet hatch main\`, or open \`/pet hatch\` and click the start button. The egg leaves your inventory once payment settles, and the menu shows a countdown.
+
+![Egg encircled by lava](img/art-placed-egg.webp)
 
 ![Placed egg](img/placed-egg.svg)
 
@@ -179,7 +183,9 @@ You start with one active pet. More slots are bought with \`/pet slot\`, which s
 ## Releasing a pet
 
 Release trades a pet for rewards. The preview is frozen before you confirm, so what you see is what you get. A locked pet cannot be released — that is what the lock is for.`,
-        vi: `## Một lệnh cần nhớ
+        vi: `![Pet và rương báu](img/art-player.webp)
+
+## Một lệnh cần nhớ
 
 \`/pet\` mở hub. Mọi thứ khác đều vào được từ đó.
 
@@ -190,6 +196,8 @@ Release trades a pet for rewards. The preview is frozen before you confirm, so w
 Có hai cách, và cả hai đều dùng được.
 
 **Từ tay.** Giữ trứng rồi chạy \`/pet hatch main\`, hoặc mở \`/pet hatch\` và bấm nút bắt đầu. Trứng rời túi đồ khi thanh toán hoàn tất, và menu hiện đồng hồ đếm ngược.
+
+![Trứng giữa vòng dung nham](img/art-placed-egg.webp)
 
 ![Trứng đặt xuống](img/placed-egg.svg)
 
@@ -340,7 +348,9 @@ Gõ lệnh khi cần tác động lên **người chơi offline**, khi **viết 
         vi: 'Mục nào nghiêm ngặt, mục nào khoan dung, và gõ sai thì mất gì.',
       },
       body: {
-        en: `## Two kinds of section
+        en: `![Operator ledger](img/art-operator.webp)
+
+## Two kinds of section
 
 ![Strict and lenient config](img/config-strictness.svg)
 
@@ -414,7 +424,9 @@ The vault accepts materials but not slots or size: its pet rows fill slots 0-44 
 | \`messages.yml\`, \`gui.feedback.*\`, \`gui.menus.*\`, \`gui.help.linesPerPage\`, item appearance | **Live.** |
 | \`gui.vault.petsPerPage\`, \`gui.studio.promptTimeoutSeconds\` | **Restart only**, and documented as such in the file. |
 | \`runtime.*\` | **Restart only.** A reload warns you it ignored the change rather than pretending. |`,
-        vi: `## Hai loại mục cấu hình
+        vi: `![Sổ ghi của người quản trị](img/art-operator.webp)
+
+## Hai loại mục cấu hình
 
 ![Cấu hình nghiêm ngặt và khoan dung](img/config-strictness.svg)
 
