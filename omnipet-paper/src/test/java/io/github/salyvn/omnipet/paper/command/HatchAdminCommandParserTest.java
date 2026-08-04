@@ -64,4 +64,50 @@ class HatchAdminCommandParserTest {
         for (Object value : values) arguments.add(value.toString());
         return HatchAdminCommandParser.parse(arguments);
     }
+    @Test
+    void anOnlineNameResolvesWhereAUuidWasPreviouslyRequired() {
+        // An operator acting on someone standing in front of them had to open a YAML file and copy a
+        // UUID out of it. A name resolves first; the UUID form is untouched.
+        UUID steve = UUID.randomUUID();
+        PlayerArgumentResolver players = new PlayerArgumentResolver(
+                name -> name.equals("Steve") ? java.util.Optional.of(steve) : java.util.Optional.empty());
+
+        assertEquals(
+                new HatchAdminCommandParser.Inspect(steve),
+                HatchAdminCommandParser.parse(List.of("admin", "hatch", "inspect", "Steve"), players));
+        assertEquals(
+                new HatchAdminCommandParser.Inspect(playerId),
+                HatchAdminCommandParser.parse(
+                        List.of("admin", "hatch", "inspect", playerId.toString()), players));
+        assertInstanceOf(
+                HatchAdminCommandParser.Invalid.class,
+                HatchAdminCommandParser.parse(List.of("admin", "hatch", "inspect", "Offline"), players));
+    }
+
+    @Test
+    void theActionIdIsOptionalAndGeneratedWhenOmitted() {
+        // The action ID only makes a retry idempotent. Requiring the operator to invent one added a
+        // chance to mistype it and nothing else.
+        UUID generated = UUID.randomUUID();
+        PlayerArgumentResolver players = new PlayerArgumentResolver(name -> java.util.Optional.empty());
+
+        assertEquals(
+                new HatchAdminCommandParser.Cancel(playerId, incubationId, generated),
+                HatchAdminCommandParser.parse(
+                        List.of("admin", "hatch", "cancel", playerId.toString(), incubationId.toString()),
+                        players, () -> generated));
+        assertEquals(
+                new HatchAdminCommandParser.Reduce(playerId, incubationId, 5_000L, generated),
+                HatchAdminCommandParser.parse(
+                        List.of("admin", "hatch", "reduce", playerId.toString(), incubationId.toString(),
+                                "5000"),
+                        players, () -> generated));
+        // An explicitly supplied action ID still wins, so a scripted retry stays idempotent.
+        assertEquals(
+                new HatchAdminCommandParser.Cancel(playerId, incubationId, actionId),
+                HatchAdminCommandParser.parse(
+                        List.of("admin", "hatch", "cancel", playerId.toString(), incubationId.toString(),
+                                actionId.toString()),
+                        players, () -> generated));
+    }
 }

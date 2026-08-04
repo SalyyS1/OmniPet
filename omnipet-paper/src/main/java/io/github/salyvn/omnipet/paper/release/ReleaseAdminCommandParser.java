@@ -2,9 +2,32 @@ package io.github.salyvn.omnipet.paper.release;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 public final class ReleaseAdminCommandParser {
+    /**
+     * Maps an online player name to its UUID, so an operator can name the player instead of pasting a
+     * UUID copied out of a data file. Injected rather than calling Bukkit directly, which keeps this
+     * parser unit-testable; the default resolves nothing, so a UUID is then required.
+     */
+    private final Function<String, Optional<UUID>> onlineNames;
+
+    public ReleaseAdminCommandParser() {
+        this(name -> Optional.empty());
+    }
+
+    public ReleaseAdminCommandParser(Function<String, Optional<UUID>> onlineNames) {
+        this.onlineNames = java.util.Objects.requireNonNull(onlineNames, "online name lookup");
+    }
+
+    /** An online name when one matches, otherwise strict UUID text. */
+    private UUID player(String value) {
+        Optional<UUID> byName = onlineNames.apply(value);
+        return byName.orElseGet(() -> UUID.fromString(value));
+    }
+
     public ReleaseAdminParseResult parse(List<String> arguments) {
         if (arguments == null || arguments.isEmpty()) return invalid(usage());
         try {
@@ -26,21 +49,21 @@ public final class ReleaseAdminCommandParser {
         return accepted(new ReleaseAdminCommand.ListPending(limit));
     }
 
-    private static ReleaseAdminParseResult parseRecover(List<String> arguments) {
-        if (arguments.size() != 4) return invalid("usage: recover <player-uuid> <transaction-uuid> <internal|external>");
+    private ReleaseAdminParseResult parseRecover(List<String> arguments) {
+        if (arguments.size() != 4) return invalid("usage: recover <player> <transaction-uuid> <internal|external>");
         ReleaseAdminCommand.Channel channel = ReleaseAdminCommand.Channel.valueOf(
                 arguments.get(3).toUpperCase(Locale.ROOT));
         return accepted(new ReleaseAdminCommand.Recover(
-                UUID.fromString(arguments.get(1)), UUID.fromString(arguments.get(2)), channel));
+                player(arguments.get(1)), UUID.fromString(arguments.get(2)), channel));
     }
 
-    private static ReleaseAdminParseResult parseReconcile(List<String> arguments) {
+    private ReleaseAdminParseResult parseReconcile(List<String> arguments) {
         if (arguments.size() != 4) {
-            return invalid("usage: reconcile <player-uuid> <transaction-uuid> <decision>");
+            return invalid("usage: reconcile <player> <transaction-uuid> <decision>");
         }
         String decision = arguments.get(3).replace('-', '_').toUpperCase(Locale.ROOT);
         return accepted(new ReleaseAdminCommand.Reconcile(
-                UUID.fromString(arguments.get(1)), UUID.fromString(arguments.get(2)),
+                player(arguments.get(1)), UUID.fromString(arguments.get(2)),
                 ReleaseAdminCommand.Decision.valueOf(decision)));
     }
 

@@ -86,12 +86,12 @@ public final class PaperActiveSkillController {
         Objects.requireNonNull(sender, "skill admin sender");
         List<String> values = List.copyOf(arguments == null ? List.of() : arguments);
         if (values.size() == 2 && values.getFirst().equalsIgnoreCase("pending")) {
-            UUID playerId = parseUuid(sender, values.get(1), "player");
+            UUID playerId = parsePlayer(sender, values.get(1));
             if (playerId != null) inspectPending(sender, playerId);
             return;
         }
         if (values.size() == 4 && values.getFirst().equalsIgnoreCase("rollback")) {
-            UUID playerId = parseUuid(sender, values.get(1), "player");
+            UUID playerId = parsePlayer(sender, values.get(1));
             UUID petId = parseUuid(sender, values.get(2), "pet");
             UUID actionId = parseUuid(sender, values.get(3), "action");
             if (playerId != null && petId != null && actionId != null) {
@@ -99,8 +99,8 @@ public final class PaperActiveSkillController {
             }
             return;
         }
-        message(sender, "Use /pet admin skill pending <player-uuid> or "
-                + "/pet admin skill rollback <player-uuid> <pet-uuid> <action-uuid>.", NamedTextColor.YELLOW);
+        message(sender, "Use /pet admin skill pending <player> or "
+                + "/pet admin skill rollback <player> <pet-uuid> <action-uuid>.", NamedTextColor.YELLOW);
     }
 
     private void prepare(UUID playerId, UUID petId, String bindingId) {
@@ -301,11 +301,25 @@ public final class PaperActiveSkillController {
         sender.sendMessage(Component.text("OmniPet: " + text, color));
     }
 
+    /**
+     * Resolves a player argument from an online name, then from a UUID.
+     *
+     * <p>Only the player argument accepts a name; a pet or action ID has no name to resolve from and
+     * stays strict. Online-only, because an offline name needs a blocking profile lookup.
+     */
+    private static UUID parsePlayer(CommandSender sender, String raw) {
+        org.bukkit.entity.Player online = raw == null || Bukkit.getServer() == null
+                ? null
+                : Bukkit.getPlayerExact(raw);
+        if (online != null) return online.getUniqueId();
+        return parseUuid(sender, raw, "player");
+    }
+
     private static UUID parseUuid(CommandSender sender, String raw, String label) {
         try {
             return UUID.fromString(raw);
         } catch (IllegalArgumentException invalid) {
-            message(sender, label + " UUID is invalid.", NamedTextColor.RED);
+            message(sender, label + " must be an online player name or a valid UUID.", NamedTextColor.RED);
             return null;
         }
     }

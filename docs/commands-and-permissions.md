@@ -19,9 +19,9 @@ The Gradle-built Paper runtime registers the player hub, the player vault, Admin
 | `/pet admin egg give <player> <egg-id> [amount]` | — | `omnipet.admin.egg` | Gives a hatchable egg carrying the OmniPet PDC identity. One inventory slot per egg: each egg has its own nonce and must not stack. |
 | `/pet admin egg create <egg-id> <definition-id> [duration]` | — | `omnipet.admin.egg` | Defines an egg that hatches one pet definition. Saving a pet in the Studio already writes `<definitionId>_egg` automatically; this is for hand-built catalog entries. |
 | `/pet admin pet give <player> <definition-id>` | — | `omnipet.admin.petgive` | Grants a pet straight into a vault, bypassing incubation and escrow. Separate permission because it is stronger than handing out an egg. The grant is serialized on the target's task queue, so it cannot interleave with their own vault work; a lost revision race is reported as retryable. The granted pet carries no rarity band, since no roll happened. |
-| `/pet admin hatch inspect <player-uuid>` | `/pets ...` | `omnipet.admin.inspect` | Reads persisted incubation for an offline or online player. |
-| `/pet admin hatch reduce\|set <player-uuid> <incubation-uuid> <millis> <action-uuid>` | `/pets ...` | `omnipet.admin.manageegg` | Adjusts remaining active time under the player revision lock; the action UUID makes retries idempotent. |
-| `/pet admin hatch complete\|cancel <player-uuid> <incubation-uuid> <action-uuid>` | `/pets ...` | `omnipet.admin.manageegg` | Completes or cancels a persisted incubation. |
+| `/pet admin hatch inspect <player>` | `/pets ...` | `omnipet.admin.inspect` | Reads persisted incubation. `<player>` is an online name or a UUID; a UUID is required for an offline player. |
+| `/pet admin hatch reduce\|set <player> <incubation-uuid> <millis> [action-uuid]` | `/pets ...` | `omnipet.admin.manageegg` | Adjusts remaining active time under the player revision lock. The action UUID makes a retry idempotent and is generated when omitted; supply it explicitly only when scripting a retry. |
+| `/pet admin hatch complete\|cancel <player> <incubation-uuid> [action-uuid]` | `/pets ...` | `omnipet.admin.manageegg` | Completes or cancels a persisted incubation. |
 | `/pet admin skill pending\|rollback <...>` | `/pets ...` | `omnipet.admin.skill` | Lists durable skill reservations or rolls one back after a failed cast. |
 | `/pet admin cultivation <...>` | `/pets ...` | `omnipet.admin.cultivation` | Recovers interrupted cultivation item transactions. |
 | `/pet admin release <...>` | `/pets ...` | `omnipet.admin.release` | Lists bounded release mailbox rows and reconciles an exact transaction. |
@@ -43,6 +43,14 @@ Reducer and instant-hatch items redeem through the same durable rule as egg star
 Right-clicking a vault pet opens management: favorite, lock, reorder, EXP candy, breakthrough, and release. Right-clicking your own **rendered** pet in the world opens the same screen; another player's pet does nothing, and a non-OmniPet entity behaves normally. Every rendered inventory carries viewer, owner, pet UUID, session, inventory generation, and expected revision; drags touching the top inventory are cancelled and stale views cannot act.
 
 Cultivation removes the exact item before applying progression under a journal receipt, so a restart cannot reapply experience and a rejected mutation refunds the exact item. Release freezes a reward preview, then removes the pet and appends the internal outbox entry in one player-state write. Internal rewards deliver through a durable mailbox that is idempotent across restart; ambiguous external Vault/PlayerPoints outcomes persist as `UNKNOWN_COMMIT` and require `/pet admin release` reconciliation rather than automatic retry.
+
+## Player arguments on admin commands
+
+Every admin command that takes a player accepts an **online name or a UUID**. The name is tried first, and tab-complete suggests online names.
+
+- Only online names resolve. Mapping an offline name to a UUID needs a blocking profile lookup, which must not run while a command is dispatched on the main thread — use the UUID form for an offline player.
+- A name can never be confused with a UUID: names are at most 16 characters, UUID text is 36.
+- Argument positions that are IDs rather than players (incubation, pet, transaction, action) stay strict and are not suggested, because there is nothing safe to enumerate for them.
 
 ## Transaction paging and bounds
 

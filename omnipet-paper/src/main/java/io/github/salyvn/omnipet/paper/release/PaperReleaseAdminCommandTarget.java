@@ -9,7 +9,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class PaperReleaseAdminCommandTarget {
     private final JavaPlugin plugin;
-    private final ReleaseAdminCommandParser parser = new ReleaseAdminCommandParser();
+    private final ReleaseAdminCommandParser parser = new ReleaseAdminCommandParser(name -> {
+        if (org.bukkit.Bukkit.getServer() == null) return java.util.Optional.empty();
+        org.bukkit.entity.Player online = org.bukkit.Bukkit.getPlayerExact(name);
+        return online == null ? java.util.Optional.empty() : java.util.Optional.of(online.getUniqueId());
+    });
     private final ReleaseAdminController controller;
     private final Executor executor;
 

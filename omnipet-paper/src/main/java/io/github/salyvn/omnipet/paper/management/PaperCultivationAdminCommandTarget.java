@@ -25,11 +25,20 @@ public final class PaperCultivationAdminCommandTarget {
             return;
         }
         UUID playerId;
-        try {
-            playerId = UUID.fromString(arguments.get(1));
-        } catch (IllegalArgumentException invalid) {
-            sender.sendMessage("OmniPet: cultivation player UUID is invalid.");
-            return;
+        // An online name first, then a UUID: the operator is usually acting on someone in front of
+        // them, and copying a UUID out of a YAML file to do it was the whole friction.
+        org.bukkit.entity.Player online = org.bukkit.Bukkit.getServer() == null
+                ? null
+                : org.bukkit.Bukkit.getPlayerExact(arguments.get(1));
+        if (online != null) {
+            playerId = online.getUniqueId();
+        } else {
+            try {
+                playerId = UUID.fromString(arguments.get(1));
+            } catch (IllegalArgumentException invalid) {
+                sender.sendMessage("OmniPet: cultivation player must be an online name or a valid UUID.");
+                return;
+            }
         }
         switch (arguments.getFirst().toLowerCase(java.util.Locale.ROOT)) {
             case "pending", "review" -> list(sender, arguments, playerId);

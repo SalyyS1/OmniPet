@@ -105,4 +105,30 @@ class CommandSuggestionsTest {
     private static List<String> suggest(Predicate<String> hasPermission, boolean isPlayer, String... args) {
         return CommandSuggestions.suggest(OmniPetCommandTree.root(), hasPermission, isPlayer, args);
     }
+    @Test
+    void aPlayerArgumentSuggestsOnlineNames() {
+        // The one argument position worth completing. Reading the online roster is an in-memory lookup,
+        // unlike resolving a UUID, which is why only names are offered.
+        java.util.function.Supplier<List<String>> roster = () -> List.of("Steve", "Alex", "Stephanie");
+
+        assertEquals(List.of("Steve", "Alex", "Stephanie"),
+                suggestWithRoster(roster, "admin", "hatch", "inspect", ""));
+        assertEquals(List.of("Steve", "Stephanie"),
+                suggestWithRoster(roster, "admin", "hatch", "inspect", "Ste"));
+    }
+
+    @Test
+    void anIdArgumentSuggestsNothingRatherThanGuessing() {
+        java.util.function.Supplier<List<String>> roster = () -> List.of("Steve");
+
+        // Position 2 of `hatch reduce` is an incubation UUID: there is nothing safe to enumerate.
+        assertEquals(List.of(), suggestWithRoster(roster, "admin", "hatch", "reduce", "Steve", ""));
+        // A node whose first argument is not a player gets no value suggestions either.
+        assertEquals(List.of(), suggestWithRoster(roster, "admin", "reconcile", ""));
+    }
+
+    private static List<String> suggestWithRoster(
+            java.util.function.Supplier<List<String>> roster, String... args) {
+        return CommandSuggestions.suggest(OmniPetCommandTree.root(), EVERYTHING, true, args, roster);
+    }
 }

@@ -135,19 +135,19 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("inspect", "Show durable incubation state for a player")
-                                .args("<player-uuid>")
+                                .args("<player>")
                                 .permission(HatchAdminCommandParser.INSPECT_PERMISSION),
                         CommandSpec.of("reduce", "Reduce remaining incubation time")
-                                .args("<player-uuid>", "<incubation-uuid>", "<millis>", "<action-uuid>")
+                                .args("<player>", "<incubation-uuid>", "<millis>", "[action-uuid]")
                                 .permission(HatchAdminCommandParser.MANAGE_PERMISSION),
                         CommandSpec.of("set", "Set remaining incubation time")
-                                .args("<player-uuid>", "<incubation-uuid>", "<millis>", "<action-uuid>")
+                                .args("<player>", "<incubation-uuid>", "<millis>", "[action-uuid]")
                                 .permission(HatchAdminCommandParser.MANAGE_PERMISSION),
                         CommandSpec.of("complete", "Complete an incubation")
-                                .args("<player-uuid>", "<incubation-uuid>", "<action-uuid>")
+                                .args("<player>", "<incubation-uuid>", "[action-uuid]")
                                 .permission(HatchAdminCommandParser.MANAGE_PERMISSION),
                         CommandSpec.of("cancel", "Cancel an incubation")
-                                .args("<player-uuid>", "<incubation-uuid>", "<action-uuid>")
+                                .args("<player>", "<incubation-uuid>", "[action-uuid]")
                                 .permission(HatchAdminCommandParser.MANAGE_PERMISSION));
     }
 
@@ -156,10 +156,10 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("pending", "List pending skill reservations")
-                                .args("<player-uuid>")
+                                .args("<player>")
                                 .permission("omnipet.admin.skill"),
                         CommandSpec.of("rollback", "Roll back one pending reservation")
-                                .args("<player-uuid>", "<pet-uuid>", "<action-uuid>")
+                                .args("<player>", "<pet-uuid>", "<action-uuid>")
                                 .permission("omnipet.admin.skill"));
     }
 
@@ -168,13 +168,13 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("pending", "List pending cultivation actions")
-                                .args("<player-uuid>", "[limit]")
+                                .args("<player>", "[limit]")
                                 .permission("omnipet.admin.cultivation"),
                         CommandSpec.of("review", "List cultivation actions needing operator review")
-                                .args("<player-uuid>", "[limit]")
+                                .args("<player>", "[limit]")
                                 .permission("omnipet.admin.cultivation"),
                         CommandSpec.of("recover", "Recover one cultivation action")
-                                .args("<player-uuid>", "<action-uuid>")
+                                .args("<player>", "<action-uuid>")
                                 .permission("omnipet.admin.cultivation"));
     }
 
@@ -186,7 +186,7 @@ public final class OmniPetCommandTree {
                                 .args("[limit]")
                                 .permission("omnipet.admin.release"),
                         CommandSpec.of("recover", "Recover one release reward outbox")
-                                .args("<player-uuid>", "<transaction-uuid>", "<internal|external>")
+                                .args("<player>", "<transaction-uuid>", "<internal|external>")
                                 .permission("omnipet.admin.release"),
                         CommandSpec.of("reconcile", "Reconcile one external release reward")
                                 .args("<transaction-uuid>", "<decision>")

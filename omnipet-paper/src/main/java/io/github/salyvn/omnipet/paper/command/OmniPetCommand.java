@@ -25,6 +25,23 @@ import io.github.salyvn.omnipet.paper.release.PaperReleaseAdminCommandTarget;
 import io.github.salyvn.omnipet.paper.skill.PaperActiveSkillController;
 
 public final class OmniPetCommand implements BasicCommand {
+    /**
+     * Resolves an admin command's player argument from an online name, falling back to a UUID.
+     *
+     * <p>Static because it only reads the live roster. Only online names resolve: an offline lookup
+     * is a blocking profile fetch and must not run while a command is dispatched on the main thread.
+     *
+     * <p>Returns empty when no server is running, so the UUID form still parses in a unit test rather
+     * than the roster read throwing before the argument is even examined.
+     */
+    private static final PlayerArgumentResolver ONLINE_PLAYERS = new PlayerArgumentResolver(name -> {
+        if (org.bukkit.Bukkit.getServer() == null) return java.util.Optional.empty();
+        Player online = org.bukkit.Bukkit.getPlayerExact(name);
+        return online == null
+                ? java.util.Optional.empty()
+                : java.util.Optional.of(online.getUniqueId());
+    });
+
     private final PetStudioController studio;
     private final PlayerPetController players;
     private final PlayerHatchCommandTarget hatches;
@@ -474,7 +491,8 @@ public final class OmniPetCommand implements BasicCommand {
             slotPurchases.open(player, returnPage);
             return;
         }
-        HatchAdminCommandParser.Result hatchAdminCommand = HatchAdminCommandParser.parse(arguments);
+        HatchAdminCommandParser.Result hatchAdminCommand =
+                HatchAdminCommandParser.parse(arguments, ONLINE_PLAYERS);
         if (!(hatchAdminCommand instanceof HatchAdminCommandParser.NotMatched)) {
             dispatchHatchAdmin(sender, hatchAdminCommand);
             return;
@@ -573,7 +591,12 @@ public final class OmniPetCommand implements BasicCommand {
     public Collection<String> suggest(CommandSourceStack source, String[] args) {
         CommandSender sender = source.getSender();
         return CommandSuggestions.suggest(
-                OmniPetCommandTree.root(), sender::hasPermission, sender instanceof Player, args);
+                OmniPetCommandTree.root(), sender::hasPermission, sender instanceof Player, args,
+                // In-memory roster read, so it is safe per keystroke on the main thread. Suggesting a
+                // UUID would not be, which is why only names are offered.
+                () -> org.bukkit.Bukkit.getOnlinePlayers().stream()
+                        .map(Player::getName)
+                        .toList());
     }
 
     @Override
