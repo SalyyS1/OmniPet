@@ -12,6 +12,8 @@ import org.bukkit.inventory.Inventory;
 import net.kyori.adventure.text.Component;
 
 import io.github.salyvn.omnipet.core.release.ReleaseRewardBundle;
+import io.github.salyvn.omnipet.paper.config.GuiSettings;
+import io.github.salyvn.omnipet.paper.config.MenuStyle;
 import io.github.salyvn.omnipet.paper.gui.GuiColors;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
 import io.github.salyvn.omnipet.paper.management.PetManagementViewModel;
@@ -21,6 +23,9 @@ import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class PetManagementMenuRenderer {
+    private static final int MANAGEMENT_SIZE = 45;
+    private static final int RELEASE_SIZE = 27;
+
     public Inventory render(PetManagementViewModel view) {
         Layout layout = layout(view);
         Inventory inventory = Bukkit.createInventory(layout.holder(), layout.size(), layout.title());
@@ -36,18 +41,19 @@ public final class PetManagementMenuRenderer {
     }
 
     private Layout management(PetManagementViewModel view) {
+        MenuStyle style = GuiSettings.gui().menu("management");
         Map<Integer, PetManagementInventoryHolder.Action> actions = new LinkedHashMap<>();
         Map<Integer, Entry> entries = new LinkedHashMap<>();
         boolean favorite = view.metadata().favorite();
         boolean locked = view.metadata().locked();
 
-        put(actions, entries, 10,
+        put(style, actions, entries, "favorite", 10,
                 PetManagementInventoryHolder.Action.favorite(!favorite),
                 favorite ? Material.NETHER_STAR : Material.GRAY_DYE,
                 label(favorite ? MessageKey.GUI_MANAGE_UNFAVORITE : MessageKey.GUI_MANAGE_FAVORITE,
                         GuiColors.WARNING),
                 Messages.line(MessageKey.GUI_MANAGE_FAVORITE_HINT));
-        put(actions, entries, 11,
+        put(style, actions, entries, "lock", 11,
                 PetManagementInventoryHolder.Action.lock(!locked),
                 locked ? Material.TRIPWIRE_HOOK : Material.IRON_NUGGET,
                 label(locked ? MessageKey.GUI_MANAGE_UNLOCK : MessageKey.GUI_MANAGE_LOCK, GuiColors.ACCENT),
@@ -55,19 +61,19 @@ public final class PetManagementMenuRenderer {
                         ? MessageKey.GUI_MANAGE_LOCKED_HINT
                         : MessageKey.GUI_MANAGE_UNLOCKED_HINT));
         if (view.petIndex() > 0) {
-            put(actions, entries, 12,
+            put(style, actions, entries, "moveUp", 12,
                     PetManagementInventoryHolder.Action.move(view.petIndex() - 1),
                     Material.ARROW, label(MessageKey.GUI_MANAGE_MOVE_LEFT, GuiColors.WARNING),
                     Messages.line(MessageKey.GUI_MANAGE_MOVE_TARGET, Messages.of("amount", view.petIndex())));
         }
         if (view.petIndex() + 1 < view.ownerState().pets().size()) {
-            put(actions, entries, 13,
+            put(style, actions, entries, "moveDown", 13,
                     PetManagementInventoryHolder.Action.move(view.petIndex() + 1),
                     Material.ARROW, label(MessageKey.GUI_MANAGE_MOVE_RIGHT, GuiColors.WARNING),
                     Messages.line(MessageKey.GUI_MANAGE_MOVE_TARGET,
                             Messages.of("amount", view.petIndex() + 2)));
         }
-        put(actions, entries, 14,
+        put(style, actions, entries, "candy", 14,
                 PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.ADD_EXPERIENCE),
                 Material.EXPERIENCE_BOTTLE, label(MessageKey.GUI_MANAGE_CANDY, GuiColors.POSITIVE),
                 Messages.line(MessageKey.GUI_MANAGE_LEVEL, Messages.of("level", view.progression().level())),
@@ -75,29 +81,29 @@ public final class PetManagementMenuRenderer {
                         Messages.of("exp", decimal(view.progression().experience()))),
                 Component.empty(),
                 Messages.line(MessageKey.GUI_MANAGE_CANDY_HINT));
-        put(actions, entries, 15,
+        put(style, actions, entries, "breakthrough", 15,
                 PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.BREAKTHROUGH),
                 Material.AMETHYST_SHARD, label(MessageKey.GUI_MANAGE_BREAKTHROUGH, GuiColors.TITLE),
                 Messages.line(MessageKey.GUI_MANAGE_EVOLUTION,
                         Messages.of("amount", view.progression().evolution())),
                 Component.empty(),
                 Messages.line(MessageKey.GUI_MANAGE_BREAKTHROUGH_HINT));
-        put(actions, entries, 16,
+        put(style, actions, entries, "release", 16,
                 PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.PREVIEW_RELEASE),
                 locked ? Material.BARRIER : Material.LAVA_BUCKET,
                 label(MessageKey.GUI_MANAGE_RELEASE, locked ? GuiColors.SECTION : GuiColors.BLOCKED),
                 Messages.line(locked
                         ? MessageKey.GUI_MANAGE_RELEASE_LOCKED
                         : MessageKey.GUI_MANAGE_RELEASE_HINT));
-        put(actions, entries, 31,
+        put(style, actions, entries, "refresh", 31,
                 PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.REFRESH),
                 Material.CLOCK, Messages.line(MessageKey.GUI_MANAGE_REFRESH),
                 Messages.line(MessageKey.GUI_MANAGE_REFRESH_HINT));
-        put(actions, entries, 35,
+        put(style, actions, entries, "back", 35,
                 PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.BACK),
                 Material.BARRIER, Messages.line(MessageKey.GUI_MANAGE_BACK));
         // Slot 27 is free: 10-16, 22, 31, and 35 carry the existing controls.
-        put(actions, entries, 27,
+        put(style, actions, entries, "hub", 27,
                 PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.HUB),
                 Material.COMPASS, Messages.line(MessageKey.HUB_BACK));
 
@@ -118,7 +124,8 @@ public final class PetManagementMenuRenderer {
                                 : MessageKey.GUI_MANAGE_STORED))));
         PetManagementInventoryHolder holder = new PetManagementInventoryHolder(
                 view.session(), PetManagementInventoryHolder.View.MANAGEMENT, actions, null);
-        return new Layout(45, Messages.line(MessageKey.GUI_TITLE_MANAGE), holder, entries);
+        return new Layout(size(style, MANAGEMENT_SIZE), Messages.line(MessageKey.GUI_TITLE_MANAGE),
+                holder, entries);
     }
 
     private Layout release(PetManagementViewModel view) {
@@ -141,7 +148,7 @@ public final class PetManagementMenuRenderer {
         PetManagementInventoryHolder holder = new PetManagementInventoryHolder(
                 view.session(), PetManagementInventoryHolder.View.RELEASE_CONFIRMATION,
                 actions, view.releasePreview());
-        return new Layout(27, Messages.line(MessageKey.GUI_TITLE_RELEASE), holder, entries);
+        return new Layout(RELEASE_SIZE, Messages.line(MessageKey.GUI_TITLE_RELEASE), holder, entries);
     }
 
     private static List<Component> rewardLore(ReleaseRewardBundle rewards) {
@@ -165,16 +172,72 @@ public final class PetManagementMenuRenderer {
         return Messages.line(key).colorIfAbsent(color);
     }
 
+    /**
+     * Binds an action and its item together, at the operator's slot when they moved it.
+     *
+     * <p>One call for both halves on purpose: a slot that carries an item always carries its action, so
+     * a moved button cannot become a drawn control that does nothing when clicked.
+     */
     private static void put(
+            MenuStyle style,
             Map<Integer, PetManagementInventoryHolder.Action> actions,
             Map<Integer, Entry> entries,
-            int slot,
+            String button,
+            int defaultSlot,
             PetManagementInventoryHolder.Action action,
             Material material,
             Component name,
             Component... lore) {
+        int slot = slot(style, actions, entries, button, defaultSlot);
         actions.put(slot, action);
-        entries.put(slot, new Entry(material, name, List.of(lore)));
+        entries.put(slot, new Entry(material(style, button, material), name, List.of(lore)));
+    }
+
+    /** The operator's slot for a button, or its built-in one when unset or already taken. */
+    private static int slot(
+            MenuStyle style,
+            Map<Integer, PetManagementInventoryHolder.Action> actions,
+            Map<Integer, Entry> entries,
+            String button,
+            int defaultSlot) {
+        int configured = style.button(button).slot().orElse(defaultSlot);
+        if (configured == defaultSlot) return defaultSlot;
+        if (actions.containsKey(configured) || entries.containsKey(configured)) {
+            GuiSettings.warn("gui.menus.management.buttons." + button + ".slot " + configured
+                    + " is already used; keeping its built-in slot " + defaultSlot);
+            return defaultSlot;
+        }
+        if (configured >= MANAGEMENT_SIZE) {
+            GuiSettings.warn("gui.menus.management.buttons." + button + ".slot " + configured
+                    + " is outside this menu; keeping its built-in slot " + defaultSlot);
+            return defaultSlot;
+        }
+        return configured;
+    }
+
+    /** The operator's material for a button, or the state-dependent one the renderer chose. */
+    private static Material material(MenuStyle style, String button, Material fallback) {
+        return style.button(button).material()
+                .map(name -> {
+                    Material resolved = Material.matchMaterial(
+                            name.trim().toUpperCase(java.util.Locale.ROOT));
+                    if (resolved == null || resolved == Material.AIR || !resolved.isItem()) {
+                        GuiSettings.warn("gui.menus.management.buttons." + button
+                                + ".material is not a usable item material: " + name);
+                        return fallback;
+                    }
+                    return resolved;
+                })
+                .orElse(fallback);
+    }
+
+    /** The configured size, when it is still large enough to hold every placed control. */
+    private static int size(MenuStyle style, int defaultSize) {
+        return style.size().filter(size -> size >= defaultSize).orElseGet(() -> {
+            style.size().ifPresent(size -> GuiSettings.warn("gui.menus.management.size " + size
+                    + " is too small for this menu's controls; using " + defaultSize));
+            return defaultSize;
+        });
     }
 
     private static String decimal(double value) {

@@ -1,34 +1,37 @@
 package io.github.salyvn.omnipet.paper.gui.hub;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
 import io.github.salyvn.omnipet.core.domain.incubation.IncubationState;
 import io.github.salyvn.omnipet.core.domain.incubation.IncubationStatus;
 import io.github.salyvn.omnipet.core.storage.PetStorageSnapshot;
-import io.github.salyvn.omnipet.paper.gui.GuiItems;
+import io.github.salyvn.omnipet.paper.config.GuiSettings;
+import io.github.salyvn.omnipet.paper.gui.MenuLayout;
 import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
 /**
- * The 27-slot hub: one tile per destination, each with a live summary.
+ * The hub: one tile per destination, each with a live summary.
  *
  * <p>Pure rendering. Every value comes from the snapshot the controller already read, so no tile
  * performs I/O.
+ *
+ * <p>Size, materials, and slots come from {@code gui.menus.hub} when the operator set them, and from
+ * the constants below otherwise. Every tile is placed through {@link MenuLayout#put}, which binds the
+ * click action and the item together — a moved tile cannot become a drawn button with no action.
  */
 public final class HubMenuRenderer {
-    /** Slot layout, mirroring the spacing the hatch menu already uses. */
+    /** Built-in layout, used for any slot the operator did not move. */
+    private static final int DEFAULT_SIZE = 27;
     private static final int VAULT_SLOT = 11;
     private static final int HATCH_SLOT = 13;
     private static final int SLOTS_SLOT = 15;
@@ -40,35 +43,39 @@ public final class HubMenuRenderer {
      *     the tile is never visible-but-dead.
      */
     public Inventory render(HubView view, boolean studioVisible) {
-        Map<Integer, HubInventoryHolder.Action> actions = new LinkedHashMap<>();
-        actions.put(VAULT_SLOT, HubInventoryHolder.Action.VAULT);
-        actions.put(HATCH_SLOT, HubInventoryHolder.Action.HATCH);
-        actions.put(SLOTS_SLOT, HubInventoryHolder.Action.SLOTS);
-        actions.put(HELP_SLOT, HubInventoryHolder.Action.HELP);
-        if (studioVisible) actions.put(STUDIO_SLOT, HubInventoryHolder.Action.STUDIO);
+        MenuLayout<HubInventoryHolder.Action> layout = new MenuLayout<>(
+                GuiSettings.gui().menu("hub"), "gui.menus.hub", GuiSettings::warn);
 
-        HubInventoryHolder holder = new HubInventoryHolder(
-                view.viewerId(), view.storage().revision(), actions);
-        Inventory inventory = Bukkit.createInventory(
-                holder, 27, Messages.line(MessageKey.GUI_TITLE_HUB));
-        holder.bind(inventory);
-        for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, GuiItems.filler());
-
-        inventory.setItem(VAULT_SLOT, vaultTile(view.storage()));
-        inventory.setItem(HATCH_SLOT, hatchTile(view.incubation()));
-        inventory.setItem(SLOTS_SLOT, slotsTile(view.storage()));
-        inventory.setItem(HELP_SLOT, GuiItems.of(Material.BOOK,
-                Messages.line(MessageKey.HUB_HELP),
-                List.of(Messages.line(MessageKey.HUB_HELP_HINT))));
+        layout.put("vault", VAULT_SLOT, HubInventoryHolder.Action.VAULT,
+                Material.ENDER_CHEST, Messages.line(MessageKey.HUB_VAULT), vaultLore(view.storage()));
+        hatchTile(layout, view.incubation());
+        layout.put("slots", SLOTS_SLOT, HubInventoryHolder.Action.SLOTS,
+                Material.EXPERIENCE_BOTTLE, Messages.line(MessageKey.HUB_SLOTS),
+                List.of(
+                        Messages.line(MessageKey.HUB_SLOTS_COUNT,
+                                Messages.of("amount", view.storage().effectiveActiveSlotCount())),
+                        Component.empty(),
+                        Messages.line(MessageKey.HUB_SLOTS_HINT)));
+        layout.put("help", HELP_SLOT, HubInventoryHolder.Action.HELP,
+                Material.BOOK, Messages.line(MessageKey.HUB_HELP),
+                List.of(Messages.line(MessageKey.HUB_HELP_HINT)));
         if (studioVisible) {
-            inventory.setItem(STUDIO_SLOT, GuiItems.of(Material.CARTOGRAPHY_TABLE,
-                    Messages.line(MessageKey.HUB_STUDIO),
-                    List.of(Messages.line(MessageKey.HUB_STUDIO_HINT))));
+            layout.put("studio", STUDIO_SLOT, HubInventoryHolder.Action.STUDIO,
+                    Material.CARTOGRAPHY_TABLE, Messages.line(MessageKey.HUB_STUDIO),
+                    List.of(Messages.line(MessageKey.HUB_STUDIO_HINT)));
         }
+
+        // Built after every tile is recorded, so the holder still snapshots a complete action map.
+        HubInventoryHolder holder = new HubInventoryHolder(
+                view.viewerId(), view.storage().revision(), layout.actions());
+        Inventory inventory = Bukkit.createInventory(
+                holder, layout.size(DEFAULT_SIZE), Messages.line(MessageKey.GUI_TITLE_HUB));
+        holder.bind(inventory);
+        layout.draw(inventory);
         return inventory;
     }
 
-    private static ItemStack vaultTile(PetStorageSnapshot storage) {
+    private static List<Component> vaultLore(PetStorageSnapshot storage) {
         List<Component> lore = new ArrayList<>();
         lore.add(Messages.line(MessageKey.HUB_VAULT_OWNED,
                 Messages.of("amount", storage.ownedCount()),
@@ -82,10 +89,18 @@ public final class HubMenuRenderer {
         }
         lore.add(Component.empty());
         lore.add(Messages.line(MessageKey.HUB_VAULT_HINT));
-        return GuiItems.of(Material.ENDER_CHEST, Messages.line(MessageKey.HUB_VAULT), lore);
+        return lore;
     }
 
-    private static ItemStack hatchTile(IncubationState incubation) {
+    /**
+     * The hatch tile, whose material reflects state.
+     *
+     * <p>An operator who names one material for this tile gets it in all three states; that is what
+     * naming a single material means, and {@link MenuLayout#material} treats the state choice as the
+     * fallback rather than the override.
+     */
+    private static void hatchTile(
+            MenuLayout<HubInventoryHolder.Action> layout, IncubationState incubation) {
         List<Component> lore = new ArrayList<>();
         boolean active = incubation != null && !incubation.terminal();
         boolean ready = active && incubation.status() == IncubationStatus.READY;
@@ -101,19 +116,8 @@ public final class HubMenuRenderer {
         }
         lore.add(Component.empty());
         lore.add(Messages.line(MessageKey.HUB_HATCH_HINT));
-        return GuiItems.of(
+        layout.put("hatch", HATCH_SLOT, HubInventoryHolder.Action.HATCH,
                 ready ? Material.LIME_DYE : active ? Material.DRAGON_EGG : Material.EGG,
-                Messages.line(MessageKey.HUB_HATCH),
-                lore);
-    }
-
-    private static ItemStack slotsTile(PetStorageSnapshot storage) {
-        return GuiItems.of(Material.EXPERIENCE_BOTTLE,
-                Messages.line(MessageKey.HUB_SLOTS),
-                List.of(
-                        Messages.line(MessageKey.HUB_SLOTS_COUNT,
-                                Messages.of("amount", storage.effectiveActiveSlotCount())),
-                        Component.empty(),
-                        Messages.line(MessageKey.HUB_SLOTS_HINT)));
+                Messages.line(MessageKey.HUB_HATCH), lore);
     }
 }

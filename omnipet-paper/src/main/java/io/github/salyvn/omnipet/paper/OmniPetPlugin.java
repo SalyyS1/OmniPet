@@ -132,6 +132,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             // Bound before any renderer or the Studio is constructed: those read their page sizes and
             // prompt timeout once, which is what makes those keys restart-only.
             GuiSettings.bind(activeConfig.gui());
+            GuiSettings.bindWarnings(warning -> getLogger().warning("OmniPet gui.menus: " + warning));
             feedback = new FeedbackService(
                     new BukkitFeedbackOutput(), resolveFeedback(activeConfig.gui().feedback()));
             Feedback.bind(feedback);

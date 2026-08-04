@@ -9,7 +9,9 @@ import org.bukkit.inventory.Inventory;
 import net.kyori.adventure.text.Component;
 
 import io.github.salyvn.omnipet.paper.gui.GuiColors;
+import io.github.salyvn.omnipet.paper.config.GuiSettings;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
+import io.github.salyvn.omnipet.paper.gui.MenuMaterials;
 import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
@@ -31,6 +33,19 @@ final class VaultMenuControls {
 
     private VaultMenuControls() {}
 
+    /**
+     * The vault's background pane.
+     *
+     * <p>Lives here rather than in the renderer because both paint it, and an operator changing the
+     * vault's filler expects one setting to cover the whole menu.
+     */
+    static org.bukkit.inventory.ItemStack filler() {
+        if (GuiSettings.gui().menu("vault").filler().isEmpty()) return GuiItems.filler();
+        return GuiItems.of(
+                MenuMaterials.filler("vault", Material.GRAY_STAINED_GLASS_PANE),
+                GuiItems.label(" ", GuiItems.LORE_COLOR), java.util.List.of());
+    }
+
     static void paint(
             Inventory inventory,
             Map<Integer, PlayerPetInventoryHolder.Action> actions,
@@ -38,7 +53,7 @@ final class VaultMenuControls {
             VaultPetView view) {
         actions.put(SORT_SLOT, PlayerPetInventoryHolder.Action.sort());
         inventory.setItem(SORT_SLOT, GuiItems.of(
-                Material.HOPPER,
+                MenuMaterials.of("vault", "sort", Material.HOPPER),
                 Messages.line(MessageKey.GUI_VAULT_SORT,
                         Messages.of("status", Displays.words(state.sort()))),
                 List.of(
@@ -51,7 +66,7 @@ final class VaultMenuControls {
 
         actions.put(FILTER_SLOT, PlayerPetInventoryHolder.Action.filter());
         inventory.setItem(FILTER_SLOT, GuiItems.of(
-                Material.SPYGLASS,
+                MenuMaterials.of("vault", "filter", Material.SPYGLASS),
                 Messages.line(MessageKey.GUI_VAULT_FILTER,
                         Messages.of("status", Displays.words(state.filter()))),
                 List.of(Messages.line(MessageKey.GUI_VAULT_FILTER_HINT,

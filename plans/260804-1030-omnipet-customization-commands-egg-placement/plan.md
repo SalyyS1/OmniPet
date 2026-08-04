@@ -43,7 +43,7 @@ button all landed in `32834f8`.
 | --- | --- | --- | --- | --- |
 | 1 | Command usability | Complete | — | Cheapest, largest daily impact, touches no persistence. |
 | 2 | Egg and item format | Complete | — | Cheap, self-contained; establishes the item-appearance config shape Phase 3 reuses. |
-| 3 | [GUI customization](./phase-03-gui-customization.md) | Pending | 2 | Largest. Needs the appearance-config precedent from Phase 2. |
+| 3 | GUI customization | Complete | 2 | Largest. Needs the appearance-config precedent from Phase 2. |
 | 4 | [Placed-egg incubation](./phase-04-placed-egg-incubation.md) | Pending | 2 | Riskiest — touches escrow. Goes last so it cannot block the other three. |
 
 Phase 4 is deliberately last. It is the only phase that changes where a paid egg lives, and escrow is

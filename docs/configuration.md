@@ -154,6 +154,27 @@ items:
 - `gui` is optional and owns menu behaviour and player feedback. Deleting the whole section reproduces the behaviour OmniPet had before it existed. See below.
 - Unknown root **sections** fail closed before the live snapshot changes. The one exception is inside `gui`, which is lenient on purpose.
 
+### `gui.menus`
+
+Optional per-menu restyling. Absent means every menu renders exactly as it did before the section existed.
+
+```yaml
+gui:
+  menus:
+    hub:
+      filler: BLACK_STAINED_GLASS_PANE
+      buttons:
+        vault: { material: CHEST, slot: 10 }
+```
+
+- Per menu: `size` (a multiple of 9 up to 54), `filler` (the background pane material), and `buttons`.
+- Per button: `material` and `slot`.
+- Buttons are keyed by **name**, not slot, so a tile whose material depends on state — the hatch tile differs when ready, incubating, and idle — can be restyled without enumerating its states. Naming one material pins the button to that material in every state, which is what naming a single material means.
+- Menus and their buttons: `hub` (vault, hatch, slots, help, studio); `vault` (previous, next, hub, sort, filter, status, unlockSlot); `hatch` (startMain, startOff, incubation, hub, refresh); `management` (favorite, lock, moveUp, moveDown, candy, breakthrough, release, refresh, back, hub); `slot` (payVault, payPoints, confirm, cancel, hub).
+- The vault accepts materials and a filler but **not** slots or size: pet rows occupy slots 0-44 and the pagination arithmetic is derived from that shape.
+- Lenient, like the rest of `gui:`. An unknown menu or button name, a size that is not rows of nine, an out-of-range slot, and an unusable material each warn and fall back for that key alone. A move onto an already-occupied slot is refused and the button keeps its built-in position, so it cannot silently vanish.
+- Item names and lore are not here; they live in `messages.yml` under `gui.*`.
+
 ### `gui`
 
 ```yaml
@@ -197,6 +218,7 @@ sort, filter, status, hub, and slot-purchase controls.
 | `gui.help.linesPerPage` | **Live.** Help paging reads the page size on each `/pet help`, so a reload applies it. |
 | `gui.studio.promptTimeoutSeconds` | **Restart only.** The Studio's chat-input service is built at startup and reload does not rebuild it. |
 | `gui.studio.autoCreateEgg` | **Live.** Read at each save, so toggling it takes effect on the next definition you save. |
+| `gui.menus.*` | **Live.** Read each time a menu is rendered, so reopening the menu shows the change. |
 
 Editing a restart-only key and running `/pet admin reload` is silently ineffective by design; restart
 the server to apply it.

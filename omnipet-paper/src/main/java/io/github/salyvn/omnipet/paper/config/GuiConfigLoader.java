@@ -17,11 +17,13 @@ import java.util.function.Consumer;
  * the default value for that key alone.
  */
 public final class GuiConfigLoader {
-    private static final Set<String> ROOT = Set.of("feedback", "vault", "help", "studio");
+    private static final Set<String> ROOT = Set.of("feedback", "vault", "help", "studio", "menus");
     private static final Set<String> STUDIO = Set.of("promptTimeoutSeconds", "autoCreateEgg");
     private static final Set<String> FEEDBACK =
             Set.of("enabled", "actionBar", "minIntervalMillis", "success", "failure", "blocked", "progress");
     private static final Set<String> CUE = Set.of("sound", "volume", "pitch");
+
+    private static final MenuStyleCodec MENUS = new MenuStyleCodec();
 
     /** Parses {@code gui:}. An absent or unusable section yields {@link GuiConfig#defaults()}. */
     public GuiConfig parse(Object section, Consumer<String> warnings) {
@@ -56,7 +58,8 @@ public final class GuiConfigLoader {
         warnClamp(linesPerPage, 1, GuiConfig.MAX_HELP_LINES_PER_PAGE, "gui.help.linesPerPage", warn);
         // The record clamps; warning here keeps the operator informed of what was actually applied.
         return new GuiConfig(
-                feedback, petsPerPage, linesPerPage, Duration.ofSeconds(promptSeconds), autoCreateEgg);
+                feedback, petsPerPage, linesPerPage, Duration.ofSeconds(promptSeconds), autoCreateEgg,
+                MENUS.parse(values.get("menus"), "gui.menus", warn));
     }
 
     /** Serialises the section so a legacy migration round-trip cannot silently drop it. */
@@ -77,6 +80,10 @@ public final class GuiConfigLoader {
         studio.put("promptTimeoutSeconds", config.studioPromptTimeout().toSeconds());
         studio.put("autoCreateEgg", config.studioAutoCreateEgg());
         root.put("studio", studio);
+        // Only written when the operator restyled something, so a migration neither drops their layout
+        // nor litters the file with empty menu blocks.
+        Map<String, Object> menus = MENUS.encode(config.menus());
+        if (!menus.isEmpty()) root.put("menus", menus);
         return root;
     }
 

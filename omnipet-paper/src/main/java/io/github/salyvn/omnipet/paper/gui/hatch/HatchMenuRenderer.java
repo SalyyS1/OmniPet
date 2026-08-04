@@ -1,9 +1,7 @@
 package io.github.salyvn.omnipet.paper.gui.hatch;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
@@ -17,49 +15,66 @@ import net.kyori.adventure.text.Component;
 import io.github.salyvn.omnipet.core.domain.PlayerState;
 import io.github.salyvn.omnipet.core.domain.incubation.IncubationState;
 import io.github.salyvn.omnipet.core.domain.incubation.IncubationStatus;
+import io.github.salyvn.omnipet.paper.config.GuiSettings;
 import io.github.salyvn.omnipet.paper.gui.GuiColors;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
+import io.github.salyvn.omnipet.paper.gui.MenuLayout;
 import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
+/**
+ * The hatch view, in four durable presentations.
+ *
+ * <p>Size, materials, and slots come from {@code gui.menus.hatch} when the operator set them. Controls
+ * go through {@link MenuLayout}, so a moved control keeps its action.
+ */
 public final class HatchMenuRenderer {
+    private static final int DEFAULT_SIZE = 27;
+    private static final int START_MAIN_SLOT = 11;
+    private static final int INCUBATION_SLOT = 13;
+    private static final int START_OFF_SLOT = 15;
+    private static final int HUB_SLOT = 18;
+    private static final int REFRESH_SLOT = 22;
+
     public Inventory render(Player player, PlayerState state) {
-        Map<Integer, HatchInventoryHolder.Action> actions = new HashMap<>();
+        MenuLayout<HatchInventoryHolder.Action> layout = new MenuLayout<>(
+                GuiSettings.gui().menu("hatch"), "gui.menus.hatch", GuiSettings::warn);
         IncubationState incubation = state.incubation();
         UUID incubationId = incubation == null ? null : incubation.id();
-        HatchInventoryHolder holder = new HatchInventoryHolder(
-                player.getUniqueId(), state.revision(), incubationId, actions);
-        Inventory inventory = Bukkit.createInventory(
-                holder, 27, Messages.line(MessageKey.GUI_TITLE_HATCH));
-        holder.bind(inventory);
-        fill(inventory);
 
         if (incubation == null || incubation.terminal()) {
-            if (incubation != null) inventory.setItem(13, previousHatch(incubation));
-            actions.put(11, HatchInventoryHolder.Action.startMain());
-            actions.put(15, HatchInventoryHolder.Action.startOffHand());
-            inventory.setItem(11, GuiItems.of(Material.DRAGON_EGG,
-                    Messages.line(MessageKey.GUI_HATCH_START_MAIN),
-                    List.of(Messages.line(MessageKey.GUI_HATCH_START_MAIN_HINT))));
-            inventory.setItem(15, GuiItems.of(Material.DRAGON_EGG,
-                    Messages.line(MessageKey.GUI_HATCH_START_OFF),
-                    List.of(Messages.line(MessageKey.GUI_HATCH_START_OFF_HINT))));
+            // Terminal history is reported but not clickable: the tile explains what happened, and the
+            // start controls below are what the player acts on.
+            if (incubation != null) {
+                layout.decorate("incubation", INCUBATION_SLOT, previousHatch(incubation));
+            }
+            layout.put("startMain", START_MAIN_SLOT, HatchInventoryHolder.Action.startMain(),
+                    Material.DRAGON_EGG, Messages.line(MessageKey.GUI_HATCH_START_MAIN),
+                    List.of(Messages.line(MessageKey.GUI_HATCH_START_MAIN_HINT)));
+            layout.put("startOff", START_OFF_SLOT, HatchInventoryHolder.Action.startOffHand(),
+                    Material.DRAGON_EGG, Messages.line(MessageKey.GUI_HATCH_START_OFF),
+                    List.of(Messages.line(MessageKey.GUI_HATCH_START_OFF_HINT)));
         } else {
-            inventory.setItem(13, activeIncubation(incubation));
-            actions.put(13, incubation.status() == IncubationStatus.READY
-                    ? HatchInventoryHolder.Action.claim()
-                    : HatchInventoryHolder.Action.refresh());
+            layout.putStack("incubation", INCUBATION_SLOT,
+                    incubation.status() == IncubationStatus.READY
+                            ? HatchInventoryHolder.Action.claim()
+                            : HatchInventoryHolder.Action.refresh(),
+                    activeIncubation(incubation));
         }
-        actions.put(22, HatchInventoryHolder.Action.refresh());
-        inventory.setItem(22, GuiItems.of(Material.CLOCK,
-                Messages.line(MessageKey.GUI_HATCH_REFRESH),
-                List.of(Messages.line(MessageKey.GUI_HATCH_REFRESH_HINT))));
-        // Slot 18 is free: 11/13/15/22 carry the start, incubation, and refresh controls.
-        actions.put(18, HatchInventoryHolder.Action.hub());
-        inventory.setItem(18, GuiItems.of(Material.COMPASS,
-                Messages.line(MessageKey.HUB_BACK), List.of()));
+        layout.put("refresh", REFRESH_SLOT, HatchInventoryHolder.Action.refresh(),
+                Material.CLOCK, Messages.line(MessageKey.GUI_HATCH_REFRESH),
+                List.of(Messages.line(MessageKey.GUI_HATCH_REFRESH_HINT)));
+        layout.put("hub", HUB_SLOT, HatchInventoryHolder.Action.hub(),
+                Material.COMPASS, Messages.line(MessageKey.HUB_BACK), List.of());
+
+        HatchInventoryHolder holder = new HatchInventoryHolder(
+                player.getUniqueId(), state.revision(), incubationId, layout.actions());
+        Inventory inventory = Bukkit.createInventory(
+                holder, layout.size(DEFAULT_SIZE), Messages.line(MessageKey.GUI_TITLE_HATCH));
+        holder.bind(inventory);
+        layout.draw(inventory);
         return inventory;
     }
 
@@ -78,7 +93,8 @@ public final class HatchMenuRenderer {
      * The active incubation head.
      *
      * <p>Built on the skull stack so {@link GuiItems#of(ItemStack, Component, List)} preserves the
-     * texture applied by {@link HatchHeadItems}.
+     * texture applied by {@link HatchHeadItems}. Placed with {@code putStack} for the same reason: the
+     * layout must not rebuild it from a material and drop the texture.
      */
     private static ItemStack activeIncubation(IncubationState incubation) {
         ItemStack egg = new ItemStack(Material.PLAYER_HEAD);
@@ -100,10 +116,5 @@ public final class HatchMenuRenderer {
                                 Messages.of("status", Displays.words(incubation.status())))
                         .color(ready ? GuiColors.POSITIVE : GuiColors.TITLE),
                 lore);
-    }
-
-    private static void fill(Inventory inventory) {
-        ItemStack pane = GuiItems.filler();
-        for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, pane);
     }
 }

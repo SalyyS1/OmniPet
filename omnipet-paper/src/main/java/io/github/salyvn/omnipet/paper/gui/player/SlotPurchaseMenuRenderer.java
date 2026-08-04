@@ -20,6 +20,7 @@ import io.github.salyvn.omnipet.core.economy.EconomyProvider;
 import io.github.salyvn.omnipet.paper.config.Phase4PaperConfig;
 import io.github.salyvn.omnipet.paper.gui.GuiColors;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
+import io.github.salyvn.omnipet.paper.gui.MenuMaterials;
 import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
@@ -59,7 +60,8 @@ public final class SlotPurchaseMenuRenderer {
                     balance.apply(provider), diagnostic.apply(provider)));
         }
         actions.put(22, SlotPurchaseInventoryHolder.Action.cancel());
-        inventory.setItem(22, GuiItems.of(Material.ARROW,
+        inventory.setItem(22, GuiItems.of(
+                MenuMaterials.of("slot", "hub", Material.ARROW),
                 Messages.line(MessageKey.GUI_SLOT_BACK_TO_VAULT), List.of()));
         return inventory;
     }
@@ -84,7 +86,7 @@ public final class SlotPurchaseMenuRenderer {
         actions.put(11, SlotPurchaseInventoryHolder.Action.confirm(amount));
         actions.put(15, SlotPurchaseInventoryHolder.Action.cancel());
         inventory.setItem(11, GuiItems.of(
-                Material.LIME_CONCRETE,
+                MenuMaterials.of("slot", "confirm", Material.LIME_CONCRETE),
                 Messages.line(MessageKey.GUI_SLOT_CONFIRM),
                 List.of(
                         Messages.line(MessageKey.GUI_SLOT_CONFIRM_PROVIDER,
@@ -93,7 +95,8 @@ public final class SlotPurchaseMenuRenderer {
                                 Messages.of("cost", amount.value().toPlainString())),
                         Component.empty(),
                         Messages.line(MessageKey.GUI_SLOT_CONFIRM_ONCE))));
-        inventory.setItem(15, GuiItems.of(Material.RED_CONCRETE,
+        inventory.setItem(15, GuiItems.of(
+                MenuMaterials.of("slot", "cancel", Material.RED_CONCRETE),
                 Messages.line(MessageKey.GUI_SLOT_CANCEL), List.of()));
         return inventory;
     }
@@ -135,12 +138,17 @@ public final class SlotPurchaseMenuRenderer {
                 player.getUniqueId(), revision, slot, origin, transactionId, stage, actions);
     }
 
+    /** The coin for one payment option, restyleable per provider. */
     private static Material material(EconomyProvider provider) {
-        return provider == EconomyProvider.VAULT ? Material.GOLD_INGOT : Material.NETHER_STAR;
+        return provider == EconomyProvider.VAULT
+                ? MenuMaterials.of("slot", "payVault", Material.GOLD_INGOT)
+                : MenuMaterials.of("slot", "payPoints", Material.NETHER_STAR);
     }
 
     private static void fill(Inventory inventory) {
-        ItemStack pane = GuiItems.filler();
+        ItemStack pane = GuiItems.of(
+                MenuMaterials.filler("slot", org.bukkit.Material.GRAY_STAINED_GLASS_PANE),
+                GuiItems.label(" ", GuiItems.LORE_COLOR), java.util.List.of());
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, pane);
     }
 }

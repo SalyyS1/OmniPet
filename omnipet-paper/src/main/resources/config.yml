@@ -215,3 +215,42 @@ gui:
     # your hand-tuned durations and candidate pools are safe. Set false to stop the Studio
     # writing egg files at all. Reloads live.
     autoCreateEgg: true
+
+  # ----------------------------------------------------------------------------------------------
+  #  MENU RESTYLING (optional)
+  # ----------------------------------------------------------------------------------------------
+  #  Change what a menu is made of. Delete this and every menu looks exactly as it does now.
+  #  Reloads live - reopen the menu to see a change.
+  #
+  #  Per menu:  size    slots, a multiple of 9 up to 54
+  #             filler  the background pane material
+  #             buttons per-button material and slot
+  #
+  #  Buttons are named, not numbered, so you can restyle "the hatch tile" without listing every
+  #  state it can be in. Naming ONE material for a button that changes with state - the hatch tile
+  #  is a different item when ready, incubating, and idle - pins it to that one look on purpose.
+  #
+  #  Menus and their buttons:
+  #    hub         vault, hatch, slots, help, studio
+  #    vault       previous, next, hub, sort, filter, status, unlockSlot   (materials only)
+  #    hatch       startMain, startOff, incubation, hub, refresh
+  #    management  favorite, lock, moveUp, moveDown, candy, breakthrough, release,
+  #                refresh, back, hub
+  #    slot        payVault, payPoints, confirm, cancel, hub
+  #
+  #  The vault takes materials but not slots or size: pet rows fill slots 0-44 and the paging maths
+  #  is built on that shape. Moving a button onto an occupied slot, or outside the menu, is refused
+  #  with a warning naming the key - it keeps its normal slot rather than silently vanishing.
+  #
+  #  Item NAMES and LORE are not here; they are in messages.yml under gui.*
+  #
+  # menus:
+  #   hub:
+  #     filler: BLACK_STAINED_GLASS_PANE
+  #     buttons:
+  #       vault:  { material: CHEST, slot: 10 }
+  #       hatch:  { material: TURTLE_EGG }
+  #   management:
+  #     size: 54
+  #     buttons:
+  #       release: { material: FIRE_CHARGE }

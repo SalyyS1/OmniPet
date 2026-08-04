@@ -18,13 +18,15 @@ public record GuiConfig(
         int vaultPetsPerPage,
         int helpLinesPerPage,
         Duration studioPromptTimeout,
-        boolean studioAutoCreateEgg) {
+        boolean studioAutoCreateEgg,
+        java.util.Map<String, MenuStyle> menus) {
     /** A vault page cannot exceed this: the 54-slot layout reserves the bottom row for controls. */
     public static final int MAX_VAULT_PETS_PER_PAGE = 45;
     public static final int MAX_HELP_LINES_PER_PAGE = 20;
 
     public GuiConfig {
         feedback = Objects.requireNonNull(feedback, "feedback settings");
+        menus = menus == null ? java.util.Map.of() : java.util.Map.copyOf(menus);
         vaultPetsPerPage = clamp(vaultPetsPerPage, 1, MAX_VAULT_PETS_PER_PAGE);
         helpLinesPerPage = clamp(helpLinesPerPage, 1, MAX_HELP_LINES_PER_PAGE);
         Objects.requireNonNull(studioPromptTimeout, "studio prompt timeout");
@@ -38,7 +40,13 @@ public record GuiConfig(
      * what makes a Studio-created pet reachable in game without a second command.
      */
     public static GuiConfig defaults() {
-        return new GuiConfig(Feedback.defaults(), MAX_VAULT_PETS_PER_PAGE, 8, Duration.ofMinutes(2), true);
+        return new GuiConfig(Feedback.defaults(), MAX_VAULT_PETS_PER_PAGE, 8, Duration.ofMinutes(2), true,
+                java.util.Map.of());
+    }
+
+    /** The operator's layout for one menu, or an all-defaults style when they configured none. */
+    public MenuStyle menu(String name) {
+        return menus.getOrDefault(Objects.requireNonNull(name, "menu name"), MenuStyle.defaults());
     }
 
     /**

@@ -19,6 +19,7 @@ import io.github.salyvn.omnipet.paper.config.GuiConfig;
 import io.github.salyvn.omnipet.paper.config.GuiSettings;
 import io.github.salyvn.omnipet.paper.gui.GuiColors;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
+import io.github.salyvn.omnipet.paper.gui.MenuMaterials;
 import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
@@ -62,7 +63,8 @@ public final class PlayerPetMenuRenderer {
 
         if (!view.firstPage()) {
             actions.put(45, PlayerPetInventoryHolder.Action.previous());
-            inventory.setItem(45, GuiItems.of(Material.ARROW,
+            inventory.setItem(45, GuiItems.of(
+                    MenuMaterials.of("vault", "previous", Material.ARROW),
                     Messages.line(MessageKey.GUI_VAULT_PREVIOUS), List.of()));
         }
         if (view.lastPage()) {
@@ -70,18 +72,20 @@ public final class PlayerPetMenuRenderer {
             VaultMenuControls.paintLastPage(inventory, view);
         } else {
             actions.put(53, PlayerPetInventoryHolder.Action.next());
-            inventory.setItem(53, GuiItems.of(Material.ARROW,
+            inventory.setItem(53, GuiItems.of(
+                    MenuMaterials.of("vault", "next", Material.ARROW),
                     Messages.line(MessageKey.GUI_VAULT_NEXT), List.of()));
         }
         VaultMenuControls.paint(inventory, actions, state, view);
         inventory.setItem(49, vaultStatus(snapshot));
         // 45/49/50/53 are paging, status, and slot purchase; 48 is the hub; 46/47 are sort and filter.
         actions.put(48, PlayerPetInventoryHolder.Action.hub());
-        inventory.setItem(48, GuiItems.of(Material.COMPASS,
+        inventory.setItem(48, GuiItems.of(
+                MenuMaterials.of("vault", "hub", Material.COMPASS),
                 Messages.line(MessageKey.HUB_BACK), List.of()));
         actions.put(50, PlayerPetInventoryHolder.Action.purchaseSlot());
         inventory.setItem(50, GuiItems.of(
-                Material.EXPERIENCE_BOTTLE,
+                MenuMaterials.of("vault", "unlockSlot", Material.EXPERIENCE_BOTTLE),
                 Messages.line(MessageKey.GUI_VAULT_UNLOCK_SLOT),
                 List.of(Messages.line(MessageKey.GUI_VAULT_UNLOCK_HINT))));
         return inventory;
@@ -129,13 +133,14 @@ public final class PlayerPetMenuRenderer {
         if (overflow) lore.addAll(VaultMenuControls.overflowLore());
         else lore.add(Messages.line(MessageKey.GUI_VAULT_PROVIDER_NOTE));
         return GuiItems.of(
-                overflow ? Material.RED_STAINED_GLASS : Material.ENDER_CHEST,
+                MenuMaterials.of("vault", "status",
+                        overflow ? Material.RED_STAINED_GLASS : Material.ENDER_CHEST),
                 Messages.line(MessageKey.GUI_VAULT_STATUS).color(GuiColors.availability(!overflow)),
                 lore);
     }
 
     private static void fill(Inventory inventory) {
-        ItemStack pane = GuiItems.filler();
+        ItemStack pane = VaultMenuControls.filler();
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, pane);
     }
 }
