@@ -42,6 +42,7 @@ final class StudioInventoryRenderer {
                     tier.name() + " tier", NamedTextColor.GOLD,
                     "Definitions: " + count, "Click to browse"));
         }
+        actions.put(22, new StudioAction(StudioActionType.CLOSE, ""));
         inventory.setItem(22, item(Material.BARRIER, "Close", NamedTextColor.RED, "Exit OmniPet Studio"));
         return inventory;
     }

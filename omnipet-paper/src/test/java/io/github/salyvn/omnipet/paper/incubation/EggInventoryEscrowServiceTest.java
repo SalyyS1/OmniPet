@@ -49,16 +49,31 @@ class EggInventoryEscrowServiceTest {
     }
 
     @Test
-    void removesExactlyOneOnlyFromTheRecordedSlotAndAmount() {
+    void removesExactlyOneByNonceEvenAfterTheStackMoves() {
+        // Capture and removal are separated by an async round trip. Requiring the original slot and hand
+        // meant a hotbar scroll in that window made the egg unremovable: it stayed in the inventory
+        // while the incubation persisted, so the countdown froze and claim locked forever, and recovery
+        // could not heal it because observe() locates the egg by nonce and kept reporting it present.
         FakePort success = port(stack(4, 5));
         FakePort moved = port(stack(8, 5));
 
         assertEquals(EggInventoryMutationResult.REMOVED, service.removeOne(identity(5), success));
         assertEquals(4, success.stacks().getFirst().amount());
-        assertEquals(EggInventoryMutationResult.NOT_MATCHING, service.removeOne(identity(5), moved));
-        assertEquals(5, moved.stacks().getFirst().amount());
-        success.handMatches = false;
-        assertEquals(EggInventoryMutationResult.NOT_MATCHING, service.removeOne(identity(4), success));
+        assertEquals(EggInventoryMutationResult.REMOVED, service.removeOne(identity(5), moved),
+                "a moved egg is still the paid egg; the nonce identifies it, not the slot");
+        assertEquals(4, moved.stacks().getFirst().amount());
+
+        // Held-slot disagreement is likewise not grounds to refuse - only the nonce and amount are.
+        FakePort switchedHand = port(stack(4, 5));
+        switchedHand.handMatches = false;
+        assertEquals(EggInventoryMutationResult.REMOVED, service.removeOne(identity(5), switchedHand));
+    }
+
+    @Test
+    void anUnexpectedStackAmountStillRefusesRemoval() {
+        // Amount is genuine ambiguity about which egg was paid for, so it stays strict.
+        assertEquals(EggInventoryMutationResult.NOT_MATCHING,
+                service.removeOne(identity(5), port(stack(4, 3))));
     }
 
     @Test

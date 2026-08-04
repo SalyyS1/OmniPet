@@ -23,14 +23,25 @@ public final class EggInventoryEscrowService {
         return EggEscrowItemObservation.AMBIGUOUS;
     }
 
+    /**
+     * Removes the paid egg, locating it by nonce rather than by where it was when captured.
+     *
+     * <p>Deliberately does not require the egg to still be in the original slot or hand. Capture and
+     * removal are separated by an async round trip, so scrolling the hotbar or moving the stack in that
+     * window used to make removal impossible: the egg stayed in the inventory while the incubation
+     * persisted, freezing the countdown and locking claim forever, and recovery could not heal it
+     * because {@link #observe} finds the egg by nonce and so kept reporting it present.
+     *
+     * <p>Safe because the nonce is unique per egg and {@link #match} refuses to act on a duplicate, and
+     * because {@code inventory.removeOne} re-observes the located slot and removes only on an exact
+     * match. The amount check stays: an unexpected stack size is genuine ambiguity about which egg was
+     * paid for.
+     */
     public EggInventoryMutationResult removeOne(EggItemIdentity identity, EggInventoryPort inventory) {
         Match match = match(identity, inventory);
         if (match.ambiguous()) return EggInventoryMutationResult.AMBIGUOUS;
         ObservedEggStack stack = match.stack();
-        if (stack == null
-                || !inventory.handMatches(identity)
-                || stack.slot() != identity.inventorySlot()
-                || stack.amount() != identity.expectedStackAmount()) {
+        if (stack == null || stack.amount() != identity.expectedStackAmount()) {
             return EggInventoryMutationResult.NOT_MATCHING;
         }
         return inventory.removeOne(stack)

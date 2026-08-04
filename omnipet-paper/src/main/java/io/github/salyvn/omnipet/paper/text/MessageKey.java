@@ -36,6 +36,9 @@ public enum MessageKey {
     HATCH_START_QUEUED("hatch.start-queued",
             "<green>OmniPet: Egg start queued; the escrow must commit before time advances.</green>"),
     HATCH_START_NOT_QUEUED("hatch.start-not-queued", "<red>OmniPet: Egg start could not be queued.</red>"),
+    EGG_NOT_PLACEABLE("hatch.egg-not-placeable",
+            "<red>OmniPet: That egg cannot be placed as a block.</red> "
+                    + "<gray>Hold it and run</gray> <white>/pet hatch main</white><gray>.</gray>"),
     HATCH_START_FAILED("hatch.start-failed", "<red>OmniPet: Egg start failed.</red>"),
     HATCH_LIMITS_UNRESOLVED("hatch.limits-unresolved", "<red>OmniPet: Vault limits could not be resolved.</red>"),
     HATCH_NO_INCUBATION("hatch.no-incubation", "<red>OmniPet: No incubation is available.</red>"),
@@ -188,6 +191,28 @@ public enum MessageKey {
     GUI_EGG_ITEM_DURATION("gui.egg.item-duration", "<gray>Incubates in</gray> <white><detail></white>"),
     GUI_EGG_ITEM_HINT("gui.egg.item-hint",
             "<yellow>Hold and run <white>/pet hatch main</white></yellow> <gray>to start</gray>"),
+
+    // --- consumable items --------------------------------------------------------------------
+    // Every OmniPet consumable is a plain vanilla material, so without a name and a usage line it is
+    // indistinguishable from the vanilla item and nothing tells the holder how to redeem it.
+    GUI_CANDY_ITEM_NAME("gui.item.candy-name", "<green>OmniPet EXP Candy</green>"),
+    GUI_CANDY_ITEM_DETAIL("gui.item.candy-detail", "<gray>Grants</gray> <white><detail> EXP</white>"),
+    GUI_CANDY_ITEM_HINT("gui.item.candy-hint",
+            "<yellow>Open <white>/pet</white>, right-click a pet, then click EXP candy</yellow>"),
+    GUI_BREAKTHROUGH_ITEM_NAME("gui.item.breakthrough-name", "<light_purple>OmniPet Breakthrough Stone</light_purple>"),
+    GUI_BREAKTHROUGH_ITEM_DETAIL("gui.item.breakthrough-detail",
+            "<gray>Requires level</gray> <white><detail></white>"),
+    GUI_BREAKTHROUGH_ITEM_HINT("gui.item.breakthrough-hint",
+            "<yellow>Open <white>/pet</white>, right-click a pet, then click Breakthrough</yellow>"),
+    GUI_REDUCER_ITEM_NAME("gui.item.reducer-name", "<aqua>OmniPet Hatch Accelerator</aqua>"),
+    GUI_REDUCER_ITEM_DETAIL("gui.item.reducer-detail",
+            "<gray>Cuts</gray> <white><detail></white> <gray>from the current hatch</gray>"),
+    GUI_REDUCER_ITEM_HINT("gui.item.reducer-hint",
+            "<yellow>Hold and run <white>/pet hatch use-main</white></yellow>"),
+    GUI_INSTANT_ITEM_NAME("gui.item.instant-name", "<gold>OmniPet Instant Hatch</gold>"),
+    GUI_INSTANT_ITEM_DETAIL("gui.item.instant-detail", "<gray>Finishes the current hatch at once</gray>"),
+    GUI_INSTANT_ITEM_HINT("gui.item.instant-hint",
+            "<yellow>Hold and run <white>/pet hatch use-main</white></yellow>"),
 
     GUI_HATCH_START_MAIN("gui.hatch.start-main", "<aqua>Start main-hand egg</aqua>"),
     GUI_HATCH_START_MAIN_HINT("gui.hatch.start-main-hint",

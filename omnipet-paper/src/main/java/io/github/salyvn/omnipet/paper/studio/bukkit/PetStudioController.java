@@ -209,6 +209,9 @@ public final class PetStudioController {
                     StudioDraftInputParsers::stats, state.draft::withStats);
             case STAT_SEARCH -> awaitStatSearch(player, state);
             case STAT_REFRESH -> { statCatalog.invalidate(); openStats(state); }
+            // Deferred a tick: closing an inventory from inside InventoryClickEvent is unreliable,
+            // and the resulting InventoryCloseEvent already ends the session and drops the state.
+            case CLOSE -> plugin.getServer().getScheduler().runTask(plugin, (Runnable) () -> player.closeInventory());
         }
     }
 

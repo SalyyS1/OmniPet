@@ -11,12 +11,16 @@ import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
+import net.kyori.adventure.text.Component;
 
 import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
 import io.github.salyvn.omnipet.core.incubation.IncubationItemActionStage;
 import io.github.salyvn.omnipet.core.incubation.IncubationItemActionTransaction;
 import io.github.salyvn.omnipet.core.incubation.RepositoryHatchService;
 import io.github.salyvn.omnipet.paper.text.Displays;
+import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -97,8 +101,8 @@ public final class IncubationActionItemController {
             int amountIndex = type.equals("reducer") ? 3 : 2;
             int amount = arguments.size() > amountIndex ? Integer.parseInt(arguments.get(amountIndex)) : 1;
             ItemStack item = switch (type) {
-                case "reducer" -> codec.createReducer(Material.CLOCK, effectMillis);
-                case "instant" -> codec.createInstantHatch(Material.NETHER_STAR);
+                case "reducer" -> label(codec.createReducer(Material.CLOCK, effectMillis), true, effectMillis);
+                case "instant" -> label(codec.createInstantHatch(Material.NETHER_STAR), false, 0);
                 default -> throw new IllegalArgumentException("unknown incubation item type");
             };
             if (amount < 1 || amount > item.getMaxStackSize()) {
@@ -115,6 +119,31 @@ public final class IncubationActionItemController {
         } catch (ArithmeticException | IllegalArgumentException failure) {
             sender.sendMessage("OmniPet: invalid item request - " + detail(failure) + ".");
         }
+    }
+
+    /**
+     * Names and describes the item so its holder can tell what it is and how to redeem it.
+     *
+     * <p>Applied here rather than in the codec: the codec is driven in tests through a fake item
+     * factory that carries no real meta, and its job is the PDC identity that {@code capture()}
+     * validates. Display text is set before the identity is ever fingerprinted, so it cannot affect
+     * escrow matching.
+     */
+    private static ItemStack label(ItemStack item, boolean reducer, long effectMillis) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return item;
+        meta.displayName(Messages.line(reducer
+                ? MessageKey.GUI_REDUCER_ITEM_NAME : MessageKey.GUI_INSTANT_ITEM_NAME));
+        meta.lore(List.of(
+                reducer
+                        ? Messages.line(MessageKey.GUI_REDUCER_ITEM_DETAIL,
+                                Messages.of("detail", Durations.countdown(effectMillis)))
+                        : Messages.line(MessageKey.GUI_INSTANT_ITEM_DETAIL),
+                Component.empty(),
+                Messages.line(reducer
+                        ? MessageKey.GUI_REDUCER_ITEM_HINT : MessageKey.GUI_INSTANT_ITEM_HINT)));
+        item.setItemMeta(meta);
+        return item;
     }
 
     private static void usage(CommandSender sender) {

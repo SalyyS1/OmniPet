@@ -28,5 +28,7 @@ public enum StudioActionType {
     STAT_MANUAL,
     STAT_SEARCH,
     STAT_REFRESH,
-    CLONE
+    CLONE,
+    /** Leaves the Studio entirely, ending the session rather than navigating to another screen. */
+    CLOSE
 }

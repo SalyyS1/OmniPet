@@ -78,6 +78,22 @@ public final class PaperEggItemCodec {
         return new CapturedEggItem(stack, eggId, identity);
     }
 
+    /**
+     * Whether the stack carries OmniPet egg identity, without deriving a fingerprint.
+     *
+     * <p>Cheap enough for a hot event handler: it reads one PDC key and never serializes the stack.
+     * Deliberately accepts a malformed or legacy identity too — for deciding "is this ours, leave it
+     * alone", an egg with a broken schema still must not be treated as a vanilla block.
+     */
+    public boolean carriesEggIdentity(ItemStack source) {
+        if (source == null || source.getType() == Material.AIR) return false;
+        ItemMeta meta = source.getItemMeta();
+        if (meta == null) return false;
+        PersistentDataContainer data = meta.getPersistentDataContainer();
+        return data.get(eggKey, PersistentDataType.STRING) != null
+                || data.get(legacyEggKey, PersistentDataType.STRING) != null;
+    }
+
     public Optional<ObservedEggStack> observe(ItemStack source, int slot) {
         if (source == null || source.getType() == Material.AIR || source.getAmount() < 1) return Optional.empty();
         ItemMeta meta = source.getItemMeta();

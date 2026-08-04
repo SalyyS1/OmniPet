@@ -105,7 +105,8 @@ class RendererTextContractTest {
             boolean coloured = value.contains("<gray>") || value.contains("<white>")
                     || value.contains("<yellow>") || value.contains("<green>")
                     || value.contains("<red>") || value.contains("<gold>")
-                    || value.contains("<aqua>") || value.contains("<dark_gray>");
+                    || value.contains("<aqua>") || value.contains("<dark_gray>")
+                    || value.contains("<light_purple>");
             // Titles and a few names take their colour from the renderer's state-dependent choice.
             boolean rendererColoured = key.path().startsWith("gui.title.")
                     || key.path().equals("gui.vault.status")

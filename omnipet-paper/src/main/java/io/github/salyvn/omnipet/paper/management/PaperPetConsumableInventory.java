@@ -19,13 +19,15 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 
 import io.github.salyvn.omnipet.paper.config.OmniPetConfig;
 import io.github.salyvn.omnipet.core.incubation.EggEscrowItemObservation;
 import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
 import io.github.salyvn.omnipet.core.incubation.EggItemIdentity;
 import io.github.salyvn.omnipet.paper.incubation.EggInventoryMutationResult;
+import io.github.salyvn.omnipet.paper.text.Durations;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 /** Exact PDC identity for standalone cultivation items; generic materials never qualify. */
 public final class PaperPetConsumableInventory implements PetConsumableInventoryPort {
@@ -60,19 +62,30 @@ public final class PaperPetConsumableInventory implements PetConsumableInventory
     public ItemStack create(Kind kind) {
         requireMainThread();
         OmniPetConfig.CultivationItems current = config;
-        ItemStack item = new ItemStack(material(kind == Kind.EXPERIENCE_CANDY
+        boolean candy = kind == Kind.EXPERIENCE_CANDY;
+        ItemStack item = new ItemStack(material(candy
                 ? current.experienceMaterial() : current.breakthroughMaterial()));
         item.setAmount(1);
         ItemMeta meta = requireMeta(item);
-        meta.displayName(Component.text(
-                kind == Kind.EXPERIENCE_CANDY ? "OmniPet EXP Candy" : "OmniPet Breakthrough Stone",
-                kind == Kind.EXPERIENCE_CANDY ? NamedTextColor.GREEN : NamedTextColor.LIGHT_PURPLE));
+        // Named and described through the catalog: these are vanilla materials, so an unlabelled one is
+        // indistinguishable from an ordinary bottle or star and says nothing about how to redeem it.
+        meta.displayName(Messages.line(candy
+                ? MessageKey.GUI_CANDY_ITEM_NAME : MessageKey.GUI_BREAKTHROUGH_ITEM_NAME));
+        meta.lore(java.util.List.of(
+                candy
+                        ? Messages.line(MessageKey.GUI_CANDY_ITEM_DETAIL,
+                                Messages.of("detail", Durations.decimal(current.experienceAmount())))
+                        : Messages.line(MessageKey.GUI_BREAKTHROUGH_ITEM_DETAIL,
+                                Messages.of("detail", String.valueOf(current.breakthroughRequiredLevel()))),
+                Component.empty(),
+                Messages.line(candy
+                        ? MessageKey.GUI_CANDY_ITEM_HINT : MessageKey.GUI_BREAKTHROUGH_ITEM_HINT)));
         PersistentDataContainer data = meta.getPersistentDataContainer();
         data.set(schemaKey, PersistentDataType.INTEGER, SCHEMA);
         data.set(typeKey, PersistentDataType.STRING, kind.name());
         data.set(nonceKey, PersistentDataType.STRING, UUID.randomUUID().toString());
         data.set(experienceKey, PersistentDataType.DOUBLE,
-                kind == Kind.EXPERIENCE_CANDY ? current.experienceAmount() : 0D);
+                candy ? current.experienceAmount() : 0D);
         data.set(requiredLevelKey, PersistentDataType.INTEGER,
                 kind == Kind.BREAKTHROUGH_STONE ? current.breakthroughRequiredLevel() : 1);
         data.set(requiredEvolutionKey, PersistentDataType.INTEGER,

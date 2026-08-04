@@ -51,6 +51,7 @@ import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegis
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.pet.PetInteractListener;
 import io.github.salyvn.omnipet.paper.incubation.EggAdminController;
+import io.github.salyvn.omnipet.paper.incubation.EggBlockPlacementListener;
 import io.github.salyvn.omnipet.paper.incubation.PaperEggItemCodec;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuListener;
@@ -251,6 +252,9 @@ public final class OmniPetPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(
                     new IncubationLifecycleListener(incubationCoordinator, hatchController), this);
             getServer().getPluginManager().registerEvents(new HatchMenuListener(hatchController), this);
+            // Placing an egg would convert it to a block and destroy the identity escrow matches on.
+            getServer().getPluginManager().registerEvents(
+                    new EggBlockPlacementListener(new PaperEggItemCodec(this)), this);
             getServer().getPluginManager().registerEvents(new HubMenuListener(hubController), this);
             getServer().getPluginManager().registerEvents(new EconomyProviderLifecycleListener(
                     this,
