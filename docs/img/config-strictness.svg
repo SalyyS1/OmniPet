@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 608 274" width="608" height="274" role="img" aria-label="Two kinds of config section">
+  <rect width="608" height="274" fill="#f3f0e7"/>
+  <text x="24" y="34" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#e67532" letter-spacing="1.6">TWO KINDS OF CONFIG SECTION</text>
+  <line x1="24" y1="46" x2="584" y2="46" stroke="#102a2b" stroke-opacity="0.22"/>
+  <defs>
+    <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#102a2b" fill-opacity="0.55"/>
+    </marker>
+  </defs>
+  <rect x="24" y="80" width="250" height="96" rx="4" fill="#f6d5c4" stroke="#102a2b" stroke-opacity="0.35"/>
+  <text x="149" y="124" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#102a2b">storage:</text>
+  <text x="149" y="142" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#2d4a49">strict</text>
+  <text x="149" y="204" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#2d4a49">A bad value stops startup.</text>
+  <text x="149" y="222" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#2d4a49">Capacity and prices are about</text>
+  <text x="149" y="240" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#2d4a49">someone's pets and money.</text>
+  <rect x="334" y="80" width="250" height="96" rx="4" fill="#d3eadf" stroke="#102a2b" stroke-opacity="0.35"/>
+  <text x="459" y="124" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#102a2b">everything else</text>
+  <text x="459" y="142" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#2d4a49">lenient</text>
+  <text x="459" y="204" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#2d4a49">A bad value warns and falls back</text>
+  <text x="459" y="222" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#2d4a49">for that one key. A typo in a page</text>
+  <text x="459" y="240" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11" fill="#2d4a49">size never costs anyone a pet.</text>
+</svg>

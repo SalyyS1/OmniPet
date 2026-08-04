@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'tools/build-wiki-diagrams.mjs'
+      - 'tools/verify-wiki-render.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -29,6 +31,21 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Diagrams are generated rather than committed as binaries, so they cannot drift from the
+      # generator. The committed SVGs are also valid, so a failure here does not break the deploy.
+      - name: Generate diagrams
+        run: node tools/build-wiki-diagrams.mjs
+
+      # Fails the deploy on a page that does not render or a translation that is missing, rather than
+      # publishing it and finding out from a reader.
+      - name: Verify the wiki renders
+        run: node tools/verify-wiki-render.mjs
 
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3

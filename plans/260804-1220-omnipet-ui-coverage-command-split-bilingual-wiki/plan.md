@@ -1,7 +1,7 @@
 ---
 title: "OmniPet UI coverage, command split, and bilingual wiki"
 description: "Three operator-facing programmes: give every practical feature an inventory GUI, split the 653-line dispatcher into routers plus a dedicated /petadmin command, and publish a bilingual EN/VI documentation site with generated diagrams."
-status: in-progress
+status: complete
 priority: P1
 effort: "7-11d"
 tags: [gui, commands, docs, i18n]
@@ -35,9 +35,9 @@ Three independent programmes. They share no files, so any one can stall without 
 
 | # | Phase | Status | Depends on | Why this order |
 | --- | --- | --- | --- | --- |
-| 1 | [Command split](./phase-01-command-split.md) | Pending | — | Everything in Phase 2 adds dispatch branches; splitting first means adding to small routers rather than a 653-line method. |
-| 2 | [UI coverage](./phase-02-ui-coverage.md) | Pending | 1 | The new admin GUIs need somewhere to live that is not the monolith. |
-| 3 | [Bilingual wiki](./phase-03-bilingual-wiki.md) | Pending | 1, 2 | Documents the finished surface, so it goes last and cannot describe something that then changes. |
+| 1 | Command split | Complete | — | Everything in Phase 2 adds dispatch branches; splitting first means adding to small routers rather than a 653-line method. |
+| 2 | UI coverage | Complete | 1 | The new admin GUIs need somewhere to live that is not the monolith. |
+| 3 | Bilingual wiki | Complete | 1, 2 | Documents the finished surface, so it goes last and cannot describe something that then changes. |
 
 ## What gets a GUI, and what deliberately does not
 

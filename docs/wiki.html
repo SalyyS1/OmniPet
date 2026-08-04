@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="OmniPet wiki: install, play, configure, and administer the Paper pet plugin. Available in English and Vietnamese.">
+  <meta name="theme-color" content="#102a2b">
+  <title>OmniPet Wiki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="wiki.css">
+</head>
+<body class="wiki-body">
+  <a class="skip-link" href="#wiki-article">Skip to content</a>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="wiki-header">
+    <a class="brand" href="./" aria-label="OmniPet documentation home">
+      <span class="brand-mark" aria-hidden="true">OP</span>
+      <span><strong>OmniPet</strong><small id="brand-tagline">Field Manual / 3.0</small></span>
+    </a>
+
+    <div class="wiki-header-tools">
+      <label class="wiki-search-wrap">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
+          <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M16.5 16.5 21 21" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <input id="wiki-search" type="search" autocomplete="off" placeholder="Search…">
+      </label>
+
+      <div class="language-switch" role="group" aria-label="Language">
+        <button type="button" data-language="en" aria-pressed="true">EN</button>
+        <button type="button" data-language="vi" aria-pressed="false">VI</button>
+      </div>
+
+      <a class="wiki-source" href="https://github.com/SalyyS1/OmniPet">Source</a>
+    </div>
+  </header>
+
+  <img class="wiki-banner" src="img/wiki-banner.svg" alt="OmniPet field manual" width="1200" height="300">
+
+  <div class="wiki-shell">
+    <nav id="wiki-nav" class="wiki-nav" aria-label="Wiki pages"></nav>
+    <main id="wiki-article" class="wiki-article" tabindex="-1"></main>
+    <aside class="wiki-aside">
+      <div id="wiki-toc" class="wiki-toc"></div>
+      <section class="wiki-stats-panel">
+        <p class="panel-label">Build</p>
+        <dl id="wiki-stats">
+          <div><dt>Tests</dt><dd>—</dd></div>
+        </dl>
+      </section>
+    </aside>
+  </div>
+
+  <script src="wiki-content.js"></script>
+  <script src="wiki.js"></script>
+</body>
+</html>
