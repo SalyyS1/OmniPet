@@ -77,11 +77,15 @@ public record MenuStyle(
         menus.put("hub", java.util.Set.of("vault", "hatch", "slots", "help", "studio"));
         menus.put("vault", java.util.Set.of(
                 "previous", "next", "hub", "sort", "filter", "status", "unlockSlot"));
-        menus.put("hatch", java.util.Set.of("startMain", "startOff", "incubation", "hub", "refresh"));
+        menus.put("hatch", java.util.Set.of(
+                "startMain", "startOff", "incubation", "hub", "refresh", "redeemMain", "redeemOff"));
         menus.put("management", java.util.Set.of(
                 "favorite", "lock", "moveUp", "moveDown", "candy", "breakthrough", "release",
                 "refresh", "back", "hub"));
         menus.put("slot", java.util.Set.of("payVault", "payPoints", "confirm", "cancel", "hub"));
+        menus.put("adminTransactions", java.util.Set.of("row", "refresh", "next"));
+        menus.put("adminReconcile", java.util.Set.of(
+                "charge", "noCharge", "refund", "sync", "subject", "back"));
         return Map.copyOf(menus);
     }
 }

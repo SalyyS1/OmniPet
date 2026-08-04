@@ -55,7 +55,12 @@ public final class HatchInventoryHolder implements InventoryHolder {
         public static Action refresh() { return new Action(Type.REFRESH); }
 
         public static Action hub() { return new Action(Type.HUB); }
+
+        /** Redeems a reducer or instant-hatch item from the named hand. */
+        public static Action redeemMain() { return new Action(Type.REDEEM_MAIN); }
+
+        public static Action redeemOffHand() { return new Action(Type.REDEEM_OFF_HAND); }
     }
 
-    public enum Type { START_MAIN, START_OFF_HAND, CLAIM, REFRESH, HUB }
+    public enum Type { START_MAIN, START_OFF_HAND, CLAIM, REFRESH, HUB, REDEEM_MAIN, REDEEM_OFF_HAND }
 }

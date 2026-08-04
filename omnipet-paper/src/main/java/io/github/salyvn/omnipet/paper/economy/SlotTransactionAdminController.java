@@ -30,6 +30,17 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
     private final SlotPurchaseReconciliationService reconciliation;
     private final SlotUnlockService purchases;
     private final SlotEntitlementSynchronizer entitlements;
+    /** One full menu page. The chest holds 45 rows above its control row. */
+    private static final int MENU_PAGE_SIZE = 45;
+    /**
+     * How far the confirm screen scans to re-find its row.
+     *
+     * <p>Bounded like every other journal read: a transaction beyond this is reachable by the command
+     * form with an explicit cursor, which is what that form is for.
+     */
+    private static final int MENU_SCAN_LIMIT = 50;
+    private final io.github.salyvn.omnipet.paper.gui.admin.AdminTransactionMenuRenderer menus =
+            new io.github.salyvn.omnipet.paper.gui.admin.AdminTransactionMenuRenderer();
     private final AtomicInteger activeTasks = new AtomicInteger();
     private final Object idleMonitor = new Object();
     private volatile boolean shuttingDown;
@@ -163,6 +174,73 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
                 }
             }
         }
+    }
+
+    /**
+     * Opens the pending-transaction menu, reading the journal off the main thread.
+     *
+     * <p>The menu exists to remove the copying: reconciling used to mean reading a UUID out of a chat
+     * page and pasting it back with a decision word. The command form stays, because its continuation
+     * cursor is an opaque token an operator pastes into a ticket, which no menu replaces.
+     */
+    public void openMenu(org.bukkit.entity.Player viewer, String cursor) {
+        Objects.requireNonNull(viewer, "viewer");
+        submit(viewer, () -> {
+            PurchaseJournalScanResult scan = reconciliation.pending(MENU_PAGE_SIZE, cursor);
+            runMain(() -> {
+                if (!viewer.isOnline()) return;
+                viewer.openInventory(menus.renderList(viewer, scan, cursor));
+            });
+        });
+    }
+
+    /**
+     * Opens the confirm screen for one transaction, re-reading it first.
+     *
+     * <p>The row is read again rather than carried from the list, so a transaction another operator
+     * already reconciled cannot be acted on from a menu that is minutes old. When it has gone, the list
+     * is reopened instead of silently doing nothing.
+     */
+    public void openConfirm(
+            org.bukkit.entity.Player viewer, UUID transactionId, String cursor, Runnable onMissing) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(transactionId, "transaction id");
+        Objects.requireNonNull(onMissing, "missing-row handler");
+        submit(viewer, () -> {
+            PurchaseJournalScanResult scan = reconciliation.pending(MENU_SCAN_LIMIT, null);
+            var row = scan.transactions().stream()
+                    .filter(candidate -> candidate.transactionId().equals(transactionId))
+                    .findFirst()
+                    .orElse(null);
+            runMain(() -> {
+                if (!viewer.isOnline()) return;
+                if (row == null) {
+                    // Reported by the caller, which owns menu-facing text: this class is the audit
+                    // trail, and its output deliberately stays in Java where a YAML edit cannot reach.
+                    onMissing.run();
+                    openMenu(viewer, null);
+                    return;
+                }
+                viewer.openInventory(menus.renderConfirm(viewer, row, cursor));
+            });
+        });
+    }
+
+    /** Applies a decision from the confirm screen, then reopens the list so the operator sees the effect. */
+    public void reconcileFromMenu(
+            org.bukkit.entity.Player viewer,
+            UUID transactionId,
+            SlotReconciliationDecision decision,
+            String cursor) {
+        reconcile(viewer, transactionId, decision);
+        runMain(() -> {
+            if (viewer.isOnline()) openMenu(viewer, cursor);
+        });
+    }
+
+    private void runMain(Runnable task) {
+        if (!plugin.isEnabled()) return;
+        plugin.getServer().getScheduler().runTask(plugin, task);
     }
 
     private void submit(CommandSender sender, CheckedTask task) {

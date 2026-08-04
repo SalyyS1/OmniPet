@@ -405,11 +405,28 @@ public final class OmniPetCommand implements BasicCommand {
 
     /** Everything under {@code admin}, shared verbatim with the standalone {@code /petadmin}. */
     AdminCommandRouter adminRouter() {
-        return new AdminCommandRouter(
+        AdminCommandRouter router = new AdminCommandRouter(
                 adminAreas(),
                 new HatchAdminRouter(hatchAdmin, ONLINE_PLAYERS),
                 new SlotTransactionAdminRouter(transactions),
                 reloadRuntime);
+        // Re-bound each time because the router is built per dispatch; the target itself is the
+        // long-lived object, set once from onEnable.
+        router.bindTransactionMenu(transactionMenu);
+        return router;
+    }
+
+    /**
+     * Opens the transaction menu, set after construction like the hub and egg admin.
+     *
+     * <p>Absent in the narrower constructors the tests use, where the router reports the menu as
+     * unavailable rather than throwing.
+     */
+    private volatile java.util.function.Consumer<Player> transactionMenu;
+
+    /** Wires the transaction menu. Called once from {@code onEnable}. */
+    public void bindTransactionMenu(java.util.function.Consumer<Player> target) {
+        this.transactionMenu = target;
     }
 
     /**

@@ -282,6 +282,12 @@ public final class OmniPetPlugin extends JavaPlugin {
                     this);
             placedEggs.start();
             getServer().getPluginManager().registerEvents(new HubMenuListener(hubController), this);
+            // Reconciling a transaction from a menu, so the operator never copies a UUID out of chat.
+            getServer().getPluginManager().registerEvents(
+                    new io.github.salyvn.omnipet.paper.gui.admin.AdminTransactionMenuListener(
+                            transactionAdmin,
+                            io.github.salyvn.omnipet.paper.command.SlotTransactionAdminCommandParser.PERMISSION),
+                    this);
             getServer().getPluginManager().registerEvents(new EconomyProviderLifecycleListener(
                     this,
                     economyProviders,
@@ -370,6 +376,7 @@ public final class OmniPetPlugin extends JavaPlugin {
                     this::reloadRuntime);
             command.bindHub(hubController::open);
             command.bindEggAdmin(eggAdmin);
+            command.bindTransactionMenu(viewer -> transactionAdmin.openMenu(viewer, null));
             event.registrar().register(
                     FoundationCommandContract.NAME, FoundationCommandContract.ALIASES, command);
             // The same administration without the second word. Routes into the router /pet already

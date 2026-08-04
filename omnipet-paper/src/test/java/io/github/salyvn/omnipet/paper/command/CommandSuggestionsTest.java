@@ -82,7 +82,15 @@ class CommandSuggestionsTest {
     void anArgumentPositionSuggestsNothingRatherThanGuessingAUuid() {
         assertEquals(List.of(), suggest(EVERYTHING, true, "skill", ""));
         assertEquals(List.of(), suggest(EVERYTHING, true, "admin", "hatch", "inspect", ""));
-        assertEquals(List.of(), suggest(EVERYTHING, true, "admin", "transactions", ""));
+        // `reconcile` takes a transaction UUID first, so it has nothing safe to enumerate.
+        assertEquals(List.of(), suggest(EVERYTHING, true, "admin", "reconcile", ""));
+    }
+
+    @Test
+    void aRealSubcommandIsStillSuggestedWhereOneExists() {
+        // `transactions` takes [limit], which cannot be guessed, but it does own a `menu` subcommand -
+        // and a literal that exists must be offered rather than suppressed along with the arguments.
+        assertEquals(List.of("menu"), suggest(EVERYTHING, true, "admin", "transactions", ""));
     }
 
     @Test

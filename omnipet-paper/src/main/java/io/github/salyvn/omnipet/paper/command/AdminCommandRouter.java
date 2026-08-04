@@ -24,6 +24,18 @@ public final class AdminCommandRouter {
     private final HatchAdminRouter hatchAdmin;
     private final SlotTransactionAdminRouter transactions;
     private final BooleanSupplier reloadRuntime;
+    /**
+     * Opens the transaction menu, when a menu is available and the sender is a player.
+     *
+     * <p>Set separately from the routers because the menu needs a live inventory: console keeps the chat
+     * form, which is also the only form that can resume a scan from a pasted cursor.
+     */
+    private volatile java.util.function.Consumer<org.bukkit.entity.Player> transactionMenu;
+
+    /** Wires the transaction menu. Called once from {@code onEnable}. */
+    public void bindTransactionMenu(java.util.function.Consumer<org.bukkit.entity.Player> target) {
+        this.transactionMenu = target;
+    }
 
     public AdminCommandRouter(
             List<AdminArea> areas,
@@ -47,6 +59,7 @@ public final class AdminCommandRouter {
         Objects.requireNonNull(sender, "sender");
         List<String> tokens = arguments == null ? List.of() : arguments;
 
+        if (menu(sender, tokens)) return true;
         Optional<AdminArea> area = area(tokens);
         if (area.isPresent()) {
             area.get().dispatch(sender, tokens.subList(2, tokens.size()));
@@ -63,6 +76,37 @@ public final class AdminCommandRouter {
         return areas.stream()
                 .filter(candidate -> candidate.literal().equalsIgnoreCase(tokens.get(1)))
                 .findFirst();
+    }
+
+    /**
+     * {@code admin transactions menu}: the same pending list, as a clickable inventory.
+     *
+     * <p>Matched before the transaction parser, which would read {@code menu} as an invalid limit. A
+     * console sender is told to use the chat form rather than being silently ignored.
+     */
+    private boolean menu(CommandSender sender, List<String> tokens) {
+        if (tokens.size() != 3
+                || !tokens.get(0).equalsIgnoreCase("admin")
+                || !tokens.get(1).equalsIgnoreCase("transactions")
+                || !tokens.get(2).equalsIgnoreCase("menu")) {
+            return false;
+        }
+        if (!sender.hasPermission(SlotTransactionAdminCommandParser.PERMISSION)) {
+            sender.sendMessage("OmniPet: you do not have permission to reconcile slot transactions.");
+            return true;
+        }
+        var target = transactionMenu;
+        if (target == null) {
+            sender.sendMessage("OmniPet: the transaction menu is not available yet.");
+            return true;
+        }
+        if (!(sender instanceof org.bukkit.entity.Player player)) {
+            sender.sendMessage("OmniPet: the transaction menu needs a player; "
+                    + "use /pet admin transactions [limit] [cursor] from console.");
+            return true;
+        }
+        target.accept(player);
+        return true;
     }
 
     private boolean reload(CommandSender sender, List<String> tokens) {

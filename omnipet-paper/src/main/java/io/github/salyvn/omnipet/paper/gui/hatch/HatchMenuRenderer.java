@@ -37,6 +37,9 @@ public final class HatchMenuRenderer {
     private static final int START_OFF_SLOT = 15;
     private static final int HUB_SLOT = 18;
     private static final int REFRESH_SLOT = 22;
+    /** Where the redeem controls sit while an egg is incubating: the slots the start buttons vacate. */
+    private static final int REDEEM_MAIN_SLOT = 11;
+    private static final int REDEEM_OFF_SLOT = 15;
 
     public Inventory render(Player player, PlayerState state) {
         MenuLayout<HatchInventoryHolder.Action> layout = new MenuLayout<>(
@@ -62,6 +65,17 @@ public final class HatchMenuRenderer {
                             ? HatchInventoryHolder.Action.claim()
                             : HatchInventoryHolder.Action.refresh(),
                     activeIncubation(incubation));
+            // Only while incubating, and only in the slots the start buttons are not using. Redeeming
+            // an accelerator was previously command-only, which left the item unusable from the very
+            // menu the player was already looking at.
+            if (incubation.status() != IncubationStatus.READY) {
+                layout.put("redeemMain", REDEEM_MAIN_SLOT, HatchInventoryHolder.Action.redeemMain(),
+                        Material.CLOCK, Messages.line(MessageKey.GUI_HATCH_REDEEM_MAIN),
+                        List.of(Messages.line(MessageKey.GUI_HATCH_REDEEM_MAIN_HINT)));
+                layout.put("redeemOff", REDEEM_OFF_SLOT, HatchInventoryHolder.Action.redeemOffHand(),
+                        Material.CLOCK, Messages.line(MessageKey.GUI_HATCH_REDEEM_OFF),
+                        List.of(Messages.line(MessageKey.GUI_HATCH_REDEEM_OFF_HINT)));
+            }
         }
         layout.put("refresh", REFRESH_SLOT, HatchInventoryHolder.Action.refresh(),
                 Material.CLOCK, Messages.line(MessageKey.GUI_HATCH_REFRESH),

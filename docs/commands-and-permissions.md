@@ -21,7 +21,7 @@ Both route into the same code, so a permission or a behaviour can never differ b
 | `/pet <page>` | `/pets <page>` | `omnipet.general` | Opens the vault directly on the given page. |
 | `/pet help [page]` | `/pets help [page]` | `omnipet.general` | Lists the commands the sender may use, paged. Tab-complete on `/pet ` is permission-filtered. |
 | `/pet slot` | `/pets slot` | `omnipet.general` | Opens explicit Vault/PlayerPoints choices for the next configured active slot. |
-| `/pet hatch [main\|off\|claim\|refresh\|use-main\|use-off]` | `/pets hatch ...` | `omnipet.general` | Opens the hatch GUI, captures an exact main/off-hand egg, claims a committed READY hatch, refreshes the durable view, or redeems a reducer/instant item from the named hand. |
+| `/pet hatch [main\|off\|claim\|refresh\|use-main\|use-off]` | `/pets hatch ...` | `omnipet.general` | Opens the hatch GUI, captures an exact main/off-hand egg, claims a committed READY hatch, refreshes the durable view, or redeems a reducer/instant item from the named hand. While an egg is incubating the menu also shows both redeem buttons, so an accelerator can be used without leaving it. |
 | `/pet skill <pet-uuid> <binding-id>` | `/pets skill ...` | `omnipet.general` | Casts an ACTIVE skill binding on an owned, currently active pet. |
 | `/pet admin browse` | `/pets admin browse` | `omnipet.general` + `omnipet.admin.managepet` | Opens the D/C/B/A/S definition browser and editor. |
 | `/pet admin reload` | `/pets admin reload` | `omnipet.admin.reload` | Stages config/definitions, swaps the live generation, then queues online-player limit reconciliation. |
@@ -36,6 +36,7 @@ Both route into the same code, so a permission or a behaviour can never differ b
 | `/pet admin cultivation <...>` | `/pets ...` | `omnipet.admin.cultivation` | Recovers interrupted cultivation item transactions. |
 | `/pet admin release <...>` | `/pets ...` | `omnipet.admin.release` | Lists bounded release mailbox rows and reconciles an exact transaction. |
 | `/pet admin transactions [limit] [cursor]` | `/pets ...` | `omnipet.admin.reconcile` | Lists a bounded page of pending/ambiguous slot transactions and unreadable journal entries. |
+| `/pet admin transactions menu` | `/petadmin transactions menu` | `omnipet.admin.reconcile` | Opens the same pending list as a clickable menu. Clicking a row opens a confirm screen carrying that transaction's UUID, so no UUID is ever typed. The chat form remains, and is the only one that can resume a scan from a pasted cursor. |
 | `/pet admin reconcile <transaction-uuid> <charge\|no-charge\|refund\|sync>` | `/pets ...` | `omnipet.admin.reconcile` | Applies explicit operator evidence without replaying ambiguous economy calls; `sync` retries only idempotent entitlement verification/grant. |
 
 Studio Save, archive, clone-only authoring, and exact-ID hard delete mutate only definition files through the shared transaction boundary, and each accepted save writes one durable audit record. Hard delete is blocked while YAML, egg, player, or active Studio references exist. Slot purchase work runs off-thread, while Vault/PlayerPoints calls are bridged to Paper's main thread and journaled around every external outcome. A required LuckPerms grant is also journaled and must finish before the purchase becomes `COMPLETED`.

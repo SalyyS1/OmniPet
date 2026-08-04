@@ -80,8 +80,11 @@ public final class OmniPetCommandTree {
                         adminCultivation(),
                         adminRelease(),
                         CommandSpec.of("transactions", "List pending slot transactions")
-                                .args("[limit]", "[cursor]")
-                                .permission(SlotTransactionAdminCommandParser.PERMISSION),
+                                .args("[limit|menu]", "[cursor]")
+                                .permission(SlotTransactionAdminCommandParser.PERMISSION)
+                                .child(CommandSpec.of("menu", "Reconcile transactions from a menu")
+                                        .permission(SlotTransactionAdminCommandParser.PERMISSION)
+                                        .playerOnly()),
                         CommandSpec.of("reconcile", "Resolve one slot transaction")
                                 .args("<transaction-uuid>", "<charge|no-charge|refund|sync>")
                                 .permission(SlotTransactionAdminCommandParser.PERMISSION));

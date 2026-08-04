@@ -131,6 +131,8 @@ public final class PlayerHatchController {
                 case START_OFF_HAND -> start(current, EggInventoryHand.OFF_HAND);
                 case CLAIM -> claim(current, holder);
                 case REFRESH -> open(current);
+                case REDEEM_MAIN -> redeemItem(current, EggInventoryHand.MAIN_HAND);
+                case REDEEM_OFF_HAND -> redeemItem(current, EggInventoryHand.OFF_HAND);
                 case HUB -> {
                     release(current.getUniqueId());
                     current.performCommand("pet");
