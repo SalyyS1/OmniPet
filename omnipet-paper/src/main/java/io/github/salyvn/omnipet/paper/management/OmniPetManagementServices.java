@@ -43,6 +43,13 @@ public final class OmniPetManagementServices {
     private final PaperCultivationRecoveryController cultivationRecovery;
     private final PaperCultivationAdminCommandTarget cultivationAdmin;
     private final PaperReleaseAdminCommandTarget releaseAdmin;
+    /**
+     * The live config, read by the item-appearance supplier handed to the consumable factory.
+     *
+     * <p>A reference rather than a rebuild, so {@code /pet admin reload} restyles the next item without
+     * reconstructing services that hold durable journals.
+     */
+    private final java.util.concurrent.atomic.AtomicReference<OmniPetConfig> live;
 
     private OmniPetManagementServices(
             PaperPetConsumableInventory consumables,
@@ -51,7 +58,9 @@ public final class OmniPetManagementServices {
             PetManagementMenuController menu,
             PaperCultivationRecoveryController cultivationRecovery,
             PaperCultivationAdminCommandTarget cultivationAdmin,
-            PaperReleaseAdminCommandTarget releaseAdmin) {
+            PaperReleaseAdminCommandTarget releaseAdmin,
+            java.util.concurrent.atomic.AtomicReference<OmniPetConfig> live) {
+        this.live = live;
         this.consumables = consumables;
         this.cultivationItems = cultivationItems;
         this.management = management;
@@ -82,8 +91,15 @@ public final class OmniPetManagementServices {
                 .runTaskAsynchronously(plugin, task);
         CultivationItemActionService cultivationActions = new CultivationItemActionService(
                 new CultivationItemActionFileJournal(dataRoot.resolve("data/cultivation-actions")));
+        // Appearance is read per item creation through a supplier reading the same volatile field
+        // updateConfig writes, so a reload restyles the next item without rebuilding this service.
+        java.util.concurrent.atomic.AtomicReference<OmniPetConfig> live =
+                new java.util.concurrent.atomic.AtomicReference<>(config);
         PaperPetConsumableInventory consumables = new PaperPetConsumableInventory(
-                plugin, config.cultivationItems());
+                plugin,
+                config.cultivationItems(),
+                () -> live.get().appearances(),
+                warning -> plugin.getLogger().warning("OmniPet item appearance: " + warning));
 
         ReleaseService release = new ReleaseService(players, new SnapshotReleaseRewardPolicy());
         ReleaseOutboxDeliveryService delivery = new ReleaseOutboxDeliveryService(players);
@@ -121,7 +137,8 @@ public final class OmniPetManagementServices {
                 menu,
                 recovery,
                 new PaperCultivationAdminCommandTarget(plugin, recovery),
-                new PaperReleaseAdminCommandTarget(plugin, releaseAdmin, asynchronous));
+                new PaperReleaseAdminCommandTarget(plugin, releaseAdmin, asynchronous),
+                live);
     }
 
     public PetCultivationItemController cultivationItems() { return cultivationItems; }
@@ -131,6 +148,7 @@ public final class OmniPetManagementServices {
     public PaperReleaseAdminCommandTarget releaseAdmin() { return releaseAdmin; }
 
     public void updateConfig(OmniPetConfig config) {
+        live.set(config);
         consumables.updateConfig(config.cultivationItems());
         menu.updateProgression(config.progression());
         cultivationRecovery.updateProgression(config.progression());

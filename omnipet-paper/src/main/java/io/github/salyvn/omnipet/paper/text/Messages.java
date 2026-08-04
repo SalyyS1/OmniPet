@@ -56,6 +56,25 @@ public final class Messages {
         return Placeholder.unparsed(name, value == null ? "" : value);
     }
 
+    /**
+     * Renders operator-authored MiniMessage lines that are not catalog keys.
+     *
+     * <p>For config-supplied lore, where the operator writes the text directly rather than overriding a
+     * key. Lore is non-italic by default here, matching every other OmniPet item line, because
+     * Minecraft italicises lore unless told otherwise and an operator should not have to know that.
+     */
+    public static List<Component> lines(List<String> miniMessage) {
+        if (miniMessage == null || miniMessage.isEmpty()) return List.of();
+        List<Component> rendered = new java.util.ArrayList<>(miniMessage.size());
+        for (String line : miniMessage) {
+            rendered.add(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                    .deserialize(line == null ? "" : line)
+                    .decorationIfAbsent(net.kyori.adventure.text.format.TextDecoration.ITALIC,
+                            net.kyori.adventure.text.format.TextDecoration.State.FALSE));
+        }
+        return List.copyOf(rendered);
+    }
+
     /** A placeholder for a numeric value. */
     public static TagResolver of(String name, long value) {
         return Placeholder.unparsed(name, Long.toString(value));

@@ -31,6 +31,9 @@ import io.github.salyvn.omnipet.core.persistence.StaleRevisionException;
 import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
 import io.github.salyvn.omnipet.core.storage.PetStorageResult;
 import io.github.salyvn.omnipet.core.storage.RepositoryPetStorageService;
+import io.github.salyvn.omnipet.paper.config.ItemAppearance;
+import io.github.salyvn.omnipet.paper.config.OmniPetConfig;
+import io.github.salyvn.omnipet.paper.item.ItemAppearanceApplier;
 import io.github.salyvn.omnipet.paper.permission.PaperStorageLimitsResolver;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.text.Displays;
@@ -51,6 +54,9 @@ public final class EggAdminController {
     /** The default incubation time for an auto-created egg. */
     public static final String DEFAULT_DURATION = "1h";
 
+    /** The egg material used when the operator configures none. */
+    public static final Material DEFAULT_EGG_MATERIAL = Material.TURTLE_EGG;
+
     /**
      * How many times a grant re-reads the revision after losing a race.
      *
@@ -68,6 +74,13 @@ public final class EggAdminController {
     private final PerPlayerTaskQueue tasks;
     private final Consumer<Runnable> mainDispatcher;
     private final Supplier<UUID> petIds;
+    /**
+     * Read per mint rather than captured once, so {@code /pet admin reload} applies a new appearance to
+     * the next egg without a restart. Eggs already in an inventory or in escrow are untouched, which is
+     * required: their recorded fingerprint describes the stack as it was minted.
+     */
+    private final Supplier<OmniPetConfig.ItemAppearances> appearances;
+    private final Consumer<String> appearanceWarnings;
 
     public EggAdminController(
             EggDefinitionRepository eggs,
@@ -76,9 +89,12 @@ public final class EggAdminController {
             PaperEggItemCodec codec,
             PaperStorageLimitsResolver limits,
             PerPlayerTaskQueue tasks,
-            JavaPlugin plugin) {
+            JavaPlugin plugin,
+            Supplier<OmniPetConfig.ItemAppearances> appearances) {
         this(eggs, registry, storage, codec, limits, tasks,
-                task -> plugin.getServer().getScheduler().runTask(plugin, task), UUID::randomUUID);
+                task -> plugin.getServer().getScheduler().runTask(plugin, task), UUID::randomUUID,
+                appearances,
+                warning -> plugin.getLogger().warning("OmniPet item appearance: " + warning));
     }
 
     EggAdminController(
@@ -89,7 +105,9 @@ public final class EggAdminController {
             PaperStorageLimitsResolver limits,
             PerPlayerTaskQueue tasks,
             Consumer<Runnable> mainDispatcher,
-            Supplier<UUID> petIds) {
+            Supplier<UUID> petIds,
+            Supplier<OmniPetConfig.ItemAppearances> appearances,
+            Consumer<String> appearanceWarnings) {
         this.eggs = Objects.requireNonNull(eggs, "egg definition repository");
         this.registry = Objects.requireNonNull(registry, "pet registry");
         this.storage = Objects.requireNonNull(storage, "pet storage service");
@@ -98,6 +116,8 @@ public final class EggAdminController {
         this.tasks = Objects.requireNonNull(tasks, "player task queue");
         this.mainDispatcher = Objects.requireNonNull(mainDispatcher, "main-thread dispatcher");
         this.petIds = Objects.requireNonNull(petIds, "pet id supplier");
+        this.appearances = Objects.requireNonNull(appearances, "item appearance supplier");
+        this.appearanceWarnings = Objects.requireNonNull(appearanceWarnings, "appearance warning sink");
     }
 
     /**
@@ -121,6 +141,8 @@ public final class EggAdminController {
         this.tasks = null;
         this.mainDispatcher = null;
         this.petIds = UUID::randomUUID;
+        this.appearances = OmniPetConfig.ItemAppearances::defaults;
+        this.appearanceWarnings = warning -> { };
     }
 
     /** {@code /pet admin egg give|create ...} */
@@ -330,7 +352,16 @@ public final class EggAdminController {
                 petIds.get(), definition.id(), definition.revision(), components, Map.of());
     }
 
+    /**
+     * Builds the egg a player receives.
+     *
+     * <p>Appearance is read here, at mint time, and never afterwards. The escrow fingerprint is a hash
+     * of the serialized stack taken when the egg is captured, so a material or model chosen now is
+     * simply part of that hash; rewriting an already-escrowed egg's appearance would invalidate the
+     * fingerprint recorded against it.
+     */
     private ItemStack item(EggDefinition definition) {
+        ItemAppearance appearance = appearances.get().egg();
         List<Component> lore = new ArrayList<>();
         lore.add(Messages.line(MessageKey.GUI_EGG_ITEM_TIER,
                 Messages.of("status", Displays.of(definition.tier()))));
@@ -338,12 +369,16 @@ public final class EggAdminController {
                 Messages.of("detail", IncubationDurationParser.formatMillis(definition.baseActiveMillis()))));
         lore.add(Component.empty());
         lore.add(Messages.line(MessageKey.GUI_EGG_ITEM_HINT));
-        return codec.create(
+        ItemStack egg = codec.create(
                 definition.id(),
-                Material.TURTLE_EGG,
+                ItemAppearanceApplier.material(
+                        appearance, DEFAULT_EGG_MATERIAL, "items.egg", appearanceWarnings),
                 Messages.line(MessageKey.GUI_EGG_ITEM_NAME,
                         Messages.of("pet", Displays.identifier(definition.id()))),
                 lore);
+        ItemAppearanceApplier.apply(
+                egg, appearance, Messages.lines(appearance.extraLore()), "items.egg", appearanceWarnings);
+        return egg;
     }
 
     private static EggDefinitionEnvelope envelope(String eggId, PetDefinition definition, long millis) {

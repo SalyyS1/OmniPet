@@ -7,6 +7,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -20,7 +22,9 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
+import io.github.salyvn.omnipet.paper.config.ItemAppearance;
 import io.github.salyvn.omnipet.paper.config.OmniPetConfig;
+import io.github.salyvn.omnipet.paper.item.ItemAppearanceApplier;
 import io.github.salyvn.omnipet.core.incubation.EggEscrowItemObservation;
 import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
 import io.github.salyvn.omnipet.core.incubation.EggItemIdentity;
@@ -39,10 +43,23 @@ public final class PaperPetConsumableInventory implements PetConsumableInventory
     private final NamespacedKey requiredLevelKey;
     private final NamespacedKey requiredEvolutionKey;
     private final Set<UUID> consumed = ConcurrentHashMap.newKeySet();
+    private final Supplier<OmniPetConfig.ItemAppearances> appearances;
+    private final Consumer<String> appearanceWarnings;
     private volatile OmniPetConfig.CultivationItems config;
 
     public PaperPetConsumableInventory(Plugin plugin, OmniPetConfig.CultivationItems config) {
+        this(plugin, config, OmniPetConfig.ItemAppearances::defaults,
+                warning -> plugin.getLogger().warning("OmniPet item appearance: " + warning));
+    }
+
+    public PaperPetConsumableInventory(
+            Plugin plugin,
+            OmniPetConfig.CultivationItems config,
+            Supplier<OmniPetConfig.ItemAppearances> appearances,
+            Consumer<String> appearanceWarnings) {
         Objects.requireNonNull(plugin, "cultivation item plugin");
+        this.appearances = Objects.requireNonNull(appearances, "item appearance supplier");
+        this.appearanceWarnings = Objects.requireNonNull(appearanceWarnings, "appearance warning sink");
         schemaKey = new NamespacedKey(plugin, "cultivation_schema");
         typeKey = new NamespacedKey(plugin, "cultivation_type");
         nonceKey = new NamespacedKey(plugin, "cultivation_nonce");
@@ -63,8 +80,17 @@ public final class PaperPetConsumableInventory implements PetConsumableInventory
         requireMainThread();
         OmniPetConfig.CultivationItems current = config;
         boolean candy = kind == Kind.EXPERIENCE_CANDY;
-        ItemStack item = new ItemStack(material(candy
-                ? current.experienceMaterial() : current.breakthroughMaterial()));
+        // Appearance is read per creation so a reload restyles the next item. It is cosmetic and is
+        // applied before the identity is fingerprinted, so it cannot affect cultivation escrow matching.
+        OmniPetConfig.ItemAppearances styles = appearances.get();
+        ItemAppearance appearance = candy ? styles.experienceCandy() : styles.breakthroughStone();
+        String appearancePath = candy
+                ? "items.experienceCandy.appearance" : "items.breakthroughStone.appearance";
+        ItemStack item = new ItemStack(ItemAppearanceApplier.material(
+                appearance,
+                material(candy ? current.experienceMaterial() : current.breakthroughMaterial()),
+                appearancePath,
+                appearanceWarnings));
         item.setAmount(1);
         ItemMeta meta = requireMeta(item);
         // Named and described through the catalog: these are vanilla materials, so an unlabelled one is
@@ -91,6 +117,8 @@ public final class PaperPetConsumableInventory implements PetConsumableInventory
         data.set(requiredEvolutionKey, PersistentDataType.INTEGER,
                 kind == Kind.BREAKTHROUGH_STONE ? current.breakthroughRequiredEvolution() : 0);
         item.setItemMeta(meta);
+        ItemAppearanceApplier.apply(item, appearance, Messages.lines(appearance.extraLore()),
+                appearancePath, appearanceWarnings);
         return item;
     }
 

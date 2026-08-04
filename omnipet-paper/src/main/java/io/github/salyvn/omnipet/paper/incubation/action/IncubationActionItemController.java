@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -19,6 +21,9 @@ import io.github.salyvn.omnipet.core.incubation.EggInventoryHand;
 import io.github.salyvn.omnipet.core.incubation.IncubationItemActionStage;
 import io.github.salyvn.omnipet.core.incubation.IncubationItemActionTransaction;
 import io.github.salyvn.omnipet.core.incubation.RepositoryHatchService;
+import io.github.salyvn.omnipet.paper.config.ItemAppearance;
+import io.github.salyvn.omnipet.paper.config.OmniPetConfig;
+import io.github.salyvn.omnipet.paper.item.ItemAppearanceApplier;
 import io.github.salyvn.omnipet.paper.text.Displays;
 import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
@@ -26,6 +31,12 @@ import io.github.salyvn.omnipet.paper.text.Messages;
 
 /** Player redemption and bounded operator distribution for durable incubation action items. */
 public final class IncubationActionItemController {
+    /** The materials used when the operator configures none. */
+    public static final Material DEFAULT_REDUCER_MATERIAL = Material.CLOCK;
+    public static final Material DEFAULT_INSTANT_MATERIAL = Material.NETHER_STAR;
+
+    private final Supplier<OmniPetConfig.ItemAppearances> appearances;
+    private final Consumer<String> appearanceWarnings;
     private final RepositoryHatchService hatches;
     private final PaperIncubationItemActionCodec codec;
     private final PaperIncubationItemActionInventory inventory;
@@ -36,10 +47,23 @@ public final class IncubationActionItemController {
             PaperIncubationItemActionCodec codec,
             PaperIncubationItemActionInventory inventory,
             IncubationItemActionCoordinator coordinator) {
+        this(hatches, codec, inventory, coordinator,
+                OmniPetConfig.ItemAppearances::defaults, warning -> { });
+    }
+
+    public IncubationActionItemController(
+            RepositoryHatchService hatches,
+            PaperIncubationItemActionCodec codec,
+            PaperIncubationItemActionInventory inventory,
+            IncubationItemActionCoordinator coordinator,
+            Supplier<OmniPetConfig.ItemAppearances> appearances,
+            Consumer<String> appearanceWarnings) {
         this.hatches = Objects.requireNonNull(hatches, "hatch repository service");
         this.codec = Objects.requireNonNull(codec, "incubation action item codec");
         this.inventory = Objects.requireNonNull(inventory, "incubation action item inventory");
         this.coordinator = Objects.requireNonNull(coordinator, "incubation action coordinator");
+        this.appearances = Objects.requireNonNull(appearances, "item appearance supplier");
+        this.appearanceWarnings = Objects.requireNonNull(appearanceWarnings, "appearance warning sink");
     }
 
     public void redeem(Player player, EggInventoryHand hand) {
@@ -100,11 +124,22 @@ public final class IncubationActionItemController {
                     : 0;
             int amountIndex = type.equals("reducer") ? 3 : 2;
             int amount = arguments.size() > amountIndex ? Integer.parseInt(arguments.get(amountIndex)) : 1;
-            ItemStack item = switch (type) {
-                case "reducer" -> label(codec.createReducer(Material.CLOCK, effectMillis), true, effectMillis);
-                case "instant" -> label(codec.createInstantHatch(Material.NETHER_STAR), false, 0);
-                default -> throw new IllegalArgumentException("unknown incubation item type");
-            };
+            boolean reducer = type.equals("reducer");
+            OmniPetConfig.ItemAppearances styles = appearances.get();
+            ItemAppearance appearance = reducer ? styles.hatchReducer() : styles.instantHatch();
+            String appearancePath = reducer ? "items.hatchReducer" : "items.instantHatch";
+            Material material = ItemAppearanceApplier.material(
+                    appearance,
+                    reducer ? DEFAULT_REDUCER_MATERIAL : DEFAULT_INSTANT_MATERIAL,
+                    appearancePath,
+                    appearanceWarnings);
+            ItemStack item = label(
+                    reducer
+                            ? codec.createReducer(material, effectMillis)
+                            : codec.createInstantHatch(material),
+                    reducer, effectMillis);
+            ItemAppearanceApplier.apply(item, appearance, Messages.lines(appearance.extraLore()),
+                    appearancePath, appearanceWarnings);
             if (amount < 1 || amount > item.getMaxStackSize()) {
                 throw new IllegalArgumentException("amount must fit one item stack");
             }

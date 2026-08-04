@@ -11,6 +11,7 @@ public record OmniPetConfig(
         ProgressionConfig progression,
         String experienceFormulaSource,
         CultivationItems cultivationItems,
+        ItemAppearances appearances,
         GuiConfig gui) {
     /** The EXP formula used when {@code progression.defaultExperienceFormula} is absent. */
     public static final String DEFAULT_EXPERIENCE_FORMULA = "100 + level * 25 + evolution * 100";
@@ -26,7 +27,37 @@ public record OmniPetConfig(
                 ? DEFAULT_EXPERIENCE_FORMULA
                 : experienceFormulaSource.trim();
         cultivationItems = Objects.requireNonNull(cultivationItems, "cultivation item config");
+        appearances = appearances == null ? ItemAppearances.defaults() : appearances;
         gui = gui == null ? GuiConfig.defaults() : gui;
+    }
+
+    /**
+     * Operator-chosen appearance for each OmniPet item.
+     *
+     * <p>Grouped rather than added as five loose fields so a new item is one entry here instead of a
+     * change to every constructor call. All presentation; none of it touches escrow identity.
+     */
+    public record ItemAppearances(
+            ItemAppearance egg,
+            ItemAppearance experienceCandy,
+            ItemAppearance breakthroughStone,
+            ItemAppearance hatchReducer,
+            ItemAppearance instantHatch) {
+        public ItemAppearances {
+            egg = orDefault(egg);
+            experienceCandy = orDefault(experienceCandy);
+            breakthroughStone = orDefault(breakthroughStone);
+            hatchReducer = orDefault(hatchReducer);
+            instantHatch = orDefault(instantHatch);
+        }
+
+        public static ItemAppearances defaults() {
+            return new ItemAppearances(null, null, null, null, null);
+        }
+
+        private static ItemAppearance orDefault(ItemAppearance value) {
+            return value == null ? ItemAppearance.defaults() : value;
+        }
     }
 
     public record CultivationItems(

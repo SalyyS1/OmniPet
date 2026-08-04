@@ -200,7 +200,9 @@ public final class OmniPetPlugin extends JavaPlugin {
                     new PaperEggItemCodec(this),
                     limitsResolver,
                     playerTasks,
-                    this);
+                    this,
+                    // Read per mint, so a reload restyles the next egg without a restart.
+                    () -> activeConfig.appearances());
             // Saving a definition in the Studio now also writes its egg, so a new pet is reachable.
             studio.bindEggs(eggAdmin);
             incubationCoordinator = new PaperIncubationCoordinator(
@@ -215,7 +217,9 @@ public final class OmniPetPlugin extends JavaPlugin {
                     new RepositoryIncubationItemActionHatchPort(incubation.hatches()),
                     actionInventory);
             actionItems = new IncubationActionItemController(
-                    incubation.hatches(), actionCodec, actionInventory, actionCoordinator);
+                    incubation.hatches(), actionCodec, actionInventory, actionCoordinator,
+                    () -> activeConfig.appearances(),
+                    warning -> getLogger().warning("OmniPet item appearance: " + warning));
             hatchController.setActionItems(actionItems);
             hatchAdmin = new HatchAdminController(this, incubation.hatches(), playerTasks);
             incubationCoordinator.setRefreshListener(hatchController::refresh);

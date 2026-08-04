@@ -131,6 +131,41 @@ items:
     requiredLevel: 10
     requiredEvolution: 0
 
+  # ----------------------------------------------------------------------------------------------
+  #  Appearance (optional)
+  # ----------------------------------------------------------------------------------------------
+  #  Every block below is optional and purely cosmetic. Delete any of them and the item looks exactly
+  #  as it does now. A bad value warns and falls back for that key alone.
+  #
+  #  Keys, all optional:
+  #    material        vanilla item id, e.g. DRAGON_EGG
+  #    customModelData number your resource pack keys its model on
+  #    glint           true adds the enchanted shimmer
+  #    itemFlags       e.g. [HIDE_ATTRIBUTES, HIDE_ENCHANTS]
+  #    lore            extra MiniMessage lines APPENDED after the built-in ones, so you cannot
+  #                    accidentally delete the line telling the player how to use the item.
+  #                    Max 12 lines, 256 characters each - a stored egg has a hard size limit.
+  #
+  #  Read when the item is CREATED. A reload restyles the next one; eggs already in an inventory or
+  #  part-way through hatching keep the look they were made with, which is required - their payment
+  #  record describes the item exactly as it was minted.
+  #
+  #  Names and descriptions are NOT here - those live in messages.yml under gui.egg.* and gui.item.*
+  #
+  #  egg:
+  #    material: DRAGON_EGG
+  #    customModelData: 1001
+  #    glint: true
+  #    lore:
+  #      - "<dark_gray>Season 3 exclusive</dark_gray>"
+  #  hatchReducer:
+  #    material: CLOCK
+  #  instantHatch:
+  #    material: NETHER_STAR
+  #  experienceCandy:
+  #    appearance:
+  #      customModelData: 2001
+
 
 # ----------------------------------------------------------------------------------------------
 #  GUI - menus, sounds, and on-screen feedback

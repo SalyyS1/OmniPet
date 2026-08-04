@@ -28,6 +28,7 @@ public final class OmniPetConfigLoader {
      */
     private static final Set<String> ROOT_KEYS =
             Set.of("storage", "runtime", "progression", "items", "integrations", "gui");
+    private static final ItemAppearanceCodec APPEARANCES = new ItemAppearanceCodec();
 
     public LoadResult load(Path file) throws IOException {
         return load(file, warning -> {});
@@ -58,10 +59,12 @@ public final class OmniPetConfigLoader {
         PaperRuntimeSettings runtime = runtime(optionalMap(root.get("runtime"), "runtime"));
         Map<String, Object> progressionValues = optionalMap(root.get("progression"), "progression");
         ProgressionConfig progression = progression(progressionValues);
-        OmniPetConfig.CultivationItems items = items(optionalMap(root.get("items"), "items"));
+        Map<String, Object> itemValues = optionalMap(root.get("items"), "items");
+        OmniPetConfig.CultivationItems items = items(itemValues);
         GuiConfig gui = new GuiConfigLoader().parse(root.get("gui"), warnings);
         return new LoadResult(new OmniPetConfig(storage.config(), runtime, progression,
-                experienceFormulaSource(progressionValues), items, gui),
+                experienceFormulaSource(progressionValues), items,
+                appearances(itemValues, warnings), gui),
                 legacy || storage.migratedLegacy());
     }
 
@@ -87,6 +90,7 @@ public final class OmniPetConfigLoader {
                 "material", config.cultivationItems().breakthroughMaterial(),
                 "requiredLevel", config.cultivationItems().breakthroughRequiredLevel(),
                 "requiredEvolution", config.cultivationItems().breakthroughRequiredEvolution()));
+        encodeAppearances(items, config.appearances());
         LinkedHashMap<String, Object> root = new LinkedHashMap<>();
         root.put("storage", storageRoot.get("storage"));
         root.put("runtime", runtime);
@@ -96,6 +100,40 @@ public final class OmniPetConfigLoader {
         // would silently discard the operator's display and feedback settings on upgrade.
         root.put("gui", new GuiConfigLoader().encode(config.gui()));
         return YamlDocuments.writeMap(root);
+    }
+
+    /**
+     * Writes each configured appearance back, omitting anything left at its default.
+     *
+     * <p>Only sections the operator actually set are written, so a migration does not litter the file
+     * with empty blocks - and, as with every other section, an appearance they tuned is not silently
+     * dropped on upgrade.
+     */
+    private static void encodeAppearances(
+            Map<String, Object> items, OmniPetConfig.ItemAppearances appearances) {
+        putAppearance(items, "egg", appearances.egg());
+        putAppearance(items, "hatchReducer", appearances.hatchReducer());
+        putAppearance(items, "instantHatch", appearances.instantHatch());
+        nestAppearance(items, "experienceCandy", appearances.experienceCandy());
+        nestAppearance(items, "breakthroughStone", appearances.breakthroughStone());
+    }
+
+    private static void putAppearance(
+            Map<String, Object> items, String key, ItemAppearance appearance) {
+        if (appearance.isDefault()) return;
+        items.put(key, APPEARANCES.encode(appearance));
+    }
+
+    /** Candy and the stone already own an {@code items:} entry, so appearance nests inside it. */
+    private static void nestAppearance(
+            Map<String, Object> items, String key, ItemAppearance appearance) {
+        if (appearance.isDefault()) return;
+        LinkedHashMap<String, Object> merged = new LinkedHashMap<>();
+        if (items.get(key) instanceof Map<?, ?> existing) {
+            existing.forEach((name, value) -> merged.put(String.valueOf(name), value));
+        }
+        merged.put("appearance", APPEARANCES.encode(appearance));
+        items.put(key, merged);
     }
 
     private static PaperRuntimeSettings runtime(Map<String, Object> values) {
@@ -143,17 +181,52 @@ public final class OmniPetConfigLoader {
     }
 
     private static OmniPetConfig.CultivationItems items(Map<String, Object> values) {
-        rejectUnknown(values, Set.of("experienceCandy", "breakthroughStone"), "items");
+        rejectUnknown(values, Set.of("experienceCandy", "breakthroughStone", "egg", "hatchReducer",
+                "instantHatch"), "items");
         Map<String, Object> candy = optionalMap(values.get("experienceCandy"), "items.experienceCandy");
         Map<String, Object> stone = optionalMap(values.get("breakthroughStone"), "items.breakthroughStone");
-        rejectUnknown(candy, Set.of("material", "experience"), "items.experienceCandy");
-        rejectUnknown(stone, Set.of("material", "requiredLevel", "requiredEvolution"), "items.breakthroughStone");
+        rejectUnknown(candy, Set.of("material", "experience", "appearance"), "items.experienceCandy");
+        rejectUnknown(stone, Set.of("material", "requiredLevel", "requiredEvolution", "appearance"),
+                "items.breakthroughStone");
         return new OmniPetConfig.CultivationItems(
                 text(candy.getOrDefault("material", "EXPERIENCE_BOTTLE"), "items.experienceCandy.material"),
                 number(candy.getOrDefault("experience", 100), "items.experienceCandy.experience"),
                 text(stone.getOrDefault("material", "NETHER_STAR"), "items.breakthroughStone.material"),
                 integer(stone.getOrDefault("requiredLevel", 10), "items.breakthroughStone.requiredLevel"),
                 integer(stone.getOrDefault("requiredEvolution", 0), "items.breakthroughStone.requiredEvolution"));
+    }
+
+    /**
+     * Reads every item's optional {@code appearance:} block.
+     *
+     * <p>Lenient on purpose, unlike the surrounding strict {@code items:} values: a mistyped material
+     * name is cosmetic and must degrade to the built-in look rather than stop the plugin loading.
+     */
+    private static OmniPetConfig.ItemAppearances appearances(
+            Map<String, Object> items, Consumer<String> warnings) {
+        return new OmniPetConfig.ItemAppearances(
+                appearance(items.get("egg"), "items.egg", warnings),
+                appearance(nested(items.get("experienceCandy"), "appearance"),
+                        "items.experienceCandy.appearance", warnings),
+                appearance(nested(items.get("breakthroughStone"), "appearance"),
+                        "items.breakthroughStone.appearance", warnings),
+                appearance(items.get("hatchReducer"), "items.hatchReducer", warnings),
+                appearance(items.get("instantHatch"), "items.instantHatch", warnings));
+    }
+
+    private static ItemAppearance appearance(Object node, String path, Consumer<String> warnings) {
+        try {
+            return APPEARANCES.parse(node, path, warnings);
+        } catch (IllegalArgumentException rejected) {
+            warnings.accept(path + " was rejected (" + rejected.getMessage()
+                    + "); using the built-in appearance");
+            return ItemAppearance.defaults();
+        }
+    }
+
+    /** The named child of a map-valued node, or null when either is absent. */
+    private static Object nested(Object node, String child) {
+        return node instanceof Map<?, ?> map ? map.get(child) : null;
     }
 
     private static Map<String, Double> numberMap(Map<String, Object> source) {
