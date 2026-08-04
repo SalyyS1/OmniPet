@@ -103,11 +103,81 @@
 .wiki-banner {
   display: block;
   width: min(1400px, calc(100% - clamp(1.6rem, 6vw, 4rem)));
-  height: auto;
-  margin: clamp(1rem, 3vw, 2rem) auto 0;
+  /*
+   * Capped and cropped rather than shown whole. At its native 21:9 the masthead was ~500px tall on a
+   * desktop, which pushed the article's first heading below the fold — decoration was outranking the
+   * text people came to read. object-position keeps the egg, which sits centre-right, inside the crop.
+   */
+  height: clamp(120px, 22vh, 210px);
+  object-fit: cover;
+  object-position: 62% 45%;
+  margin: clamp(0.8rem, 2vw, 1.4rem) auto 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+}
+
+/* --- page bar -------------------------------------------------------------------------------- */
+
+/*
+ * One horizontal row of tabs, sticky under the header.
+ *
+ * Replaces a left sidebar: six pages do not need a rail, and the column it occupied is better spent on
+ * the prose the reader came for. Scrolls horizontally on a narrow screen rather than wrapping into a
+ * block that pushes the article off the first fold.
+ */
+.wiki-nav {
+  position: sticky;
+  top: 3.7rem;
+  z-index: 15;
+  margin: 0 auto;
+  width: min(1400px, 100%);
+  padding: 0.55rem clamp(0.8rem, 3vw, 2rem);
+  border-bottom: 1px solid var(--line);
+  background: rgba(243, 240, 231, 0.94);
+  backdrop-filter: blur(14px);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.wiki-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.35rem;
+  /* Keeps the row from collapsing into two lines mid-scroll. */
+  flex-wrap: nowrap;
+}
+
+.wiki-nav a {
+  display: block;
+  padding: 0.42rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  color: var(--ink-soft);
+}
+
+.wiki-nav a:hover {
+  background: var(--paper-deep);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.wiki-nav a.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.wiki-nav .empty {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
 }
 
 /* --- shell ----------------------------------------------------------------------------------- */
@@ -117,71 +187,11 @@
   width: min(1400px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr) minmax(12rem, 15rem);
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 15rem);
   gap: clamp(1rem, 2.5vw, 2.5rem);
   padding: clamp(1rem, 3vw, 2.5rem) clamp(0.8rem, 3vw, 2rem);
   align-items: start;
 }
-
-/* --- navigation ------------------------------------------------------------------------------ */
-
-.wiki-nav {
-  position: sticky;
-  top: 5.5rem;
-  max-height: calc(100vh - 7rem);
-  overflow-y: auto;
-}
-
-.wiki-nav section + section { margin-top: 1.4rem; }
-
-.wiki-nav h3 {
-  margin: 0 0 0.5rem;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.wiki-nav ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.3rem;
-}
-
-.wiki-nav a {
-  display: block;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  text-decoration: none;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.wiki-nav a small {
-  display: block;
-  margin-top: 0.15rem;
-  font-weight: 400;
-  font-size: 0.78rem;
-  color: var(--ink-soft);
-}
-
-.wiki-nav a:hover {
-  background: var(--paper-deep);
-  border-color: var(--line);
-}
-
-.wiki-nav a.active {
-  background: var(--mint-light);
-  border-color: var(--mint);
-}
-
-.wiki-nav a.active small { color: var(--ink); }
-.wiki-nav .empty { color: var(--ink-soft); font-size: 0.85rem; }
 
 /* --- article --------------------------------------------------------------------------------- */
 
@@ -309,7 +319,7 @@
 
 .wiki-aside {
   position: sticky;
-  top: 5.5rem;
+  top: 7.5rem;
   display: grid;
   gap: 1rem;
   max-height: calc(100vh - 7rem);
@@ -367,27 +377,19 @@
 /* --- responsive ------------------------------------------------------------------------------ */
 
 @media (max-width: 1100px) {
-  .wiki-shell { grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr); }
+  /* The contents rail is the first thing to go: the page bar already gives orientation. */
+  .wiki-shell { grid-template-columns: minmax(0, 1fr); }
   .wiki-aside { display: none; }
 }
 
 @media (max-width: 760px) {
-  .wiki-shell {
-    grid-template-columns: minmax(0, 1fr);
-    padding-top: 1rem;
-  }
-
-  /* On a phone the page list is a directory to scroll past, not a rail to keep pinned. */
-  .wiki-nav {
-    position: static;
-    max-height: none;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--line);
-  }
-
+  .wiki-shell { padding-top: 1rem; }
   .wiki-header { gap: 0.6rem; }
   #wiki-search { width: 100%; }
   .wiki-search-wrap { flex: 1; }
+
+  /* Header wraps to two rows on a phone, so the bar has to start lower to stay visible. */
+  .wiki-nav { top: 6.6rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

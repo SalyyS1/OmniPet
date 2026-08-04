@@ -209,25 +209,35 @@
     return haystack.indexOf(state.query.toLowerCase()) !== -1;
   }
 
+  /**
+   * The page bar: one row of tabs, in reading order.
+   *
+   * <p>A horizontal bar rather than a sidebar because six pages do not need a rail, and the article is
+   * what the reader came for — the width the sidebar took is better spent on prose. Section headings and
+   * per-page summaries are dropped for the same reason: a tab has room for a name, and the summary is
+   * already the first thing the page itself says.
+   *
+   * <p>Pages stay in declaration order, which groups them start / player / operator / reference without
+   * needing the labels to say so.
+   */
   function renderNav() {
-    var labels = ui().sections;
-    var grouped = {};
-    wiki.pages.filter(matchesQuery).forEach(function (page) {
-      (grouped[page.section] = grouped[page.section] || []).push(page);
+    var order = ['start', 'player', 'operator', 'reference'];
+    var matches = wiki.pages.filter(matchesQuery).slice().sort(function (left, right) {
+      return order.indexOf(left.section) - order.indexOf(right.section);
     });
 
-    var order = ['start', 'player', 'operator', 'reference'];
-    var html = order.filter(function (key) { return grouped[key]; }).map(function (key) {
-      var items = grouped[key].map(function (page) {
-        var active = page.id === state.pageId ? ' class="active"' : '';
-        return '<li><a href="#/' + page.id + '"' + active + '>'
-          + escapeHtml(text(page.title))
-          + '<small>' + escapeHtml(text(page.summary)) + '</small></a></li>';
-      }).join('');
-      return '<section><h3>' + escapeHtml(labels[key] || key) + '</h3><ul>' + items + '</ul></section>';
-    }).join('');
+    if (!matches.length) {
+      dom.nav.innerHTML = '<p class="empty">' + escapeHtml(ui().noResults) + '</p>';
+      return;
+    }
 
-    dom.nav.innerHTML = html || '<p class="empty">' + escapeHtml(ui().noResults) + '</p>';
+    dom.nav.innerHTML = '<ul>' + matches.map(function (page) {
+      var active = page.id === state.pageId ? ' class="active"' : '';
+      // The summary becomes the tooltip: still reachable, no longer occupying the bar.
+      return '<li><a href="#/' + page.id + '"' + active
+        + ' title="' + escapeHtml(text(page.summary)) + '">'
+        + escapeHtml(text(page.title)) + '</a></li>';
+    }).join('') + '</ul>';
   }
 
   function renderArticle() {
