@@ -101,7 +101,16 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             }
             carrier = owner.getWorld().spawn(target, ArmorStand.class, stand -> {
                 stand.setInvisible(true);
-                stand.setMarker(true);
+                // NOT a marker, unlike the HEAD renderer's carrier. A marker armor stand has a zero-size
+                // bounding box, and ModelEngine renders its bones against the base entity the client is
+                // tracking — an entity with no volume can be culled before the model is ever drawn, which
+                // is a pet that summons, follows, and is invisible. The stand itself is still invisible,
+                // weightless, invulnerable, and non-collidable, so keeping its box costs nothing a player
+                // can see or touch.
+                stand.setMarker(false);
+                stand.setSmall(true);
+                stand.setBasePlate(false);
+                stand.setArms(false);
                 stand.setGravity(false);
                 stand.setInvulnerable(true);
                 stand.setCollidable(false);

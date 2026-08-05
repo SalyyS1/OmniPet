@@ -106,6 +106,7 @@ final class StudioInventoryRenderer {
         actions.put(16, new StudioAction(StudioActionType.EDIT_SKILLS, ""));
         actions.put(19, new StudioAction(StudioActionType.EDIT_BEHAVIOR, ""));
         actions.put(20, new StudioAction(StudioActionType.EDIT_RELEASE, ""));
+        actions.put(21, new StudioAction(StudioActionType.EDIT_NAME, ""));
         if (draft.mode() == StudioPetDraft.Mode.EDIT) actions.put(44, new StudioAction(StudioActionType.CLONE, ""));
         actions.put(45, new StudioAction(StudioActionType.BACK, ""));
         actions.put(49, new StudioAction(StudioActionType.SAVE, ""));
@@ -128,6 +129,12 @@ final class StudioInventoryRenderer {
                 "Format: key=value;...", "Click to edit"));
         inventory.setItem(20, item(Material.ENDER_CHEST, "Release policy", NamedTextColor.GREEN,
                 draft.releasePolicy() == null ? "Not configured" : draft.releasePolicy().mode(), "Click to edit"));
+        inventory.setItem(21, item(Material.OAK_SIGN, "Nameplate", NamedTextColor.AQUA,
+                displayName(draft).isEmpty()
+                        ? "Falls back to the definition ID"
+                        : "Shows: " + abbreviate(displayName(draft)),
+                "Players who rename a pet override this",
+                "Click to edit, or enter none"));
         inventory.setItem(44, item(draft.mode() == StudioPetDraft.Mode.EDIT ? Material.CARTOGRAPHY_TABLE : Material.GRAY_DYE,
                 draft.mode() == StudioPetDraft.Mode.EDIT ? "Clone definition" : "Clone unavailable", NamedTextColor.AQUA,
                 draft.mode() == StudioPetDraft.Mode.EDIT ? "Create a new stable ID from this draft" : "Save this new definition before cloning",
@@ -213,6 +220,19 @@ final class StudioInventoryRenderer {
             case DISABLED -> "Catalog disabled: " + state.statSnapshot.detail();
             case INCOMPATIBLE -> "Catalog incompatible: " + state.statSnapshot.detail();
         };
+    }
+
+    /**
+     * The operator-authored nameplate text on a draft, or empty.
+     *
+     * <p>Read from the draft's raw node because that is where it lives: a cosmetic label does not earn a
+     * field on {@code PetDefinition}, which is a schema contract with a codec and four layers of
+     * validation. {@code PaperRuntimeNameResolver} reads the same key.
+     */
+    private static String displayName(StudioPetDraft draft) {
+        Object display = draft.rawNode().get("display");
+        if (!(display instanceof Map<?, ?> node)) return "";
+        return node.get("name") instanceof String name ? name.trim() : "";
     }
 
     private static String abbreviate(String value) { return value.length() <= 32 ? value : value.substring(0, 29) + "..."; }

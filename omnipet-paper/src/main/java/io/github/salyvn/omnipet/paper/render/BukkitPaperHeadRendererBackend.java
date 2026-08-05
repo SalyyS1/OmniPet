@@ -59,6 +59,9 @@ final class BukkitPaperHeadRendererBackend implements PaperHeadRendererBackend {
             item.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.HEAD);
             item.setPersistent(false);
         });
+        // Spawned at the carrier's location, which carries the pet's heading and not the head's; see
+        // HeadFacing for why the two differ by half a turn.
+        turnVisual(ref(display), transform.yaw());
         return ref(display);
     }
 
@@ -129,6 +132,26 @@ final class BukkitPaperHeadRendererBackend implements PaperHeadRendererBackend {
         nativeCarrier.teleport(target);
     }
 
+    /**
+     * Turns the head display to match where the pet is heading.
+     *
+     * <p>Separate from the carrier's move because a passenger keeps its own rotation: Minecraft carries a
+     * display along with its vehicle but never turns it, so rotating the carrier alone left the head
+     * pointing wherever it was spawned. That is the "mặt head bị ngược" report — the head was not reversed
+     * so much as frozen, and it looked reversed whenever the pet turned away from its spawn heading.
+     *
+     * <p>See {@link HeadFacing} for the half-turn between the pet's heading and the head's.
+     */
+    @Override
+    public void turnVisual(EntityRef visual, float carrierYaw) {
+        Entity display = entity(visual);
+        Location current = display.getLocation();
+        if (!HeadFacing.needsTurn(current.getYaw(), carrierYaw)) return;
+        // setRotation rather than teleport: the display rides the carrier, so its position is not ours to
+        // write and a teleport would fight the vehicle for it.
+        display.setRotation(HeadFacing.displayYaw(carrierYaw), 0);
+    }
+
     @Override
     public void hardTeleport(
             EntityRef carrier,
@@ -146,6 +169,8 @@ final class BukkitPaperHeadRendererBackend implements PaperHeadRendererBackend {
         teleport(nativeInteraction, target);
         attach(carrier, visual);
         attach(carrier, interaction);
+        // After reattaching: teleport put the display at the carrier's heading, which is not the head's.
+        turnVisual(visual, transform.yaw());
     }
 
     @Override

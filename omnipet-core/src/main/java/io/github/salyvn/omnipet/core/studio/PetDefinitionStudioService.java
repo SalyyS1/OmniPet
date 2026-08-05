@@ -17,6 +17,8 @@ import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
+import io.github.salyvn.omnipet.core.domain.DisplayDefinition;
+import io.github.salyvn.omnipet.core.domain.HeadIcon;
 import io.github.salyvn.omnipet.core.domain.PetDefinition;
 import io.github.salyvn.omnipet.core.domain.PetDefinitionEnvelope;
 import io.github.salyvn.omnipet.core.domain.RawNodeValues;
@@ -33,6 +35,15 @@ import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotTransaction;
 /** Shared staged write/swap boundary used by Studio saves and command reloads. */
 public final class PetDefinitionStudioService {
     private static final int IDEMPOTENCY_HISTORY_LIMIT = 512;
+
+    /**
+     * The placeholder a brand-new draft's icon carries until an operator chooses one.
+     *
+     * <p>Named here because two things now depend on the same literal: the refusal that makes an operator
+     * choose a head for a HEAD pet, and the substitution that spares them choosing one for a MODELENGINE
+     * pet. The Studio seeds it; nothing else may treat it as a real value.
+     */
+    public static final String UNSET_ICON_VALUE = "CHANGE_ME";
 
     private final PetDefinitionRepository definitions;
     private final RegistrySnapshotRepository snapshots;
@@ -87,6 +98,9 @@ public final class PetDefinitionStudioService {
         Objects.requireNonNull(draft, "draft");
         Objects.requireNonNull(idempotencyKey, "idempotencyKey");
         if (draft.id() == null) throw new IllegalArgumentException("definition ID is required before save");
+        // Before validation and before the raw node is generated, so the substituted icon is the one that
+        // reaches disk and the registry and the two cannot disagree at requireDiskMatchesRegistry.
+        draft = withDefaultIconForModelEngine(draft);
         validateFields(draft);
 
         transactionLock.lock();
@@ -281,12 +295,39 @@ public final class PetDefinitionStudioService {
         }
     }
 
+    /**
+     * Fills in a head icon for a MODELENGINE pet whose operator never chose one.
+     *
+     * <p>A new draft is seeded with the {@code CHANGE_ME} sentinel and {@link #validateFields} refuses it,
+     * which is right for a HEAD pet — its icon <em>is</em> its appearance. For a MODELENGINE pet the head
+     * texture is not what a player sees: the model is. Demanding one anyway meant an operator had to go and
+     * find a skin texture for a pet that would never wear it, and the refusal named {@code icon.head.value}
+     * rather than explaining why, so it read as a bug in the provider choice.
+     *
+     * <p>{@code HEAD_CATALOG} with the definition's own ID, because that combination already means "a head
+     * with no texture" everywhere downstream — it passes the source whitelist, and the head renderer
+     * resolves it to a plain player head rather than throwing. So the icon stays non-null for the nine
+     * places that dereference it, the GUI still gets an item to draw, and the HEAD fallback still has
+     * something to render if ModelEngine is ever unavailable.
+     *
+     * <p>Only the untouched sentinel is replaced. An operator who did choose a texture keeps it, and a HEAD
+     * pet is not touched at all.
+     */
+    private static StudioPetDraft withDefaultIconForModelEngine(StudioPetDraft draft) {
+        if (draft.display() == null
+                || draft.display().provider() != DisplayDefinition.Provider.MODELENGINE) {
+            return draft;
+        }
+        if (draft.icon() == null || !draft.icon().value().equalsIgnoreCase(UNSET_ICON_VALUE)) return draft;
+        return draft.withIcon(new HeadIcon("HEAD_CATALOG", draft.id()));
+    }
+
     private static void validateFields(StudioPetDraft draft) {
         String source = draft.icon().source().toUpperCase(Locale.ROOT);
         if (!Set.of("TEXTURE_URL", "BASE64", "HEAD_CATALOG").contains(source)) {
             throw new IllegalArgumentException("unsupported icon.head.source: " + draft.icon().source());
         }
-        if (draft.icon().value().equalsIgnoreCase("CHANGE_ME")) {
+        if (draft.icon().value().equalsIgnoreCase(UNSET_ICON_VALUE)) {
             throw new IllegalArgumentException("icon.head.value must be configured");
         }
         if (source.equals("TEXTURE_URL")) {

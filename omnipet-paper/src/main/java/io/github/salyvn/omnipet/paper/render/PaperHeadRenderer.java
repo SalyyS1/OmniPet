@@ -105,6 +105,9 @@ public final class PaperHeadRenderer implements PetRendererPort {
             backend.hardTeleport(handle.carrier(), handle.visual(), handle.interaction(), targetWorld, transform);
         } else {
             backend.smoothMove(handle.carrier(), transform, settings);
+            // The display is a passenger, so the carrier's rotation does not reach it. Without this the
+            // head stays at whatever heading it spawned with while the pet turns underneath it.
+            backend.turnVisual(handle.visual(), transform.yaw());
         }
         // Only when the display would actually look different. An unchanged transformation still restarts
         // interpolation and dirties the entity's data watcher, so writing it every tick costs a packet per

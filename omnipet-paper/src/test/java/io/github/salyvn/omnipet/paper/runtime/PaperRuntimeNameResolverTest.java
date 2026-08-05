@@ -38,12 +38,30 @@ class PaperRuntimeNameResolverTest {
     }
 
     @Test
-    void aPetWithNoNameAnywhereHasNoNameplate() {
-        // Empty rather than falling back to the definition ID. "tier_d_wolf" floating over a pet is worse
-        // than nothing, and an operator who wants a name can write one.
-        assertTrue(PaperRuntimeNameResolver.resolve(Map.of(), pet(Map.of()), 3).isEmpty());
-        assertTrue(PaperRuntimeNameResolver.resolve(null, pet(Map.of()), 3).isEmpty());
-        assertTrue(PaperRuntimeNameResolver.resolve(display("   "), pet(Map.of()), 3).isEmpty());
+    void aPetWithNoNameAnywhereFallsBackToItsReadableDefinitionId() {
+        // This used to return empty, on the argument that "tier_d_wolf" floating over a pet is worse than
+        // nothing. In practice it meant nameplates never appeared at all: the only way to get one was
+        // display.name, an undocumented raw-node key, so every pet on every server was unnamed and the
+        // feature looked broken. A readable ID is a worse name than an operator would write and a far
+        // better outcome than no plate, and it makes the rename button visibly do something.
+        assertEquals("Wolf  Lv.3", PaperRuntimeNameResolver.resolve(Map.of(), pet(Map.of()), 3));
+        assertEquals("Wolf  Lv.3", PaperRuntimeNameResolver.resolve(null, pet(Map.of()), 3));
+        assertEquals("Wolf  Lv.3", PaperRuntimeNameResolver.resolve(display("   "), pet(Map.of()), 3));
+    }
+
+    /** An underscored ID is made readable rather than shown raw. */
+    @Test
+    void theFallbackReadsAsWordsRatherThanAsAnIdentifier() {
+        PetInstance underscored = new PetInstance(UUID.randomUUID(), "tier_d_wolf", 1, Map.of(), Map.of());
+
+        assertEquals("Tier d wolf  Lv.3", PaperRuntimeNameResolver.resolve(Map.of(), underscored, 3));
+    }
+
+    /** The operator's name and the player's rename both still outrank the ID. */
+    @Test
+    void theFallbackNeverOverridesANameSomebodyChose() {
+        assertEquals("Wolf Cub  Lv.3",
+                PaperRuntimeNameResolver.resolve(display("Wolf Cub"), pet(Map.of()), 3));
     }
 
     @Test

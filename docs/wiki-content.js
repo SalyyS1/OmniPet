@@ -297,6 +297,8 @@ Just after your last pet, on the last page, sits a locked-slot tile. It names th
 
 An active pet follows you, turns to face where it is going, and speeds up to catch you when you get ahead.
 
+Its name floats above it, with its level. That is the name you gave it if you renamed it, otherwise the name the server's operator wrote for that kind of pet, otherwise the pet's own kind. Rename it from the management screen — right-click the pet, in the world or in the vault.
+
 When you stop, it stops watching the road and starts watching you. Stand still long enough and it settles
 down — sits, curls up, whatever its model has for that. Move again and it gets up.
 
@@ -368,6 +370,8 @@ Ngay sau con pet cuối cùng, ở trang cuối, có một ô khoá. Nó ghi rõ
 ## Pet tự làm gì khi bạn không ra lệnh
 
 Pet đang hoạt động sẽ đi theo bạn, quay về hướng nó đang đi, và tăng tốc để bắt kịp khi bạn đi trước.
+
+Tên của nó hiện phía trên đầu, kèm cấp. Đó là tên bạn đặt nếu bạn đã đổi tên, nếu chưa thì là tên chủ server viết cho loại pet đó, nếu vẫn chưa thì là chính tên loài của nó. Đổi tên ở màn hình quản lý — click phải vào pet, ngoài thế giới hoặc trong vault.
 
 Khi bạn dừng, nó ngừng nhìn đường và bắt đầu nhìn bạn. Đứng yên đủ lâu thì nó ngồi nghỉ — ngồi, cuộn tròn,
 tuỳ model của nó có gì cho dáng đó. Bạn đi tiếp thì nó đứng lên.
@@ -993,7 +997,7 @@ present and is skipped when absent, and "skipped" always means a documented fall
 | Slot permission nodes | LuckPerms | Shipped | OmniPet stays authoritative over slots. |
 | Studio stat catalog | MythicLib | Shipped | The picker is gone; typing stat IDs still works. |
 | Skill execution | MythicMobs | Shipped, uncertified | Bindings persist; nothing is cast. |
-| Owner stat buffs | MythicLib | Not yet | No runtime buff is applied. |
+| Owner stat buffs | MythicLib | Shipped | No stat modifier is applied; pets are otherwise unaffected. |
 | Item stats | MMOItems | Not yet | No item bridge exists. |
 
 ## How rendering falls back
@@ -1050,7 +1054,7 @@ mặt và được bỏ qua khi không có, và "bỏ qua" luôn nghĩa là có 
 | Node quyền cho ô | LuckPerms | Đã có | OmniPet tự quyết định số ô. |
 | Danh mục chỉ số Studio | MythicLib | Đã có | Mất bộ chọn; gõ tay ID chỉ số vẫn được. |
 | Thực thi kỹ năng | MythicMobs | Đã có, chưa chứng nhận | Binding vẫn lưu; không có gì được thi triển. |
-| Buff chỉ số cho chủ | MythicLib | Chưa | Không buff nào được áp. |
+| Buff chỉ số cho chủ | MythicLib | Đã có | Không chỉ số nào được áp; pet vẫn hoạt động bình thường. |
 | Chỉ số vật phẩm | MMOItems | Chưa | Chưa có cầu nối vật phẩm. |
 
 ## Cách dự phòng khi dựng hình

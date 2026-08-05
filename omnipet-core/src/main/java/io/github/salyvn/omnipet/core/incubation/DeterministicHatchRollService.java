@@ -78,6 +78,28 @@ public final class DeterministicHatchRollService {
         return List.copyOf(result);
     }
 
+    /**
+     * Rolls the stats a pet definition grants, at a chosen quality.
+     *
+     * <p>Public so an admin grant can produce a pet with the same stats a hatch would. A granted pet
+     * previously carried an empty stat list, so it rendered, levelled, and showed in the vault like any
+     * other pet while giving its owner nothing — which is what an operator testing with
+     * {@code /petadmin pet give} would see and reasonably report as "stats do not work".
+     *
+     * <p>Deterministic in the seed, so the same grant repeated with the same seed produces the same pet.
+     *
+     * @param definition the pet whose {@code stats} node to roll
+     * @param quality 0-100; the position within each stat's range before per-stat jitter
+     * @param seed mixed per stat, so two stats on one pet do not roll in lockstep
+     */
+    public static List<RealizedStat> rollStats(PetDefinition definition, double quality, long seed) {
+        if (definition == null) throw new IllegalArgumentException("pet definition is required");
+        if (!Double.isFinite(quality) || quality < 0 || quality > 100) {
+            throw new IllegalArgumentException("stat quality must be between 0 and 100");
+        }
+        return realizeStats(new PetIncubationProfileReader().read(definition).stats(), quality, seed);
+    }
+
     private static List<RealizedStat> realizeStats(List<StudioStat> definitions, double quality, long seed) {
         List<StudioStat> ordered = definitions.stream().sorted(Comparator.comparing(StudioStat::id)).toList();
         List<RealizedStat> result = new ArrayList<>(ordered.size());

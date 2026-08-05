@@ -4,7 +4,9 @@
 
 OmniPet's shipped definition/storage features do not require another plugin. Optional integrations are capability-gated; exact artifact availability is not a live compatibility guarantee.
 
-The deterministic incubation, egg catalog, item escrow, and structured core hatch-event seam are vendor-neutral. Paper orchestrates the 27-slot hatch GUI, exact-hand paid start, commit-gated online ticks, bounded recovery, capacity-safe claim, and the pet runtime that renders active pets. Vendor skill execution, native item distribution, and reducer/instant-hatch item redemption remain deferred.
+The deterministic incubation, egg catalog, item escrow, and structured core hatch-event seam are vendor-neutral. Paper orchestrates the 27-slot hatch GUI, exact-hand paid start, commit-gated online ticks, bounded recovery, capacity-safe claim, the pet runtime that renders active pets, reducer/instant-hatch redemption for both held and placed eggs, and owner stat application through MythicLib. Vendor skill execution and native item distribution remain deferred.
+
+A stat picked from the MythicLib catalog is stored under the Studio's own namespaced ID and translated back to the vendor's name before it is applied. Both forms work, so a stat ID typed by hand against MythicLib's own vocabulary is left exactly as authored.
 
 `HatchEvent`/`HatchEventListener` is an in-repo, low-level persisted-state notification seam: events carry `DeliveryStage.STATE_PERSISTED`, run only after changed player state is saved, emit nothing for unchanged mutations, and isolate observer failures. It is not a separately versioned addon API, and a `STARTED` event does not prove egg escrow/payment commit.
 
@@ -13,7 +15,7 @@ The deterministic incubation, egg catalog, item escrow, and structured core hatc
 | Capability | Plugin | Current status | Missing-plugin behavior |
 | --- | --- | --- | --- |
 | Studio stat catalog | MythicLib | Reflection-safe picker with manual fallback | Picker unavailable; manual IDs remain supported. |
-| Owner stat application | MythicLib | Reflection-safe adapter implemented, uncertified | No runtime buff is applied. |
+| Owner stat application | MythicLib | Reflection-safe adapter, applied on activation | No stat modifier is applied; the pet is otherwise unaffected. |
 | Item stats/expressions | MMOItems | Deferred | No hard MMOItems integration, item distribution, reducer, or instant-hatch redemption is active. |
 | Direct skill execution | MythicMobs | Deferred | No direct adapter is loaded. |
 | Live rendering | ModelEngine | Reflection-safe renderer implemented, with gait and idle animation | Pets render through the built-in player-head renderer instead. Nothing is lost but the model. |

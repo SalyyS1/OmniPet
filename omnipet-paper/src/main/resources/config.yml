@@ -128,6 +128,12 @@ render:
   # How far a pet tips back at full speed, in degrees, like something leaning into a run.
   # 0 keeps it perfectly upright. Purely visual: the clickable hitbox stays where the pet is.
   maximumLeanDegrees: 12.0
+  # The floating name above an active pet. Shows, in order of priority: the name its owner gave it,
+  # the definition's own `display.name`, or the definition ID made readable - so every pet has a
+  # plate whether or not you wrote one. The pet's level is appended.
+  # false removes the plate from every pet, which is worth doing on a server where many pets are out
+  # at once. Names stay visible in the vault and management screens either way.
+  nameplates: true
 
 
 # ----------------------------------------------------------------------------------------------

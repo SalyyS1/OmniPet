@@ -198,6 +198,9 @@ public final class PetStudioController {
                     StudioDraftInputParsers::behavior, state.draft::withBehaviorExtensions);
             case EDIT_RELEASE -> awaitField(player, state, StudioFieldPrompt.RELEASE,
                     StudioDraftInputParsers::release, state.draft::withReleasePolicy);
+            case EDIT_NAME -> awaitField(player, state, StudioFieldPrompt.NAME,
+                    StudioDraftInputParsers::displayName,
+                    name -> state.draft.withRawValue(name, "display", "name"));
             case SAVE -> save(player, state);
             case CANCEL -> openBrowse(player, state.tier, true);
             case CONFIRM_ARCHIVE -> archive(player, state);
@@ -486,8 +489,18 @@ public final class PetStudioController {
         }
     }
 
-    private void awaitId(Player player, StudioState state) {
-        StudioViewToken inputToken = sessions.nextView(state.token);
+    /**
+     * The icon a brand-new draft starts with: a placeholder the operator is expected to replace.
+     *
+     * <p>Save refuses it for a HEAD pet, whose icon is its whole appearance. A MODELENGINE pet is given a
+     * working default instead, because its head is never what a player sees; see
+     * {@code PetDefinitionStudioService.UNSET_ICON_VALUE}.
+     */
+    private static HeadIcon unsetIcon() {
+        return new HeadIcon("BASE64", PetDefinitionStudioService.UNSET_ICON_VALUE);
+    }
+
+    private void awaitId(Player player, StudioState state) {        StudioViewToken inputToken = sessions.nextView(state.token);
         state.token = inputToken;
         sessions.setPendingInput(inputToken, true);
         StudioFieldPrompt.DEFINITION_ID.send(player);
@@ -499,8 +512,7 @@ public final class PetStudioController {
                     StudioState next = new StudioState(player.getUniqueId(), session);
                     next.tier = state.tier;
                     next.draft = StudioPetDraft.create(id, session.registryGeneration(), state.tier,
-                            new HeadIcon("BASE64", "CHANGE_ME"), new DisplayDefinition(DisplayDefinition.Provider.HEAD, null), Map.of())
-                            .withIcon(new HeadIcon("BASE64", "CHANGE_ME"));
+                            unsetIcon(), new DisplayDefinition(DisplayDefinition.Provider.HEAD, null), Map.of());
                     states.put(player.getUniqueId(), next);
                     render(next, StudioInventoryHolder.Screen.EDITOR);
                 }, failure -> inputFailure(player, state, inputToken, failure, StudioInventoryHolder.Screen.LIST));

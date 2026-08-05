@@ -24,6 +24,7 @@ import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.domain.incubation.EggDefinition;
 import io.github.salyvn.omnipet.core.domain.incubation.EggDefinitionEnvelope;
 import io.github.salyvn.omnipet.core.domain.incubation.HatchCandidate;
+import io.github.salyvn.omnipet.core.incubation.DeterministicHatchRollService;
 import io.github.salyvn.omnipet.core.incubation.IncubationDurationParser;
 import io.github.salyvn.omnipet.core.persistence.EggDefinitionRepository;
 import io.github.salyvn.omnipet.core.persistence.RegistrySnapshotRepository;
@@ -65,6 +66,15 @@ public final class EggAdminController {
      * converges without looping against a genuinely conflicting workload.
      */
     private static final int GRANT_ATTEMPTS = 3;
+
+    /**
+     * The quality a granted pet's stats roll at, on the 0-100 scale a hatch uses.
+     *
+     * <p>The middle. A grant has no incubation behind it to have earned an outcome, so an average pet is
+     * the honest result — and rolling the top of every range would turn this command into a way to mint a
+     * perfect pet by accident.
+     */
+    private static final double MEDIAN_STAT_QUALITY = 50.0;
 
     private final EggDefinitionRepository eggs;
     private final RegistrySnapshotRepository registry;
@@ -368,20 +378,64 @@ public final class EggAdminController {
      * rarity, making an S-tier grant level at common-pet cost. Both readers already treat the field as
      * optional. {@code source} records the provenance, so the difference is visible in the data rather
      * than looking like a hatch that lost its ID.
+     *
+     * <p>Stats are rolled rather than left empty. An empty list made a granted pet a convincing
+     * imitation of a real one — it rendered, levelled, and listed in the vault — that gave its owner no
+     * stats at all, which is exactly what an operator testing a definition with this command would see
+     * and reasonably report as the stat system being broken.
      */
     private PetInstance pet(PetDefinition definition) {
+        // Minted once: this identity is both the pet's ID and the seed for its stat roll, and calling the
+        // supplier twice would give the roll a seed belonging to a pet that does not exist.
+        java.util.UUID petInstanceId = petIds.get();
         Map<String, Object> hatching = new java.util.LinkedHashMap<>();
         hatching.put("eggId", companionEggId(definition.id()));
         hatching.put("source", "admin-grant");
         Map<String, Object> components = new java.util.LinkedHashMap<>();
         components.put("hatching", hatching);
-        components.put("stats", List.of());
-        components.put("appearance", Map.of(
-                "provider", "HEAD",
-                "fallbackHeadSource", definition.icon().source(),
-                "fallbackHeadValue", definition.icon().value()));
+        components.put("stats", grantedStats(definition, petInstanceId.getMostSignificantBits()));
+        // The definition's own provider, not a hardcoded HEAD: a granted MODELENGINE pet was being
+        // persisted as a head, so it rendered as one even where ModelEngine was working.
+        Map<String, Object> appearance = new java.util.LinkedHashMap<>();
+        appearance.put("provider", definition.display().provider().name());
+        if (definition.display().model() != null && !definition.display().model().isBlank()) {
+            appearance.put("assetId", definition.display().model());
+        }
+        appearance.put("fallbackHeadSource", definition.icon().source());
+        appearance.put("fallbackHeadValue", definition.icon().value());
+        components.put("appearance", Map.copyOf(appearance));
         return new PetInstance(
-                petIds.get(), definition.id(), definition.revision(), components, Map.of());
+                petInstanceId, definition.id(), definition.revision(), components, Map.of());
+    }
+
+    /**
+     * The stat nodes a granted pet carries, in the shape {@code PetStatBuffProjection} reads.
+     *
+     * <p>Rolled at median quality: a grant is a gift with no incubation behind it, so an average pet is
+     * the honest outcome, and rolling the extremes would make the command a way to mint a perfect pet.
+     *
+     * <p>Best-effort. A definition with a malformed {@code stats} node costs the granted pet its stats
+     * rather than failing the grant, which matches how every other optional node in this path behaves.
+     */
+    private List<Map<String, Object>> grantedStats(PetDefinition definition, long seed) {
+        try {
+            var rolled = DeterministicHatchRollService.rollStats(definition, MEDIAN_STAT_QUALITY, seed);
+            List<Map<String, Object>> nodes = new ArrayList<>(rolled.size());
+            for (var stat : rolled) {
+                Map<String, Object> node = new java.util.LinkedHashMap<>(stat.extensions());
+                node.put("id", stat.id());
+                node.put("modifierType", stat.modifierType().name());
+                node.put("value", stat.value());
+                nodes.add(Map.copyOf(node));
+            }
+            return List.copyOf(nodes);
+        } catch (RuntimeException failure) {
+            // Shares the appearance sink: both are "this grant is missing something cosmetic or
+            // mechanical but is still going ahead", and both end up in the plugin log.
+            appearanceWarnings.accept("could not roll stats for the granted pet "
+                    + definition.id() + ": " + failure.getMessage());
+            return List.of();
+        }
     }
 
     /**

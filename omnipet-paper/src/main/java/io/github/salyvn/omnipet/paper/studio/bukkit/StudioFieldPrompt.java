@@ -25,6 +25,11 @@ enum StudioFieldPrompt {
     DISPLAY("display", "Renderer",
             "<HEAD|MODELENGINE> [model-id]",
             "MODELENGINE wolf_model"),
+    // The name floating above an active pet. Optional: a pet with none shows its definition ID, made
+    // readable, so every pet has a plate whether or not an operator wrote one.
+    NAME("display.name", "Nameplate",
+            "the name shown above this pet, or none",
+            "Wolf Cub"),
     RARITY("rarity", "Rarity bands",
             "<id> <qualityMin> <qualityMax> <weight> <hatchMultiplier>; repeat with ; or type none",
             "common 0 50 70 1.0;rare 50 100 30 1.5"),

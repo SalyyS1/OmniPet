@@ -52,9 +52,33 @@ class PaperHeadRendererTest {
         assertEquals(3, backend.scaleUpdates);
     }
 
+    /**
+     * The head follows the pet's heading, not just the carrier.
+     *
+     * <p>The display is a passenger, and a passenger keeps its own rotation — Minecraft moves it with its
+     * vehicle but never turns it. Rotating only the carrier left every head frozen at whatever direction
+     * its owner faced when the pet spawned, which is the "mặt head bị ngược" report. Asserted as the yaw
+     * the head ends up at rather than as a call count, because a call that turned it the wrong way would
+     * satisfy a counter.
+     */
     @Test
-    void anUnchangedDisplayTransformIsNotResentEveryTick() {
-        // The display's transformation used to be written on every update. Re-sending an identical one
+    void theHeadIsTurnedToMatchThePetsHeadingOnEveryUpdate() {
+        FakeBackend backend = new FakeBackend();
+        PaperHeadRenderer renderer = renderer(backend);
+        RendererHandle handle = renderer.spawn(request());
+
+        renderer.update(handle, new RuntimeTransform(new RuntimeVector(2, 3, 4), 90, 0, 1));
+
+        assertEquals(HeadFacing.displayYaw(90), backend.headYaw);
+
+        renderer.update(handle, new RuntimeTransform(new RuntimeVector(5, 3, 4), -45, 0, 1));
+
+        assertEquals(HeadFacing.displayYaw(-45), backend.headYaw,
+                "a pet that turns has to take its head with it");
+    }
+
+    @Test
+    void anUnchangedDisplayTransformIsNotResentEveryTick() {        // The display's transformation used to be written on every update. Re-sending an identical one
         // restarts interpolation and dirties the entity's data watcher, so a stationary pet cost a packet
         // per tick for no visible change - multiplied by every pet on the server.
         FakeBackend backend = new FakeBackend();
@@ -219,6 +243,8 @@ class PaperHeadRendererTest {
         private int scaleUpdates;
         /** The text currently on the pet's nameplate, or null when it has none. */
         private String nameplate;
+        /** Where the head display is pointing, or null when it has never been turned. */
+        private Float headYaw;
         private double distanceSquared;
         private boolean failInteraction;
         private boolean entitiesValid = true;
@@ -244,6 +270,11 @@ class PaperHeadRendererTest {
         @Override public boolean currentChunkLoaded(EntityRef entity) { return true; }
         @Override public double distanceSquared(EntityRef entity, RuntimeTransform transform) { return distanceSquared; }
         @Override public void smoothMove(EntityRef carrier, RuntimeTransform transform, PaperHeadRendererSettings settings) { smoothMoves++; }
+        @Override public void turnVisual(EntityRef visual, float carrierYaw) {
+            // Recorded rather than counted, like the nameplate: whether the head ends up facing the right
+            // way is the question, and a call count cannot answer it.
+            headYaw = HeadFacing.displayYaw(carrierYaw);
+        }
         @Override public void hardTeleport(EntityRef carrier, EntityRef visual, EntityRef interaction, WorldRef world, RuntimeTransform transform) { hardTeleports++; }
         @Override public void updateAppearance(EntityRef visual, RendererAppearance appearance) { appearanceUpdates++; }
         @Override public void updateName(EntityRef carrier, RendererAppearance appearance, PaperHeadRendererSettings settings) {

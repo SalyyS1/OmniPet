@@ -23,6 +23,15 @@ import io.github.salyvn.omnipet.core.studio.input.StudioFormulaValidator;
 import io.github.salyvn.omnipet.core.studio.input.StudioInputParsers;
 
 final class StudioDraftInputParsers {
+    /**
+     * How much nameplate text an operator may type.
+     *
+     * <p>Shorter than the renderer's own ceiling, which has to hold the level suffix the runtime appends as
+     * well. Refusing here means an operator learns the limit while typing rather than discovering their name
+     * silently truncated above a pet.
+     */
+    private static final int MAX_DISPLAY_NAME_INPUT = 48;
+
     private StudioDraftInputParsers() {}
 
     /**
@@ -35,8 +44,25 @@ final class StudioDraftInputParsers {
         return new HeadIcon(detected.source(), detected.value());
     }
 
-    static DisplayDefinition display(String input) {
-        String[] parts = required(input).split("\\s+", 2);
+    /**
+     * The nameplate text for a pet, or null to clear it.
+     *
+     * <p>Kept as raw MiniMessage rather than parsed here, matching every other operator-authored string:
+     * the renderer parses it at display time, and a broken tag shows literally rather than blocking a save.
+     * Length is bounded to what a nameplate can carry, and the level suffix the runtime appends is left
+     * room for.
+     */
+    static String displayName(String input) {
+        if (isNone(input)) return null;
+        String value = required(input);
+        if (value.length() > MAX_DISPLAY_NAME_INPUT) {
+            throw new IllegalArgumentException(
+                    "nameplate text cannot exceed " + MAX_DISPLAY_NAME_INPUT + " characters");
+        }
+        return value;
+    }
+
+    static DisplayDefinition display(String input) {        String[] parts = required(input).split("\\s+", 2);
         DisplayDefinition.Provider provider;
         try {
             provider = DisplayDefinition.Provider.valueOf(parts[0].toUpperCase(Locale.ROOT));

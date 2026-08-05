@@ -5,6 +5,7 @@ import java.util.Map;
 import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.management.PetManagementMetadata;
 import io.github.salyvn.omnipet.core.runtime.RendererAppearance;
+import io.github.salyvn.omnipet.paper.text.Displays;
 
 /**
  * The name shown above a rendered pet.
@@ -12,7 +13,14 @@ import io.github.salyvn.omnipet.core.runtime.RendererAppearance;
  * <p>Read from the definition's raw node rather than from a field on {@code PetDefinition}. That record is
  * a schema contract with a codec, a migration path, and validation at four layers, and a cosmetic label
  * does not earn a place in it — the same argument the optional {@code behavior} block already settles the
- * same way. A definition with no name simply has no nameplate.
+ * same way.
+ *
+ * <p>Three sources, in falling priority: the name the player gave the pet, the operator's
+ * {@code display.name}, and finally the definition ID made readable. The last one is why every active pet
+ * now has a plate. Falling through to no name at all meant nameplates only appeared for operators who had
+ * discovered an undocumented raw-node key, so in practice they never appeared — which is the "pet được
+ * active vẫn chưa có displayname" report. A pet's ID is not a beautiful name, but it is the pet's name, and
+ * showing it is what makes the feature visible and the rename worth doing.
  *
  * <p>A player's own name wins. Renaming is the point of {@code PetManagementMetadata.customName}, and a
  * definition-level name that overrode it would make the rename look broken.
@@ -25,7 +33,7 @@ final class PaperRuntimeNameResolver {
     private PaperRuntimeNameResolver() {}
 
     /**
-     * The nameplate text for one pet, or empty when it should have none.
+     * The nameplate text for one pet.
      *
      * @param rawNode the definition's raw node, which may be absent for a pet whose definition is gone
      * @param instance the owned pet, carrying any name its owner gave it
@@ -34,6 +42,7 @@ final class PaperRuntimeNameResolver {
     static String resolve(Map<String, Object> rawNode, PetInstance instance, Integer level) {
         String name = customName(instance);
         if (name.isEmpty()) name = definitionName(rawNode);
+        if (name.isEmpty()) name = readableId(instance);
         if (name.isEmpty()) return "";
         String withLevel = level == null ? name : name + "  Lv." + level;
         // Truncated rather than rejected: a name too long for a nameplate is a cosmetic problem, and
@@ -41,6 +50,17 @@ final class PaperRuntimeNameResolver {
         return withLevel.length() <= RendererAppearance.MAX_DISPLAY_NAME
                 ? withLevel
                 : withLevel.substring(0, RendererAppearance.MAX_DISPLAY_NAME);
+    }
+
+    /**
+     * The pet's definition ID as something a player can read: {@code ember_fox} becomes {@code Ember fox}.
+     *
+     * <p>The last resort, so that a pet nobody has named still has a plate. Reuses the same sentence-casing
+     * every other player-facing identifier in the plugin goes through, so a definition ID reads the same
+     * here as it does in the vault.
+     */
+    private static String readableId(PetInstance instance) {
+        return instance == null ? "" : Displays.identifier(instance.definitionId());
     }
 
     /** The name the pet's owner gave it, or empty. Never throws: a renderer must not fail on bad data. */

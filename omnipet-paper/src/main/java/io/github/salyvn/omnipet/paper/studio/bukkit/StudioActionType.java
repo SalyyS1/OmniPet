@@ -18,6 +18,7 @@ public enum StudioActionType {
     EDIT_SKILLS,
     EDIT_BEHAVIOR,
     EDIT_RELEASE,
+    EDIT_NAME,
     SAVE,
     CANCEL,
     CONFIRM_ARCHIVE,

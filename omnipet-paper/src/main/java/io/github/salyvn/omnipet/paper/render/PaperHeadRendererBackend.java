@@ -31,6 +31,16 @@ interface PaperHeadRendererBackend {
 
     void smoothMove(EntityRef carrier, RuntimeTransform transform, PaperHeadRendererSettings settings);
 
+    /**
+     * Turns the head display to match the pet's heading.
+     *
+     * <p>Its own call rather than part of {@code smoothMove} because the two write different entities for
+     * different reasons: the carrier is moved and rotated as a vehicle, while the display is a passenger
+     * that Minecraft carries along but never turns. Rotating only the carrier is what left every head
+     * frozen at its spawn heading.
+     */
+    void turnVisual(EntityRef visual, float carrierYaw);
+
     void hardTeleport(
             EntityRef carrier,
             EntityRef visual,
