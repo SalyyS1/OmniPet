@@ -116,7 +116,9 @@ check((await page.$$('.wiki-nav a[aria-current="page"]')).length === 1,
 await page.goto(`${base}/wiki.html#/commands`, { waitUntil: 'networkidle' });
 await page.evaluate(() => window.scrollTo(0, 1200));
 await page.click('.wiki-nav a[data-page="config"]');
-await page.waitForTimeout(400);
+// Waited for rather than slept through: a fixed delay passes locally and flakes on a slower runner,
+// which says nothing about whether the page scrolled.
+await page.waitForFunction(() => window.scrollY < 50, null, { timeout: 5000 }).catch(() => {});
 check(await page.evaluate(() => window.scrollY) < 50, 'changing page scrolls back to the top');
 check(await page.evaluate(() => document.activeElement.id) === 'wiki-article',
   'focus moves into the article, so a screen reader starts reading the new page');

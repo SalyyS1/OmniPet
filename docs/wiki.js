@@ -645,11 +645,23 @@
   function scrollToTarget() {
     var target = state.headingId ? document.getElementById(state.headingId) : null;
     if (target) {
+      // Smooth for an anchor on the page you are already reading: the animation shows the reader where
+      // they were taken from, which is the whole value of scrolling rather than jumping.
       target.scrollIntoView();
     } else {
-      window.scrollTo(0, 0);
+      /*
+       * Instant for a page change. The article's content was replaced a moment ago, so animating back to
+       * the top scrolls through a page the reader never saw — several hundred milliseconds of unrelated
+       * text sliding past. `behavior: 'instant'` overrides the stylesheet's `scroll-behavior: smooth`,
+       * with the two-argument call kept for browsers that do not take the options object.
+       */
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      } catch (ignored) {
+        window.scrollTo(0, 0);
+      }
     }
-    // Focus without scrolling again: scrollIntoView has already put us in the right place.
+    // Focus without scrolling again: the call above has already put us in the right place.
     try {
       dom.article.focus({ preventScroll: true });
     } catch (ignored) {
