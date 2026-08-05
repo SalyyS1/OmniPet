@@ -77,6 +77,7 @@ public final class OmniPetConfigLoader {
         runtime.put("periodTicks", config.runtime().periodTicks());
         runtime.put("maximumOwnersPerTick", config.runtime().maximumOwnersPerTick());
         runtime.put("maximumPetsPerOwner", config.runtime().maximumPetsPerOwner());
+        runtime.put("maximumMicrosPerTick", config.runtime().maximumNanosPerTick() / 1_000L);
         // Written back for the same reason the EXP formula is: encode() is what a legacy migration
         // produces, and omitting a tuned section would reset it on upgrade.
         LinkedHashMap<String, Object> render = new LinkedHashMap<>();
@@ -173,13 +174,24 @@ public final class OmniPetConfigLoader {
     }
 
     private static PaperRuntimeSettings runtime(Map<String, Object> values) {
-        rejectUnknown(values, Set.of("initialDelayTicks", "periodTicks", "maximumOwnersPerTick", "maximumPetsPerOwner"),
-                "runtime");
+        rejectUnknown(values, Set.of("initialDelayTicks", "periodTicks", "maximumOwnersPerTick",
+                "maximumPetsPerOwner", "maximumMicrosPerTick"), "runtime");
+        // Defaults come from the record rather than being repeated here: the two disagreed before, so an
+        // operator who never wrote maximumPetsPerOwner got 64 while one who wrote the shipped 10 got 10.
+        PaperRuntimeSettings defaults = PaperRuntimeSettings.defaults();
         return new PaperRuntimeSettings(
-                longValue(values.getOrDefault("initialDelayTicks", 1), "runtime.initialDelayTicks"),
-                longValue(values.getOrDefault("periodTicks", 1), "runtime.periodTicks"),
-                integer(values.getOrDefault("maximumOwnersPerTick", 64), "runtime.maximumOwnersPerTick"),
-                integer(values.getOrDefault("maximumPetsPerOwner", 10), "runtime.maximumPetsPerOwner"));
+                longValue(values.getOrDefault("initialDelayTicks", defaults.initialDelayTicks()),
+                        "runtime.initialDelayTicks"),
+                longValue(values.getOrDefault("periodTicks", defaults.periodTicks()),
+                        "runtime.periodTicks"),
+                integer(values.getOrDefault("maximumOwnersPerTick", defaults.maximumOwnersPerTick()),
+                        "runtime.maximumOwnersPerTick"),
+                integer(values.getOrDefault("maximumPetsPerOwner", defaults.maximumPetsPerOwner()),
+                        "runtime.maximumPetsPerOwner"),
+                // Configured in microseconds: nanoseconds are finer than an operator can reason about,
+                // and a tick is 50,000 of them.
+                longValue(values.getOrDefault("maximumMicrosPerTick",
+                        defaults.maximumNanosPerTick() / 1_000L), "runtime.maximumMicrosPerTick") * 1_000L);
     }
 
     /**

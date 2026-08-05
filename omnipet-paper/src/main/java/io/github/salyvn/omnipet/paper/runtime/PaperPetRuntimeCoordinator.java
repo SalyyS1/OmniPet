@@ -28,6 +28,19 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
     private final InteractionIndex interactions;
     private final Map<UUID, PaperRuntimeOwnerSnapshot> snapshots = new LinkedHashMap<>();
     private final Set<UUID> cleanupOwners = new LinkedHashSet<>();
+    private final LongSupplier nanoTime;
+    /**
+     * Every owner the loop may visit, rebuilt only when the membership changes.
+     *
+     * <p>This used to be rebuilt from scratch on every tick — a set, a copy, a list, and another copy,
+     * all sized to the total owner count even though the budget only ever selects a few dozen. The
+     * membership changes when a player joins, quits, or is queued for cleanup, which is far rarer than
+     * twenty times a second.
+     */
+    private List<UUID> knownOwners = List.of();
+    private boolean knownOwnersStale = true;
+    /** Reused across ticks so selecting owners costs no allocation once the loop is warm. */
+    private final List<UUID> selectedOwners = new ArrayList<>();
     private PaperRuntimeScheduler.ScheduledTask task;
     private int ownerCursor;
     private boolean closed;
@@ -62,12 +75,15 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
         this.settings = Objects.requireNonNull(settings, "runtime settings");
         this.failures = Objects.requireNonNull(failures, "runtime failure sink");
         this.interactions = interactions;
+        // Retained as well as handed to the engine: the engine uses it as a movement clock, the tick
+        // loop uses it to stop before it has spent more of the tick than the operator allowed.
+        this.nanoTime = Objects.requireNonNull(nanoTime, "runtime monotonic clock");
         this.engine = new PaperRuntimeOwnerEngine(
                 Objects.requireNonNull(activation, "pet activation service"),
                 Objects.requireNonNull(movement, "movement controller"),
                 Objects.requireNonNull(renderers, "renderer resolver"),
                 Objects.requireNonNull(poses, "owner pose source"),
-                Objects.requireNonNull(nanoTime, "runtime monotonic clock"),
+                nanoTime,
                 failures,
                 settings.maximumPetsPerOwner());
     }
@@ -86,20 +102,31 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
     public synchronized void acceptSnapshot(PetStorageSnapshot storage, RegistrySnapshot registry) {
         if (closed) throw new IllegalStateException("pet runtime coordinator is closed");
         PaperRuntimeOwnerSnapshot compiled = PaperRuntimeOwnerSnapshot.compile(storage, registry);
-        snapshots.put(compiled.ownerId(), compiled);
+        if (snapshots.put(compiled.ownerId(), compiled) == null) invalidateKnownOwners();
     }
 
     public void tickNow() {
         requireMainThread();
         if (closed) return;
+        long deadline = settings.timeBudgeted()
+                ? nanoTime.getAsLong() + settings.maximumNanosPerTick()
+                : 0;
         List<UUID> owners = nextOwners();
-        for (UUID ownerId : owners) {
+        for (int index = 0; index < owners.size(); index++) {
+            UUID ownerId = owners.get(index);
             if (isCleanupPending(ownerId)) {
                 if (engine.cleanup(ownerId, PaperRuntimeFailure.Stage.CLEANUP)) clearCleanup(ownerId);
-                continue;
+            } else {
+                PaperRuntimeOwnerSnapshot snapshot = snapshot(ownerId);
+                if (snapshot != null && !engine.process(snapshot)) markCleanup(ownerId);
             }
-            PaperRuntimeOwnerSnapshot snapshot = snapshot(ownerId);
-            if (snapshot != null && !engine.process(snapshot)) markCleanup(ownerId);
+            // Checked after the owner rather than before, so every tick makes progress on at least one
+            // and a budget smaller than a single owner cannot stall the loop forever. Owners not reached
+            // are not lost: the cursor already advanced past them, so the next tick starts there.
+            if (deadline != 0 && index + 1 < owners.size() && nanoTime.getAsLong() >= deadline) {
+                rewindCursor(owners.size() - index - 1);
+                return;
+            }
         }
     }
 
@@ -109,6 +136,7 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
         synchronized (this) {
             snapshots.remove(ownerId);
             cleanupOwners.add(ownerId);
+            invalidateKnownOwners();
         }
         if (engine.cleanup(ownerId, PaperRuntimeFailure.Stage.CLEANUP)) clearCleanup(ownerId);
     }
@@ -176,9 +204,11 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
             if (closed) return;
             closed = true;
             if (task != null && !task.cancelled()) task.cancel();
+            // Read before clearing: the cached list is what close() still has to walk.
             owners = allKnownOwnersLocked();
             snapshots.clear();
             cleanupOwners.clear();
+            invalidateKnownOwners();
         }
         for (UUID ownerId : owners) engine.cleanup(ownerId, PaperRuntimeFailure.Stage.CLEANUP);
     }
@@ -199,28 +229,52 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
 
     private synchronized List<UUID> nextOwners() {
         List<UUID> candidates = allKnownOwnersLocked();
+        selectedOwners.clear();
         if (candidates.isEmpty()) {
             ownerCursor = 0;
-            return List.of();
+            return selectedOwners;
         }
         int count = Math.min(settings.maximumOwnersPerTick(), candidates.size());
         int start = Math.floorMod(ownerCursor, candidates.size());
-        List<UUID> selected = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
-            selected.add(candidates.get((start + index) % candidates.size()));
+            selectedOwners.add(candidates.get((start + index) % candidates.size()));
         }
         ownerCursor = (start + count) % candidates.size();
-        return List.copyOf(selected);
+        // The live list, not a copy: it is cleared and refilled on the next call, and the only reader is
+        // the tick loop that asked for it.
+        return selectedOwners;
+    }
+
+    /**
+     * Puts back owners the time budget stopped the loop reaching, so the next tick starts on them.
+     *
+     * <p>Without this a budget that regularly trips would skip the tail of every selection: the cursor
+     * had already advanced past owners nobody visited, and the same ones would be skipped again.
+     */
+    private synchronized void rewindCursor(int unvisited) {
+        int total = knownOwners.isEmpty() ? 0 : knownOwners.size();
+        if (total == 0 || unvisited <= 0) return;
+        ownerCursor = Math.floorMod(ownerCursor - unvisited, total);
     }
 
     private synchronized List<UUID> allKnownOwners() {
         return allKnownOwnersLocked();
     }
 
+    /** The cached membership, rebuilt only after a join, quit, or cleanup queue change. */
     private List<UUID> allKnownOwnersLocked() {
-        LinkedHashSet<UUID> owners = new LinkedHashSet<>(cleanupOwners);
-        owners.addAll(snapshots.keySet());
-        return List.copyOf(owners);
+        if (knownOwnersStale) {
+            LinkedHashSet<UUID> owners = new LinkedHashSet<>(cleanupOwners);
+            owners.addAll(snapshots.keySet());
+            knownOwners = List.copyOf(owners);
+            knownOwnersStale = false;
+        }
+        return knownOwners;
+    }
+
+    /** Called wherever {@code snapshots} or {@code cleanupOwners} gains or loses an entry. */
+    private void invalidateKnownOwners() {
+        knownOwnersStale = true;
     }
 
     private synchronized PaperRuntimeOwnerSnapshot snapshot(UUID ownerId) {
@@ -232,11 +286,13 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
     }
 
     private synchronized void markCleanup(UUID ownerId) {
-        cleanupOwners.add(ownerId);
+        // Only a first add changes membership; an owner already queued is still one entry.
+        if (cleanupOwners.add(ownerId)) invalidateKnownOwners();
     }
 
     private synchronized void clearCleanup(UUID ownerId) {
-        cleanupOwners.remove(ownerId);
+        // Still known while a snapshot exists, so only drop the cache when this was the last reason.
+        if (cleanupOwners.remove(ownerId) && !snapshots.containsKey(ownerId)) invalidateKnownOwners();
     }
 
     private void requireMainThread() {

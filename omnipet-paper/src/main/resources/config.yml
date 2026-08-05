@@ -85,14 +85,22 @@ storage:
 # ----------------------------------------------------------------------------------------------
 #  RESTART ONLY. One bounded task updates all pets, visiting owners round-robin - there is no
 #  task per pet, so pet count does not multiply scheduler load. Leave these alone unless you are
-#  diagnosing tick time; the two `maximum` values are the throughput ceiling, not a target.
+#  diagnosing tick time; every `maximum` here is a ceiling, not a target.
 # ----------------------------------------------------------------------------------------------
 runtime:
   initialDelayTicks: 1
   periodTicks: 1
   # Owners visited per tick. Lower this first if OmniPet costs measurable tick time.
   maximumOwnersPerTick: 64
+  # Pets drawn per owner. A player may OWN more - the active-slot schema allows 64 - but this is
+  # what the server agrees to render every tick, and each pet costs three tracked entities.
   maximumPetsPerOwner: 10
+  # Wall clock the loop may spend in one tick, in microseconds. A tick is 50,000 of them, so the
+  # default 2,000 is 4% of one. The two counts above bound how MUCH work is attempted; this bounds
+  # how LONG it may take, which is the one that protects TPS when some pets cost more than others.
+  # Owners not reached this tick are picked up next tick - the round-robin cursor does not lose them.
+  # Set 0 to disable and rely on the counts alone.
+  maximumMicrosPerTick: 2000
 
 
 # ----------------------------------------------------------------------------------------------

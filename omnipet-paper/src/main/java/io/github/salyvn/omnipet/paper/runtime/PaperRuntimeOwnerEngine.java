@@ -28,6 +28,16 @@ final class PaperRuntimeOwnerEngine {
     private final int maximumPetsPerOwner;
     private final Map<UUID, LinkedHashMap<UUID, PaperRuntimePetState>> states = new LinkedHashMap<>();
     private final Map<UUID, SnapshotKey> reportedInvalidSnapshots = new LinkedHashMap<>();
+    /**
+     * Scratch reused across owners and ticks.
+     *
+     * <p>Safe because both are consumed before {@link #process} returns: the request list is read into a
+     * map by the activation service, and the retained set is only used to prune this owner's states. Held
+     * as fields because allocating them per owner per tick was two collections times sixty-four owners
+     * times twenty ticks a second.
+     */
+    private final List<RendererSpawnRequest> requests = new ArrayList<>();
+    private final Set<UUID> retained = new LinkedHashSet<>();
     private long nextRendererGeneration = 1;
 
     PaperRuntimeOwnerEngine(
@@ -70,8 +80,10 @@ final class PaperRuntimeOwnerEngine {
         long nowNanos = nanoTime.getAsLong();
         LinkedHashMap<UUID, PaperRuntimePetState> ownerStates =
                 states.computeIfAbsent(ownerId, ignored -> new LinkedHashMap<>());
-        List<RendererSpawnRequest> requests = new ArrayList<>(snapshot.desiredPets().size());
-        Set<UUID> retained = new LinkedHashSet<>();
+        List<RendererSpawnRequest> requests = this.requests;
+        Set<UUID> retained = this.retained;
+        requests.clear();
+        retained.clear();
         for (DesiredPet pet : snapshot.desiredPets()) {
             UUID petId = pet.instance().id();
             try {

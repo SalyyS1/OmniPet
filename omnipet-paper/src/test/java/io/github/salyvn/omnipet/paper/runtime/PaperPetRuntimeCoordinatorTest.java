@@ -25,8 +25,10 @@ import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
 class PaperPetRuntimeCoordinatorTest {
     @Test
     void oneIdempotentTaskReconcilesUpdatesRemovesReloadsAndCloses() {
+        // Time budget off: this fixture drives a fake clock, so a real elapsed-time ceiling would
+        // decide when the loop stops rather than the count ceiling under test.
         Fixture fixture = new Fixture(new PaperRuntimeSettings(
-                1, 1, 8, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT));
+                1, 1, 8, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, 0));
         UUID owner = UUID.randomUUID();
         PetInstance first = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
         PetInstance second = RuntimeTestFixtures.pet(UUID.randomUUID(), "fox");
@@ -152,7 +154,7 @@ class PaperPetRuntimeCoordinatorTest {
     @Test
     void ownerBudgetAdvancesRoundRobinWithoutCreatingPetTasks() {
         Fixture fixture = new Fixture(new PaperRuntimeSettings(
-                0, 1, 1, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT));
+                0, 1, 1, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, 0));
         UUID firstOwner = UUID.randomUUID();
         UUID secondOwner = UUID.randomUUID();
         PetInstance firstPet = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
@@ -170,6 +172,74 @@ class PaperPetRuntimeCoordinatorTest {
         fixture.scheduler.runTick();
         assertEquals(2, fixture.coordinator.activePetCount());
         assertEquals(1, fixture.scheduler.scheduleCalls);
+    }
+
+    @Test
+    void theTimeBudgetStopsTheTickButNeverLosesAnOwner() {
+        // The count ceiling bounds how much work is attempted; it cannot bound how long that work takes,
+        // because pets do not all cost the same. An owner the budget stopped us reaching must be picked
+        // up next tick rather than skipped until the cursor wraps all the way round.
+        long budgetNanos = 5_000L;
+        Fixture fixture = new Fixture(new PaperRuntimeSettings(
+                0, 1, 4, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, budgetNanos));
+        List<UUID> owners = new ArrayList<>();
+        for (int index = 0; index < 4; index++) {
+            UUID owner = UUID.randomUUID();
+            PetInstance pet = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
+            owners.add(owner);
+            fixture.coordinator.acceptSnapshot(
+                    RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                    RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition("wolf")));
+        }
+        // Every owner costs the whole budget, so each tick gets through exactly one.
+        fixture.nanosPerRead = budgetNanos;
+        fixture.coordinator.start();
+
+        fixture.scheduler.runTick();
+        assertEquals(1, fixture.coordinator.activePetCount(), "the budget must stop the loop early");
+
+        for (int tick = 0; tick < 3; tick++) fixture.scheduler.runTick();
+        assertEquals(owners.size(), fixture.coordinator.activePetCount(),
+                "every owner must still be reached across later ticks");
+    }
+
+    @Test
+    void aBudgetSmallerThanOneOwnerStillMakesProgress() {
+        // Checked after the owner rather than before, so an unreachably small budget degrades to
+        // one-owner-per-tick instead of stalling the runtime completely.
+        Fixture fixture = new Fixture(new PaperRuntimeSettings(
+                0, 1, 4, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, 1));
+        UUID owner = UUID.randomUUID();
+        PetInstance pet = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition("wolf")));
+        fixture.nanosPerRead = 1_000_000L;
+        fixture.coordinator.start();
+
+        fixture.scheduler.runTick();
+
+        assertEquals(1, fixture.coordinator.activePetCount());
+    }
+
+    @Test
+    void aZeroBudgetVisitsEveryOwnerInOneTick() {
+        // The escape hatch for an operator diagnosing the count ceilings.
+        Fixture fixture = new Fixture(new PaperRuntimeSettings(
+                0, 1, 4, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, 0));
+        for (int index = 0; index < 3; index++) {
+            UUID owner = UUID.randomUUID();
+            PetInstance pet = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
+            fixture.coordinator.acceptSnapshot(
+                    RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                    RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition("wolf")));
+        }
+        fixture.nanosPerRead = 1_000_000L;
+        fixture.coordinator.start();
+
+        fixture.scheduler.runTick();
+
+        assertEquals(3, fixture.coordinator.activePetCount());
     }
 
     @Test
@@ -195,6 +265,13 @@ class PaperPetRuntimeCoordinatorTest {
         private final FakeScheduler scheduler = new FakeScheduler();
         private final RuntimeTestRenderer renderer = new RuntimeTestRenderer();
         private final AtomicLong clock = new AtomicLong(1_000_000_000);
+        /**
+         * How far the clock jumps per read, so elapsed time is deterministic.
+         *
+         * <p>Zero keeps the clock still, which is what every test that is not about the time budget
+         * wants: a frozen clock cannot trip a deadline by accident.
+         */
+        private long nanosPerRead;
         private final List<PaperRuntimeFailure> failures = new ArrayList<>();
         private final PaperPetRuntimeCoordinator coordinator;
 
@@ -207,8 +284,12 @@ class PaperPetRuntimeCoordinatorTest {
                     new HeadFallbackRendererResolver(request -> renderer, renderer),
                     ownerId -> Optional.of(new PaperRuntimeOwnerPose(
                             new RuntimeVector(0, 64, 0), new RuntimeVector(0, 0, 1), 0, 0, true)),
-                    clock::get,
+                    this::readClock,
                     failures::add);
+        }
+
+        private long readClock() {
+            return clock.getAndAdd(nanosPerRead);
         }
     }
 

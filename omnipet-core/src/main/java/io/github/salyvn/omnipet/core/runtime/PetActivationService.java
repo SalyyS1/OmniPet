@@ -150,7 +150,10 @@ public final class PetActivationService {
             UUID ownerId,
             List<RendererSpawnRequest> desired) {
         LinkedHashMap<UUID, RendererSpawnRequest> result = new LinkedHashMap<>();
-        for (RendererSpawnRequest request : List.copyOf(desired == null ? List.of() : desired)) {
+        // Iterated, not copied: the map below is the detached value this method returns, so copying the
+        // input first bought nothing and allocated a list per owner per tick.
+        if (desired == null) return result;
+        for (RendererSpawnRequest request : desired) {
             if (!ownerId.equals(request.ownerId())) throw new IllegalArgumentException("desired renderer owner differs");
             if (result.putIfAbsent(request.petInstanceId(), request) != null) {
                 throw new IllegalArgumentException("duplicate desired pet instance ID");
