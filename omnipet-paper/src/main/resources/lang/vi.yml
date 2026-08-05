@@ -175,7 +175,11 @@ gui:
     studio-stat: "OmniPet <dark_gray>▸</dark_gray> <detail>"
   vault:
     pet-level: "<gray>Cấp</gray> <white><level></white>"
+    pet-experience: "<gray>Kinh nghiệm</gray> <white><exp></white>"
     pet-rarity: "<gray>Độ hiếm</gray> <white><status></white>"
+    pet-stats: "<gray>Chỉ số</gray>"
+    pet-stat-line: "<dark_gray>·</dark_gray> <gray><stat></gray> <white><amount></white>"
+    pet-stats-more: "<dark_gray>· và <amount> chỉ số nữa</dark_gray>"
     pet-recall: "<yellow>Chuột trái</yellow> <gray>thu về</gray>"
     pet-activate: "<yellow>Chuột trái</yellow> <gray>triệu hồi</gray>"
     pet-manage: "<yellow>Chuột phải</yellow> <gray>quản lý, tu luyện hoặc phóng sinh</gray>"

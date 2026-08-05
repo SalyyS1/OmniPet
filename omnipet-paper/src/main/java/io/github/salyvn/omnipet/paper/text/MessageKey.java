@@ -211,7 +211,13 @@ public enum MessageKey {
 
     // --- vault menu --------------------------------------------------------------------------
     GUI_VAULT_PET_LEVEL("gui.vault.pet-level", "<gray>Level</gray> <white><level></white>"),
+    GUI_VAULT_PET_EXPERIENCE("gui.vault.pet-experience", "<gray>Experience</gray> <white><exp></white>"),
     GUI_VAULT_PET_RARITY("gui.vault.pet-rarity", "<gray>Rarity</gray> <white><status></white>"),
+    GUI_VAULT_PET_STATS("gui.vault.pet-stats", "<gray>Stats</gray>"),
+    GUI_VAULT_PET_STAT_LINE("gui.vault.pet-stat-line",
+            "<dark_gray>·</dark_gray> <gray><stat></gray> <white><amount></white>"),
+    GUI_VAULT_PET_STATS_MORE("gui.vault.pet-stats-more",
+            "<dark_gray>· and <amount> more</dark_gray>"),
     GUI_VAULT_PET_RECALL("gui.vault.pet-recall", "<yellow>Left-click</yellow> <gray>recall</gray>"),
     GUI_VAULT_PET_ACTIVATE("gui.vault.pet-activate", "<yellow>Left-click</yellow> <gray>activate</gray>"),
     GUI_VAULT_PET_MANAGE("gui.vault.pet-manage",

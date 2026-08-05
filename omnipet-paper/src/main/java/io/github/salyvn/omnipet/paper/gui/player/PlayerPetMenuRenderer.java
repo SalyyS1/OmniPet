@@ -21,6 +21,7 @@ import io.github.salyvn.omnipet.paper.gui.GuiColors;
 import io.github.salyvn.omnipet.paper.gui.GuiItems;
 import io.github.salyvn.omnipet.paper.gui.MenuMaterials;
 import io.github.salyvn.omnipet.paper.text.Displays;
+import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
@@ -92,11 +93,16 @@ public final class PlayerPetMenuRenderer {
     }
 
     /**
-     * Pet name, then level and rarity where present, then the action hints.
+     * Pet name, then its values, then the action hints.
      *
      * <p>Values come from {@link VaultPetSummary}, which omits what it cannot read rather than
      * throwing, so one malformed legacy pet cannot blank the page. The previous truncated instance
      * UUID is gone — it was noise for players; full UUIDs remain in the management screen.
+     *
+     * <p>Stats are listed here because comparing two pets was otherwise impossible without opening each
+     * one's management screen, and comparison is most of what a vault is for. Experience is shown as a
+     * bare total: the target for the next level comes from a configured formula this renderer has no
+     * access to, and a percentage against a guessed target would be worse than an honest number.
      */
     private static ItemStack petRow(PetInstance pet, boolean active) {
         VaultPetSummary summary = VaultPetSummary.of(pet);
@@ -104,8 +110,11 @@ public final class PlayerPetMenuRenderer {
         if (summary.favorite()) lore.add(Messages.line(MessageKey.GUI_VAULT_PET_FAVORITE));
         summary.level().ifPresent(level -> lore.add(
                 Messages.line(MessageKey.GUI_VAULT_PET_LEVEL, Messages.of("level", level))));
+        summary.experience().ifPresent(exp -> lore.add(Messages.line(
+                MessageKey.GUI_VAULT_PET_EXPERIENCE, Messages.of("exp", Durations.decimal(exp)))));
         summary.rarity().ifPresent(rarity -> lore.add(Messages.line(
                 MessageKey.GUI_VAULT_PET_RARITY, Messages.of("status", Displays.identifier(rarity)))));
+        appendStats(lore, summary);
         // Value lines first, spacer, then the action hints last so players always read actions in
         // the same position across every menu.
         lore.add(Component.empty());
@@ -117,6 +126,42 @@ public final class PlayerPetMenuRenderer {
                 active ? Material.LIME_DYE : Material.PLAYER_HEAD,
                 GuiItems.label(pet.definitionId(), active ? GuiColors.POSITIVE : GuiColors.ACCENT),
                 lore);
+    }
+
+    /**
+     * The pet's largest stats, under a heading, with a count of any left out.
+     *
+     * <p>Nothing at all for a pet with no stats rather than an empty heading: a legacy pet and a pet whose
+     * definition simply grants none are both better served by silence than by a label with no rows.
+     */
+    private static void appendStats(List<Component> lore, VaultPetSummary summary) {
+        if (summary.stats().isEmpty()) return;
+        lore.add(Messages.line(MessageKey.GUI_VAULT_PET_STATS));
+        for (var stat : summary.stats()) {
+            lore.add(Messages.line(MessageKey.GUI_VAULT_PET_STAT_LINE,
+                    Messages.of("stat", Displays.identifier(stat.statId())),
+                    Messages.of("amount", statValue(stat))));
+        }
+        if (summary.hiddenStatCount() > 0) {
+            lore.add(Messages.line(MessageKey.GUI_VAULT_PET_STATS_MORE,
+                    Messages.of("amount", summary.hiddenStatCount())));
+        }
+    }
+
+    /**
+     * A stat value as a player reads it.
+     *
+     * <p>Signed, because a negative modifier is a real outcome and "-4" says something "4" does not, and
+     * suffixed for the relative types so a value of 12 is not read as twelve points of the stat when it
+     * means twelve percent.
+     */
+    private static String statValue(io.github.salyvn.omnipet.core.buff.PetStatBuff stat) {
+        String magnitude = Durations.decimal(Math.abs(stat.value()));
+        String sign = stat.value() < 0 ? "-" : "+";
+        return switch (stat.modifierType()) {
+            case "RELATIVE", "ADDITIVE_MULTIPLIER" -> sign + magnitude + "%";
+            default -> sign + magnitude;
+        };
     }
 
     private static ItemStack vaultStatus(PetStorageSnapshot snapshot) {
