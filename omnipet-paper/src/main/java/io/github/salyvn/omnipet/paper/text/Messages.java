@@ -57,6 +57,19 @@ public final class Messages {
     }
 
     /**
+     * Renders one operator-authored MiniMessage line that is not a catalog key.
+     *
+     * <p>For a pet's nameplate, where the name comes from a definition or from a player rename rather than
+     * from a message key. A player-supplied name is parsed here, which is safe because a nameplate is only
+     * ever shown for that player's own pet and a broken tag renders literally rather than escaping into
+     * anyone else's screen.
+     */
+    public static Component operator(String miniMessage) {
+        return net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                .deserialize(miniMessage == null ? "" : miniMessage);
+    }
+
+    /**
      * Renders operator-authored MiniMessage lines that are not catalog keys.
      *
      * <p>For config-supplied lore, where the operator writes the text directly rather than overriding a

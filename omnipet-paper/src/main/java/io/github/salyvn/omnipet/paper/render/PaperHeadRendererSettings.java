@@ -12,7 +12,8 @@ public record PaperHeadRendererSettings(
         double movementGain,
         double maximumVelocity,
         int interpolationTicks,
-        double maximumLeanDegrees) {
+        double maximumLeanDegrees,
+        boolean nameplates) {
     public PaperHeadRendererSettings {
         if (!Double.isFinite(safetyDistance) || safetyDistance <= 0) {
             throw new IllegalArgumentException("HEAD safety distance must be positive and finite");
@@ -33,6 +34,21 @@ public record PaperHeadRendererSettings(
     }
 
     public static PaperHeadRendererSettings defaults() {
-        return new PaperHeadRendererSettings(8.0, 0.35, 1.2, 3, 12.0);
+        return new PaperHeadRendererSettings(8.0, 0.35, 1.2, 3, 12.0, true);
+    }
+
+    /**
+     * Movement settings with nameplates left at their default.
+     *
+     * <p>Kept so retuning movement does not force a caller to restate a cosmetic switch it has no opinion
+     * about, and so the existing five-argument call sites keep meaning what they meant.
+     */
+    public PaperHeadRendererSettings(
+            double safetyDistance,
+            double movementGain,
+            double maximumVelocity,
+            int interpolationTicks,
+            double maximumLeanDegrees) {
+        this(safetyDistance, movementGain, maximumVelocity, interpolationTicks, maximumLeanDegrees, true);
     }
 }

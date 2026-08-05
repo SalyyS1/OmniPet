@@ -123,6 +123,7 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
                     carrier, interaction, modeled, active, request.appearance().assetId(),
                     request.transform(), animations.available());
             handles.put(request.petInstanceId(), handle);
+            Nameplate.apply(carrier, request.appearance(), settings);
             driveAnimation(handle, request.transform());
             return handle;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
@@ -215,6 +216,9 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
     public void updateAppearance(RendererHandle raw, RendererAppearance appearance) {
         requireMainThread();
         ModelEngineRendererHandle handle = requireHandle(raw);
+        // Before the asset check, because a rename changes the name and not the model: returning early on
+        // an unchanged asset ID would make renaming a ModelEngine pet do nothing.
+        Nameplate.apply(handle.carrier(), appearance, settings);
         if (handle.assetId().equals(appearance.assetId())) return;
         try {
             if (!bindings.hasBlueprint(appearance.assetId())) {

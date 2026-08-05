@@ -153,6 +153,18 @@ final class BukkitPaperHeadRendererBackend implements PaperHeadRendererBackend {
         itemDisplay(visual).setItemStack(PaperHeadItems.create(appearance));
     }
 
+    /**
+     * Puts the pet's name above it, or takes it away.
+     *
+     * <p>Delegated so a model pet and a head pet are labelled identically; see {@link Nameplate} for why the
+     * carrier rather than the display carries it.
+     */
+    @Override
+    public void updateName(
+            EntityRef carrier, RendererAppearance appearance, PaperHeadRendererSettings settings) {
+        Nameplate.apply(entity(carrier), appearance, settings);
+    }
+
     @Override
     public void updateScale(
             EntityRef visual,

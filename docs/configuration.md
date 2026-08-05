@@ -156,6 +156,14 @@ runtime:
   maximumPetsPerOwner: 10
   maximumMicrosPerTick: 2000
 
+render:
+  safetyDistance: 8.0
+  movementGain: 0.35
+  maximumVelocity: 1.2
+  interpolationTicks: 3
+  maximumLeanDegrees: 12.0
+  nameplates: true
+
 progression:
   maxLevel: 100
   maxStamina: 100.0
@@ -175,6 +183,8 @@ items:
 ```
 
 - `runtime` bounds the single pet coordinator. `maximumOwnersPerTick` and `maximumPetsPerOwner` cap work per tick; owners are visited round-robin so a large fleet degrades update rate instead of tick time. `maximumMicrosPerTick` is the wall-clock ceiling — 2000 µs of a 50,000 µs tick by default — and it exists because the count ceilings bound how *much* work is attempted but not how *long* it takes: a distant pet crossing a chunk boundary does not cost what a nearby one standing still costs. The budget is checked after each owner rather than before, so a budget too small for even one owner degrades to one-owner-per-tick instead of stalling, and owners the budget stopped short of are the ones the next tick starts on. Set it to `0` to disable the time ceiling and fall back to the counts alone, which is the setting for diagnosing them. `maximumPetsPerOwner` is capped at the active-slot maximum; note that it is what the server agrees to *draw* every tick, which is not the same as what a player may *own*. Scheduler values are read at enable; changing them logs a warning and requires a restart.
+
+- `render` is how any pet is drawn, server-wide, as opposed to the per-definition `behavior` block that shapes one pet's movement. `safetyDistance` is how far a pet may drift before it is teleported back rather than steered. `interpolationTicks` is how long the client glides between server positions; it must be at least as long as the gap between updates or the pet finishes interpolating and stutters before the next one arrives. `maximumLeanDegrees` tips a pet back as it picks up speed, and `0` disables the lean. `nameplates: false` removes the floating name from every pet — worth setting on a server where many pets are out at once, since names remain visible in the vault and management screens either way. Strict like `storage`: an unknown key or a bad value refuses startup rather than being silently ignored.
 - `progression.defaultExperienceFormula` is compiled and evaluated against `formulaSamples` before activation. A non-finite or non-positive sample rejects the config. A pet definition may override the formula; an invalid override falls back to this validated global one. The formula text is retained beside the compiled result, so a legacy migration rewrites your formula rather than resetting it to the default.
 - `overflowPolicy` is `CARRY` or `DISCARD` and decides what happens to experience granted at `maxLevel`.
 - `items` defines the standalone material identities for EXP candy and breakthrough stones. MMOItems identities are not supported yet.

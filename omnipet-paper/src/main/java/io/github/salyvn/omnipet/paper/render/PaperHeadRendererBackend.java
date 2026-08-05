@@ -40,6 +40,14 @@ interface PaperHeadRendererBackend {
 
     void updateAppearance(EntityRef visual, RendererAppearance appearance);
 
+    /**
+     * Shows or hides the nameplate above a pet.
+     *
+     * <p>Applied to the carrier rather than the visual: the carrier is the entity the passengers ride, so
+     * its name floats above the whole pet regardless of how the display is scaled or leaned.
+     */
+    void updateName(EntityRef carrier, RendererAppearance appearance, PaperHeadRendererSettings settings);
+
     void updateScale(
             EntityRef visual,
             EntityRef interaction,

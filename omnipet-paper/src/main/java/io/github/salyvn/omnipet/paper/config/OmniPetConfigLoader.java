@@ -86,6 +86,7 @@ public final class OmniPetConfigLoader {
         render.put("maximumVelocity", config.render().maximumVelocity());
         render.put("interpolationTicks", config.render().interpolationTicks());
         render.put("maximumLeanDegrees", config.render().maximumLeanDegrees());
+        render.put("nameplates", config.render().nameplates());
         LinkedHashMap<String, Object> progression = new LinkedHashMap<>();
         progression.put("maxLevel", config.progression().maxLevel());
         progression.put("maxStamina", config.progression().maxStamina());
@@ -158,7 +159,7 @@ public final class OmniPetConfigLoader {
     private static PaperHeadRendererSettings render(Map<String, Object> values) {
         rejectUnknown(values, Set.of(
                 "safetyDistance", "movementGain", "maximumVelocity", "interpolationTicks",
-                "maximumLeanDegrees"), "render");
+                "maximumLeanDegrees", "nameplates"), "render");
         PaperHeadRendererSettings defaults = PaperHeadRendererSettings.defaults();
         return new PaperHeadRendererSettings(
                 number(values.getOrDefault("safetyDistance", defaults.safetyDistance()),
@@ -170,7 +171,8 @@ public final class OmniPetConfigLoader {
                 integer(values.getOrDefault("interpolationTicks", defaults.interpolationTicks()),
                         "render.interpolationTicks"),
                 number(values.getOrDefault("maximumLeanDegrees", defaults.maximumLeanDegrees()),
-                        "render.maximumLeanDegrees"));
+                        "render.maximumLeanDegrees"),
+                truthy(values.getOrDefault("nameplates", defaults.nameplates()), "render.nameplates"));
     }
 
     private static PaperRuntimeSettings runtime(Map<String, Object> values) {
@@ -311,6 +313,19 @@ public final class OmniPetConfigLoader {
             throw new IllegalArgumentException(path + " must be finite");
         }
         return number.doubleValue();
+    }
+
+    /**
+     * A strict boolean.
+     *
+     * <p>Only a real boolean, not the string "true". This section is validated strictly and a value that
+     * looks like a boolean but is not one should say so rather than being silently coerced — an operator who
+     * wrote {@code nameplates: "no"} means to turn them off, and treating that as truthy would be the
+     * opposite of what they asked for.
+     */
+    private static boolean truthy(Object value, String path) {
+        if (value instanceof Boolean flag) return flag;
+        throw new IllegalArgumentException(path + " must be true or false");
     }
 
     private static int integer(Object value, String path) {

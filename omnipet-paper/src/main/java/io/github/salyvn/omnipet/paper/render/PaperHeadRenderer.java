@@ -65,6 +65,7 @@ public final class PaperHeadRenderer implements PetRendererPort {
             backend.attach(carrier, interaction);
             backend.updateAppearance(visual, request.appearance());
             backend.updateScale(visual, interaction, request.transform(), settings);
+            backend.updateName(carrier, request.appearance(), settings);
             PaperHeadRendererHandle handle = new PaperHeadRendererHandle(
                     request.ownerId(), request.petInstanceId(), request.rendererGeneration(),
                     carrier, visual, interaction, request.appearance(), request.transform());
@@ -121,6 +122,8 @@ public final class PaperHeadRenderer implements PetRendererPort {
         Objects.requireNonNull(appearance, "renderer appearance");
         backend.updateAppearance(handle.visual(), appearance);
         backend.updateScale(handle.visual(), handle.interaction(), handle.transform(), settings);
+        // The name rides the appearance, so a rename arrives here rather than needing its own port method.
+        backend.updateName(handle.carrier(), appearance, settings);
         handle.appearance(appearance);
     }
 

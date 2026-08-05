@@ -158,6 +158,55 @@ class PaperHeadRendererTest {
                 new RuntimeTransform(new RuntimeVector(0, 1, 0), 0, 0, 1));
     }
 
+    @Test
+    void aNamedPetGetsANameplateAndARenameReachesIt() {
+        // Before this an activated pet was an anonymous floating head: no nameplate code existed anywhere
+        // and no path carried a name to a renderer. The name rides the appearance, so a rename arrives
+        // through updateAppearance rather than needing its own port method.
+        FakeBackend backend = new FakeBackend();
+        PaperHeadRenderer renderer = renderer(backend);
+
+        RendererHandle handle = renderer.spawn(named("Shadow  Lv.7"));
+        assertEquals("Shadow  Lv.7", backend.nameplate);
+
+        renderer.updateAppearance(handle, new RendererAppearance(
+                "HEAD", "", "TEXTURE_URL", "https://example.invalid/a.png", "Ember  Lv.8"));
+        assertEquals("Ember  Lv.8", backend.nameplate);
+    }
+
+    @Test
+    void aPetWithNoNameHasNoNameplate() {
+        FakeBackend backend = new FakeBackend();
+
+        renderer(backend).spawn(request());
+
+        assertEquals(null, backend.nameplate, "an unnamed pet must not carry an empty plate");
+    }
+
+    @Test
+    void anOperatorCanTurnNameplatesOffEntirely() {
+        // A server with many pets out at once is a wall of floating text, so this has to be switchable
+        // without giving up the names in menus.
+        FakeBackend backend = new FakeBackend();
+        PaperHeadRenderer renderer = new PaperHeadRenderer(backend,
+                new PaperHeadRendererSettings(8.0, 0.35, 1.2, 3, 12.0, false));
+
+        renderer.spawn(named("Shadow  Lv.7"));
+
+        assertEquals(null, backend.nameplate);
+    }
+
+    private static RendererSpawnRequest named(String displayName) {
+        return new RendererSpawnRequest(
+                UUID.fromString("541642d7-62ee-4620-b35f-1fdb14cddae1"),
+                UUID.fromString("e08e475f-d2ee-4249-aef6-9955f30de59f"),
+                7,
+                "wolf",
+                new RendererAppearance(
+                        "HEAD", "", "TEXTURE_URL", "https://example.invalid/a.png", displayName),
+                new RuntimeTransform(new RuntimeVector(0, 1, 0), 0, 0, 1));
+    }
+
     private static final class FakeBackend implements PaperHeadRendererBackend {
         private boolean mainThread = true;
         private WorldRef world = new WorldRef(UUID.randomUUID(), "world");
@@ -168,6 +217,8 @@ class PaperHeadRendererTest {
         private int hardTeleports;
         private int appearanceUpdates;
         private int scaleUpdates;
+        /** The text currently on the pet's nameplate, or null when it has none. */
+        private String nameplate;
         private double distanceSquared;
         private boolean failInteraction;
         private boolean entitiesValid = true;
@@ -195,6 +246,11 @@ class PaperHeadRendererTest {
         @Override public void smoothMove(EntityRef carrier, RuntimeTransform transform, PaperHeadRendererSettings settings) { smoothMoves++; }
         @Override public void hardTeleport(EntityRef carrier, EntityRef visual, EntityRef interaction, WorldRef world, RuntimeTransform transform) { hardTeleports++; }
         @Override public void updateAppearance(EntityRef visual, RendererAppearance appearance) { appearanceUpdates++; }
+        @Override public void updateName(EntityRef carrier, RendererAppearance appearance, PaperHeadRendererSettings settings) {
+            // Recorded rather than counted: whether the plate shows the right text is the question, and a
+            // call count cannot answer it.
+            nameplate = settings.nameplates() && appearance.named() ? appearance.displayName() : null;
+        }
         @Override public void updateScale(EntityRef visual, EntityRef interaction, RuntimeTransform transform, PaperHeadRendererSettings settings) { scaleUpdates++; }
         @Override public void remove(EntityRef entity) { removed.add(names.get(entity)); }
     }
