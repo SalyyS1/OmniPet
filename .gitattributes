@@ -1,2 +1,7 @@
 gradlew text eol=lf
 gradlew.bat text eol=crlf
+
+# Checked out with LF on every platform. These are read as resources and parsed, not just edited, so a
+# CRLF working copy changes what the code sees.
+*.yml text eol=lf
+*.yaml text eol=lf

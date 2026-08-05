@@ -1,6 +1,6 @@
 # Examples
 
-These examples match contracts accepted by the current Gradle-built JAR. Pet, storage, and canonical egg examples are Paper-wired; egg catalog edits require restart. The legacy root `src/main/resources/example/` tree is not packaged by `omnipet-paper` and is not a copy-safe runtime starter.
+These examples match contracts accepted by the current Gradle-built JAR. Pet, storage, and canonical egg examples are Paper-wired; egg catalog edits require restart. The examples below are the authoritative ones: the pre-rewrite `src/main/resources/example/` tree was never packaged by `omnipet-paper` and has been removed rather than left to read as a copy-safe starter.
 
 ## Minimal schema 2 definition
 

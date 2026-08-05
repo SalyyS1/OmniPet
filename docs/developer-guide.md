@@ -1,6 +1,6 @@
 # Developer guide
 
-OmniPet is a Java 21, Gradle Kotlin DSL, multi-project rewrite. The authoritative implementation lives in `omnipet-core` and `omnipet-paper`; the older root `src/` tree remains migration and behavior reference, not the shipped gameplay authority.
+OmniPet is a Java 21, Gradle Kotlin DSL, multi-project rewrite. The implementation lives entirely in `omnipet-core` and `omnipet-paper` — the two projects `settings.gradle.kts` includes. The pre-rewrite `src/` tree at the repository root was removed once nothing referenced it; it was never on the build path, so it could not have been the gameplay authority. Read it in Git history when you need the pre-rewrite behavior.
 
 ## Build contract
 
