@@ -163,13 +163,18 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             carrier.setVelocity(velocity);
             carrier.setRotation(transform.yaw(), transform.pitch());
         }
-        try {
-            bindings.scale(handle.activeModel(), transform.scale());
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
-            quarantine(failure);
-            throw wrap(failure);
+        // Only when the size actually changed. setScale is a reflective call and the interaction's width
+        // and height are data-watcher fields, so re-applying an unchanged scale cost a metadata packet per
+        // pet per tick to every nearby player for no visible difference.
+        if (handle.scaleChanged(transform)) {
+            try {
+                bindings.scale(handle.activeModel(), transform.scale());
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
+                quarantine(failure);
+                throw wrap(failure);
+            }
+            setInteractionScale(handle.interaction(), transform.scale());
         }
-        setInteractionScale(handle.interaction(), transform.scale());
         driveAnimation(handle, transform);
         handle.transform(transform);
     }

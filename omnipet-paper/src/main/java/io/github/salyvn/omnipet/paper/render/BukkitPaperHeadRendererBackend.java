@@ -109,8 +109,29 @@ final class BukkitPaperHeadRendererBackend implements PaperHeadRendererBackend {
         if (velocity.lengthSquared() > settings.maximumVelocity() * settings.maximumVelocity()) {
             velocity.normalize().multiply(settings.maximumVelocity());
         }
+        // A pet already standing where it should be, facing where it should face, needs neither write.
+        // Standing still is the common case, and both calls reach the network: setVelocity sends a
+        // velocity packet and setRotation moves a tracked entity.
+        boolean settled = velocity.lengthSquared() <= AT_REST_VELOCITY_SQUARED
+                && nativeCarrier.getVelocity().lengthSquared() <= AT_REST_VELOCITY_SQUARED;
+        if (settled && sameFacing(nativeCarrier, transform)) return;
         nativeCarrier.setVelocity(velocity);
         nativeCarrier.setRotation(transform.yaw(), transform.pitch());
+    }
+
+    /**
+     * Below this squared speed a carrier counts as at rest.
+     *
+     * <p>Roughly a thousandth of a block per tick. Small enough that a pet genuinely following still
+     * moves, large enough that the spring's residual jitter around a target does not keep resending.
+     */
+    private static final double AT_REST_VELOCITY_SQUARED = 1.0e-6;
+
+    /** Whether the carrier already faces where the transform wants it, within rounding. */
+    private static boolean sameFacing(Entity carrier, RuntimeTransform transform) {
+        Location current = carrier.getLocation();
+        return Math.abs(current.getYaw() - transform.yaw()) < 0.1f
+                && Math.abs(current.getPitch() - transform.pitch()) < 0.1f;
     }
 
     @Override

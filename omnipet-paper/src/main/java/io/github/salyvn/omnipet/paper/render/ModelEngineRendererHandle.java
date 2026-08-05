@@ -65,6 +65,17 @@ final class ModelEngineRendererHandle implements RendererHandle {
     String assetId() { return assetId; }
     RuntimeTransform transform() { return transform; }
 
+    /**
+     * Whether the model's scale would actually differ from the one already applied.
+     *
+     * <p>Both writes it guards are expensive in different ways: {@code setScale} is a reflective call, and
+     * the interaction's width and height are data-watcher fields, so re-applying an unchanged scale costs
+     * a metadata packet per pet per tick to every nearby player and changes nothing on screen.
+     */
+    boolean scaleChanged(RuntimeTransform next) {
+        return transform == null || transform.scale() != next.scale();
+    }
+
     /** The clip currently driven, so a gait change stops the old one before starting the new. */
     String playingAnimation() { return playingAnimation; }
     void playingAnimation(String next) { playingAnimation = next; }
