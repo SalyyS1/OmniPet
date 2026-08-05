@@ -57,7 +57,7 @@ Tính trên nền `--paper #f3f0e7`:
 
 **Sửa:** đậm signal về ~`#a84a12` (~5.4:1) cho chữ; nâng alpha của `--line` lên ~0.42.
 
-**Cần xác nhận:** đổi `--signal` ảnh hưởng cả `index.html`. Xem câu hỏi mở trong `plan.md`.
+**Đã chốt:** được đổi, và áp cả `index.html` để landing page với wiki cùng một tông.
 
 ---
 
@@ -125,9 +125,12 @@ Wiki có **6 trang**; `docs/` có **11 file markdown**; và landing page (`index
 - `index.html:38,96` nói "schema-v3 player state" trong khi `configuration.md:23` nói "schema 4".
 - `wiki-content.js:86,117` nói `/pet admin browse` còn `:518` nói `/petadmin browse`.
 
-Sáu manual **không có** trang wiki nào: migration, integrations, compatibility, developer-guide, examples, roadmap. Và không có câu nào nói wiki chỉ là một phần.
+**Đã chốt: wiki là nguồn sự thật.** Việc phải làm ở phase này:
 
-**Phase này phải chọn một hướng** — hoặc sinh `wiki-content.js` từ các file `.md` lúc build, hoặc trỏ thẻ landing vào `wiki.html#/…`. Xem câu hỏi mở #2 trong `plan.md`.
+1. **Landing page trỏ vào wiki**, không ra GitHub raw. Người đọc theo thẻ "Manuals" phải đến `wiki.html#/…`.
+2. **Sửa trôi lệch** — chốt schema 4 và một dạng lệnh duy nhất, rồi sửa mọi nơi nói khác.
+3. **Sáu manual chưa có trang wiki** (migration, integrations, compatibility, developer-guide, examples, roadmap): hoặc thêm trang, hoặc wiki phải nói rõ nó chỉ phủ một phần và trỏ tiếp. Im lặng là lựa chọn tệ nhất — người đọc không biết mình đang thiếu gì.
+4. **`docs/*.md` ở lại** cho người đọc trong repo, nhưng khi nội dung khác nhau thì **wiki thắng**, và đó là thứ phải ghi rõ ở đầu mỗi file markdown liên quan.
 
 ---
 

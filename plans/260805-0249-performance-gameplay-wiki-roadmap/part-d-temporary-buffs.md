@@ -2,6 +2,8 @@
 
 `PetStatBuff` hiện là `(petInstanceId, statId, modifierType, value)` — **không có field thời hạn nào**. Đây là hạ tầng mới, và là phần **gate** cho món ăn có thời hạn (Phase 6) và synergy đội hình (Phase 11). Làm đúng một lần ở đây thì hai phase kia thành phần thêm vào.
 
+**Server thiên cả combat lẫn cosmetic**, nên mọi thứ ở đây phải **tắt được và điều chỉnh được độ lớn**: một server cosmetic hạ mọi hệ số về 0 và vẫn dùng được thức ăn, bond, đội hình mà không mất tính năng nào. Buff không được là điều kiện bắt buộc để phần khác hoạt động.
+
 ---
 
 ## Phase 8 — Cơ chế buff hết hạn

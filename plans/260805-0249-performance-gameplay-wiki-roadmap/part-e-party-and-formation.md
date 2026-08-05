@@ -55,6 +55,12 @@ Nếu làm buff dự bị thì **phải có điều kiện** (chỉ trong một 
 
 Càng nhiều pet đồng thời thì mỗi pet phải yếu đi để cân bằng, và kết quả là **không ai cảm thấy mạnh**. Chặn bằng cách giới hạn **độ lớn synergy**, không giới hạn số slot.
 
+### Cosmetic cũng phải dùng được
+
+Server thiên cả hai hướng, nên synergy phải **tắt được** và độ lớn phải cấu hình về 0 mà party UI vẫn hoạt động. Một server cosmetic vẫn cần màn hình đội hình để sắp xếp và đổi pet — đó là giá trị độc lập với việc buff có tồn tại hay không.
+
+Cân nhắc thêm hướng cosmetic cho synergy: thay vì chỉ số, một đội đủ vai trò mở khoá ngoại hình hoặc một hiệu ứng thị giác dùng chung. Khung EULA-an-toàn từ nghiên cứu là giá trị của pet nằm ở ngoại hình/độ hiếm/danh tiếng — sức mạnh là tuỳ chọn của operator.
+
 ### Phụ thuộc
 
 **CẦN Phase 8** — synergy là buff, và buff có điều kiện cần cơ chế hết hạn/reconcile của Phase 8. Làm trước sẽ phải viết lại.

@@ -89,11 +89,14 @@ Phase 13-14 không chung file với bất kỳ phase Java nào → chạy song s
 | Đổi `--signal` ảnh hưởng cả `index.html` | Phase 13: xác nhận trước khi đổi màu thương hiệu |
 | **Folia** | **Ngoài phạm vi.** Refactor lớn của coordinator, không phải phần thêm vào |
 
-## Câu hỏi mở
+## Quyết định đã chốt
 
-1. **`--signal` (#e67532) có được đổi không?** Chỉ đạt 2.65:1 nhưng đang tô chữ. Đổi ảnh hưởng cả landing page. Nếu cố định thì `.eyebrow` cần cách thể hiện khác.
-2. **Wiki hay `docs/*.md` là nguồn sự thật?** Không chốt thì Phase 14 không sửa được trôi lệch. Tôi nghiêng về: wiki sinh từ markdown lúc build.
-3. **Có mở rộng sang trang bị cho pet không?** Giá trị cao nhưng rủi ro nhân bản vật phẩm — phải tái dùng codec escrow/identity. Hiện chưa đưa vào 15 phase.
-4. **Trần số pet hoạt động thực tế?** `defaults()` nói 64, config nói 10. Định cỡ Phase 1 và Phase 10.
-5. **Server thiên combat hay cosmetic?** Synergy (Phase 11) và buff (Phase 8) giá trị rất khác giữa hai hướng.
-6. **Boss bar mặc định bật hay tắt?** Tôi đề xuất tắt. Legacy `lang.yml` từng có `hud.hatchingBossbar` nên đây từng là thiết kế gốc.
+1. **`--signal` được đổi.** Đậm về khoảng `#a84a12` (~5.4:1) cho chữ, nâng alpha `--line` lên ~0.42. Áp dụng cả `index.html` để landing page và wiki cùng một tông. → Phase 13.
+2. **Wiki là nguồn sự thật.** `docs/*.md` không còn là bản song song: landing page trỏ vào `wiki.html#/…` thay vì GitHub raw, và sáu manual chưa có trang wiki (migration, integrations, compatibility, developer-guide, examples, roadmap) phải có trang — hoặc wiki phải nói rõ nó chỉ phủ một phần. → Phase 14.
+3. **Server thiên cả combat lẫn cosmetic.** Nên buff (Phase 8) và synergy (Phase 11) làm đủ nhưng **mọi thứ có công tắc tắt**, và độ lớn phải cấu hình được để một server cosmetic hạ về 0 mà không mất tính năng. Khung EULA-an-toàn vẫn giữ: giá trị của pet nằm ở ngoại hình/độ hiếm/danh tiếng, sức mạnh là tuỳ chọn của operator.
+4. **Trần pet hoạt động là 10/chủ.** Đã áp ở Phase 1: config đọc mặc định từ record nên hai nơi không lệch lại được.
+
+## Câu hỏi còn mở
+
+1. **Có mở rộng sang trang bị cho pet không?** Giá trị cao nhưng rủi ro nhân bản vật phẩm — phải tái dùng codec escrow/identity, không dùng inventory thô. Hiện chưa đưa vào 15 phase.
+2. **Boss bar mặc định bật hay tắt?** Tôi đề xuất tắt. Legacy `lang.yml` từng có `hud.hatchingBossbar` nên đây từng là thiết kế gốc.
