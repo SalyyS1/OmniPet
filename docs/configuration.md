@@ -326,11 +326,21 @@ behavior:
     idle: idle
     walk: walk
     run: run
+    rest: sit
+    look_around: look_around
+    shake: shake
+    hop: hop
+    sniff: sniff
+    stretch: stretch
 ```
 
 The defaults above match the names Blockbench rigs conventionally use, so a typical model animates with no configuration. Set a name to an empty string to stop that gait asking for a clip, which is how a model carrying only an idle loop avoids being asked for a walk.
 
 A clip is switched only when the gait changes, since re-issuing the playing clip every tick would restart it. Gait comes from movement: standing still is `idle`, ordinary following is `walk`, and either reaching `render.maximumVelocity` or the controller's own catch-up dash is `run`.
+
+`rest` is the settled pose, played once the owner has stood still long enough that the pet curls up rather than merely waiting. A model with no `rest` clip keeps playing `idle`, so a rig that never had a sit pose loses nothing.
+
+The last five are idle flourishes: short one-shots a pet performs between idle loops, spaced by a jittered gap so that two pets side by side never fidget on the same beat. Each pet's temperament is rolled from its instance ID, so how often it fidgets and what it prefers doing are fixed per pet and survive a restart. Unlike gaits, an unmapped flourish plays nothing at all rather than falling back to `idle` — substituting the looping clip would restart it and make a settled pet twitch.
 
 Naming a clip the model does not contain costs that gait its animation and nothing else — the pet still renders. The same is true if a server's ModelEngine build does not expose the animation API at all: it is bound separately from the methods the renderer cannot work without, reported once in the log, and `RendererCapabilities.animation()` then reads false.
 

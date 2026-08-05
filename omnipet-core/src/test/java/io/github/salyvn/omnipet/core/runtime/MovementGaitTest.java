@@ -41,6 +41,22 @@ class MovementGaitTest {
     }
 
     @Test
+    void aSettledPetRestsRatherThanMerelyStandingStill() {
+        // Idle and resting look the same in the numbers but say different things: idle is a pet standing
+        // ready, resting is a pet that decided nothing is happening. Only the second earns a sit clip.
+        assertEquals(MovementGait.REST, MovementGait.of(0, false, RUN_SPEED, true));
+        assertEquals(MovementGait.IDLE, MovementGait.of(0, false, RUN_SPEED, false));
+    }
+
+    @Test
+    void realMovementBeatsResting() {
+        // A settled pet whose owner walks off is walking, not resting -- the steering controller has
+        // already started moving it by the time gait is asked.
+        assertEquals(MovementGait.WALK, MovementGait.of(0.6, false, RUN_SPEED, true));
+        assertEquals(MovementGait.RUN, MovementGait.of(0.6, true, RUN_SPEED, true));
+    }
+
+    @Test
     void anUnusableSpeedDoesNotProduceAnUnusableGait() {
         assertEquals(MovementGait.IDLE, MovementGait.of(Double.NaN, false, RUN_SPEED));
         // A renderer with no meaningful run threshold still distinguishes standing from moving.

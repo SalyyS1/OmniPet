@@ -4,7 +4,7 @@ Hai phase rẻ nhất trên mỗi đơn vị "cảm giác có sức sống". Ngh
 
 ---
 
-## Phase 4 — Trứng rung lắc trước khi nở
+## Phase 4 — Trứng rung lắc trước khi nở ✅
 
 Việc bạn nêu trực tiếp. Làm được **ngay sau Phase 3** vì lúc đó vòng trứng mới đủ rẻ để thêm hiệu ứng vào.
 
@@ -34,9 +34,20 @@ Việc bạn nêu trực tiếp. Làm được **ngay sau Phase 3** vì lúc đ�
 
 ---
 
-## Phase 5 — Hành vi nhàn rỗi
+## Phase 5 — Hành vi nhàn rỗi ✅
 
 Rẻ, và theo nghiên cứu là thứ người chơi để ý nhất. Nguyên tắc rút ra: **vòng lặp cố định bị phát hiện ngay**, cách sửa là ngẫu nhiên hoá trong code chứ không phải thêm animation.
+
+### Đã làm
+
+`IdleBehaviour` (core) giữ toàn bộ quyết định — state machine ACTIVE/ATTENTIVE/RESTING, tính cách roll từ UUID, chọn one-shot, giãn cách có jitter, và yaw quay về chủ. `PaperRuntimePetState` chạy đồng hồ; `RuntimeTransform` mang `IdleBehaviour.Pose` (gộp lại chứ không thêm field lẻ vào port công khai); `MovementGait.REST` + clip `rest`/flourish trong `ModelEngineAnimations` biến nó thành animation.
+
+Gate "không ai xem" đến miễn phí: người xem duy nhất của một pet là chủ nó, và `PaperRuntimeOwnerEngine` đã dọn state khi chủ không hiện diện — nên chủ offline vừa là zero update vừa là không tích luỹ thời gian ngồi. Có test canh.
+
+### Hoãn có chủ ý
+
+- **Phản ứng môi trường** (mưa, nước, chủ bị đánh, chủ lên cấp) — event-driven, không chung file với state machine, và không có gì trong Phase 6-15 chặn nó. Tách ra để phase này không phải chạm listener.
+- **Pet nhận biết nhau** — cần vị trí đồng đội, đã ghi là để sau Phase 10.
 
 ### Việc cần làm
 

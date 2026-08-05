@@ -10,6 +10,7 @@ import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.salyvn.omnipet.core.runtime.IdleBehaviour;
 import io.github.salyvn.omnipet.core.runtime.MovementGait;
 
 /**
@@ -93,6 +94,37 @@ class ModelEngineAnimationFailSafeTest {
 
         assertEquals(defaults, ModelEngineAnimations.from(java.util.Map.of()));
         assertEquals(defaults, ModelEngineAnimations.from(null));
+    }
+
+    @Test
+    void aRestingPetKeepsAnimatingEvenWithoutASitClip() {
+        // Resting and idle look the same in the numbers, so the fallback matters: a model with no sit clip
+        // must keep its idle loop rather than lose animation the moment its owner stands still.
+        assertEquals("sit", ModelEngineAnimations.defaults().forGait(MovementGait.REST));
+
+        ModelEngineAnimations noSit = ModelEngineAnimations.from(java.util.Map.of(
+                "behavior", java.util.Map.of("animations", java.util.Map.of("rest", ""))));
+        assertEquals("idle", noSit.forGait(MovementGait.REST));
+    }
+
+    @Test
+    void anUnmappedFlourishLeavesTheLoopingClipAlone() {
+        // Null rather than falling back to idle: substituting the idle clip would restart the loop, so a
+        // settled pet would visibly twitch every time a flourish it has no animation for came due.
+        ModelEngineAnimations defaults = ModelEngineAnimations.defaults();
+        assertEquals("hop", defaults.forFlourish(IdleBehaviour.OneShot.HOP));
+        assertEquals("look_around", defaults.forFlourish(IdleBehaviour.OneShot.LOOK_AROUND));
+        assertEquals(null, defaults.forFlourish(null));
+
+        ModelEngineAnimations renamed = ModelEngineAnimations.from(java.util.Map.of(
+                "behavior", java.util.Map.of("animations", java.util.Map.of("sniff", "smell"))));
+        assertEquals("smell", renamed.forFlourish(IdleBehaviour.OneShot.SNIFF));
+        assertEquals("hop", renamed.forFlourish(IdleBehaviour.OneShot.HOP),
+                "an unset flourish keeps its default");
+
+        ModelEngineAnimations disabled = ModelEngineAnimations.from(java.util.Map.of(
+                "behavior", java.util.Map.of("animations", java.util.Map.of("shake", " "))));
+        assertEquals(null, disabled.forFlourish(IdleBehaviour.OneShot.SHAKE));
     }
 
     private static String source(String name) throws Exception {

@@ -185,12 +185,19 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
      * <p>Only on a change: re-issuing the playing clip every tick would restart it, so a walking pet would
      * never get past the first frame. Best-effort by design — a definition naming a clip the model does not
      * have loses its animation and keeps its model, reported once rather than every tick.
+     *
+     * <p>An idle flourish outranks the gait clip while it runs, and the gait clip resumes on its own when
+     * the flourish ends, because by then this method sees no flourish and asks for the gait again.
      */
     private void driveAnimation(ModelEngineRendererHandle handle, RuntimeTransform transform) {
         if (!animations.available()) return;
-        MovementGait gait = MovementGait.of(
-                transform.horizontalSpeed(), transform.dashing(), settings.maximumVelocity());
-        String clip = clips.forGait(gait);
+        String clip = clips.forFlourish(transform.idle().flourish());
+        if (clip == null) {
+            MovementGait gait = MovementGait.of(
+                    transform.horizontalSpeed(), transform.dashing(), settings.maximumVelocity(),
+                    transform.resting());
+            clip = clips.forGait(gait);
+        }
         if (clip == null || clip.equals(handle.playingAnimation())) return;
         if (animations.play(handle.activeModel(), handle.playingAnimation(), clip)) {
             handle.playingAnimation(clip);

@@ -3,6 +3,7 @@ package io.github.salyvn.omnipet.paper.runtime;
 import java.util.UUID;
 
 import io.github.salyvn.omnipet.core.runtime.MovementController;
+import io.github.salyvn.omnipet.core.runtime.IdleBehaviour;
 import io.github.salyvn.omnipet.core.runtime.MovementFacing;
 import io.github.salyvn.omnipet.core.runtime.MovementInput;
 import io.github.salyvn.omnipet.core.runtime.MovementStep;
@@ -20,6 +21,18 @@ final class PaperRuntimePetState {
     private RuntimeVector velocity;
     private float yaw;
     private boolean dashing;
+    /** This pet's own character, rolled once from its instance ID rather than stored. */
+    private final IdleBehaviour.Temperament temperament;
+    /** Seeds this pet's flourish choices and their spacing; the same ID the temperament came from. */
+    private final UUID petInstanceId;
+    private RuntimeVector lastOwnerPosition;
+    private double ownerStillSeconds;
+    private IdleBehaviour.State idleState = IdleBehaviour.State.ACTIVE;
+    private long flourishSequence;
+    /** Seconds until the next flourish starts, or -1 once one is running. */
+    private double untilFlourishSeconds;
+    private double flourishRemainingSeconds;
+    private IdleBehaviour.OneShot flourish;
     private long lastUpdateNanos;
 
     private PaperRuntimePetState(
@@ -29,7 +42,9 @@ final class PaperRuntimePetState {
             double phaseOffsetRadians,
             RuntimeVector position,
             RuntimeVector velocity,
-            float yaw) {
+            float yaw,
+            IdleBehaviour.Temperament temperament,
+            UUID petInstanceId) {
         this.rendererGeneration = rendererGeneration;
         this.rendererProvider = rendererProvider;
         this.phaseStartedNanos = phaseStartedNanos;
@@ -37,6 +52,10 @@ final class PaperRuntimePetState {
         this.position = position;
         this.velocity = velocity;
         this.yaw = yaw;
+        this.temperament = temperament;
+        this.petInstanceId = petInstanceId;
+        this.untilFlourishSeconds =
+                IdleBehaviour.oneShotDelaySeconds(petInstanceId, 0, temperament);
         this.lastUpdateNanos = phaseStartedNanos;
     }
 
@@ -59,7 +78,9 @@ final class PaperRuntimePetState {
                 initial.position(),
                 initial.velocity(),
                 // Spawns facing the same way as its owner; motion takes over from the first tick.
-                MovementFacing.normalize(owner.yaw()));
+                MovementFacing.normalize(owner.yaw()),
+                IdleBehaviour.temperament(pet.instance().id()),
+                pet.instance().id());
     }
 
     void advance(DesiredPet pet, PaperRuntimeOwnerPose owner, long nowNanos, MovementController movement) {
@@ -75,7 +96,67 @@ final class PaperRuntimePetState {
         yaw = step.safetySnap()
                 ? MovementFacing.normalize(owner.yaw())
                 : MovementFacing.yaw(yaw, velocity, deltaSeconds);
+        advanceIdle(owner, deltaSeconds);
+        // An idle pet has no motion to derive facing from, so it would keep whatever heading it stopped
+        // on and stare off past its owner. Only once settling has begun, and never during a snap.
+        if (!step.safetySnap() && idleState != IdleBehaviour.State.ACTIVE) {
+            yaw = IdleBehaviour.faceOwner(yaw, owner.position().subtract(position), deltaSeconds);
+        }
         lastUpdateNanos = nowNanos;
+    }
+
+    /**
+     * Tracks how long the owner has stood still, and what the pet is doing about it.
+     *
+     * <p>Owner speed is derived here rather than read from the pose, because the pose is a snapshot with
+     * no history. Two consecutive positions are all this needs.
+     */
+    private void advanceIdle(PaperRuntimeOwnerPose owner, double deltaSeconds) {
+        RuntimeVector previous = lastOwnerPosition;
+        lastOwnerPosition = owner.position();
+        if (previous == null || !(deltaSeconds > 0)) return;
+        double ownerSpeed = owner.position().subtract(previous).length() / deltaSeconds;
+        ownerStillSeconds = ownerSpeed < IdleBehaviour.OWNER_STILL_SPEED
+                ? ownerStillSeconds + deltaSeconds
+                : 0;
+        idleState = IdleBehaviour.state(ownerSpeed, ownerStillSeconds, temperament.settleSeconds());
+        advanceFlourish(deltaSeconds);
+    }
+
+    /**
+     * Runs the flourish timer: counts down to the next one, then runs it for its short duration.
+     *
+     * <p>Cancelled outright the moment the pet is steered again, because a flourish that survived the
+     * owner walking off would play while the pet ran after them.
+     */
+    private void advanceFlourish(double deltaSeconds) {
+        if (idleState == IdleBehaviour.State.ACTIVE) {
+            flourish = null;
+            flourishRemainingSeconds = 0;
+            // The countdown restarts rather than resuming, so a pet that stops briefly and often does not
+            // bank progress and fire the instant it settles.
+            untilFlourishSeconds =
+                    IdleBehaviour.oneShotDelaySeconds(petInstanceId, flourishSequence, temperament);
+            return;
+        }
+        if (flourish != null) {
+            flourishRemainingSeconds -= deltaSeconds;
+            if (flourishRemainingSeconds > 0) return;
+            flourish = null;
+            flourishSequence++;
+            untilFlourishSeconds =
+                    IdleBehaviour.oneShotDelaySeconds(petInstanceId, flourishSequence, temperament);
+            return;
+        }
+        untilFlourishSeconds -= deltaSeconds;
+        if (untilFlourishSeconds > 0) return;
+        flourish = IdleBehaviour.oneShot(petInstanceId, flourishSequence, temperament);
+        flourishRemainingSeconds = IdleBehaviour.ONE_SHOT_SECONDS;
+    }
+
+    /** What this pet is doing while nobody is steering it. */
+    IdleBehaviour.Pose idlePose() {
+        return new IdleBehaviour.Pose(idleState, flourish);
     }
 
     RendererSpawnRequest request(UUID ownerId, DesiredPet pet, PaperRuntimeOwnerPose owner) {
@@ -87,7 +168,7 @@ final class PaperRuntimePetState {
                 pet.appearance(),
                 // Pitch stays level: a pet that pitched with its owner's look would tip over when the
                 // player glanced at the sky, and nothing about following needs it.
-                new RuntimeTransform(position, yaw, 0, pet.scale(), velocity, dashing));
+                new RuntimeTransform(position, yaw, 0, pet.scale(), velocity, dashing, idlePose()));
     }
 
     boolean rendererProviderMatches(DesiredPet pet) {

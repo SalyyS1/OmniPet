@@ -18,6 +18,8 @@ class RuntimeTestRenderer implements PetRendererPort {
     final Map<UUID, Integer> spawnCounts = new LinkedHashMap<>();
     final Map<UUID, RendererSpawnRequest> spawnRequests = new LinkedHashMap<>();
     final Map<UUID, Integer> updateCounts = new LinkedHashMap<>();
+    /** The last pose each pet was updated with, which is how idle behaviour is observed end to end. */
+    final Map<UUID, RuntimeTransform> updateTransforms = new LinkedHashMap<>();
     final Map<UUID, Integer> removeCounts = new LinkedHashMap<>();
     UUID failSpawnPet;
     RendererHealth health = new RendererHealth(RendererHealth.Status.AVAILABLE, "test");
@@ -37,6 +39,7 @@ class RuntimeTestRenderer implements PetRendererPort {
     @Override
     public void update(RendererHandle handle, RuntimeTransform transform) {
         updateCounts.merge(handle.petInstanceId(), 1, Integer::sum);
+        updateTransforms.put(handle.petInstanceId(), transform);
     }
 
     @Override public void updateAppearance(RendererHandle handle, RendererAppearance appearance) {}

@@ -6,9 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -16,9 +18,12 @@ import org.junit.jupiter.api.Test;
 
 import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.domain.DisplayDefinition;
+import io.github.salyvn.omnipet.core.runtime.IdleBehaviour;
 import io.github.salyvn.omnipet.core.runtime.InteractionIndex;
 import io.github.salyvn.omnipet.core.runtime.MovementController;
+import io.github.salyvn.omnipet.core.runtime.MovementFacing;
 import io.github.salyvn.omnipet.core.runtime.PetActivationService;
+import io.github.salyvn.omnipet.core.runtime.RuntimeTransform;
 import io.github.salyvn.omnipet.core.runtime.RuntimeVector;
 import io.github.salyvn.omnipet.core.storage.PetStorageLimits;
 
@@ -261,6 +266,113 @@ class PaperPetRuntimeCoordinatorTest {
         assertThrows(IllegalStateException.class, fixture.coordinator::tickNow);
     }
 
+    @Test
+    void aPetSettlesWhileItsOwnerStandsStillAndWakesWhenTheyMove() {
+        // The whole feature seen from outside: nothing about idle is visible unless it reaches the
+        // renderer, and the state only advances because real elapsed time flows through the tick loop.
+        Fixture fixture = new Fixture(new PaperRuntimeSettings(
+                0, 1, 4, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, 0));
+        UUID owner = UUID.randomUUID();
+        PetInstance pet = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition("wolf")));
+        fixture.coordinator.start();
+        fixture.scheduler.runTick();
+
+        // A minute of standing still is past every temperament's settle threshold.
+        fixture.advanceSeconds(60);
+        assertTrue(fixture.transform(pet).resting(),
+                "an owner who has stood still for a minute must have a settled pet");
+
+        // And one stride is enough to put it back to work.
+        fixture.walkSeconds(1);
+        assertEquals(IdleBehaviour.State.ACTIVE, fixture.transform(pet).idle().state());
+    }
+
+    @Test
+    void anIdlePetTurnsToItsOwnerRatherThanKeepingTheHeadingItStoppedOn() {
+        Fixture fixture = new Fixture(new PaperRuntimeSettings(
+                0, 1, 4, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, 0));
+        UUID owner = UUID.randomUUID();
+        PetInstance pet = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition("wolf")));
+        fixture.coordinator.start();
+        fixture.scheduler.runTick();
+        fixture.advanceSeconds(60);
+
+        RuntimeTransform settled = fixture.transform(pet);
+        RuntimeVector toOwner = fixture.ownerPosition.subtract(settled.position());
+        // Only meaningful if the pet is actually standing off to one side, which orbiting guarantees.
+        assertTrue(Math.sqrt(toOwner.x() * toOwner.x() + toOwner.z() * toOwner.z()) > 0.2,
+                "the pet has to be beside its owner for facing to mean anything");
+        float wanted = (float) Math.toDegrees(Math.atan2(-toOwner.x(), toOwner.z()));
+        float error = Math.abs(MovementFacing.normalize(wanted - settled.yaw()));
+
+        assertTrue(error < 5, "a settled pet must be looking at its owner, off by " + error + " degrees");
+    }
+
+    @Test
+    void aPetPerformsIdleFlourishesButNoneWhileItIsBeingSteered() {
+        Fixture fixture = new Fixture(new PaperRuntimeSettings(
+                0, 1, 4, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, 0));
+        UUID owner = UUID.randomUUID();
+        PetInstance pet = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition("wolf")));
+        fixture.coordinator.start();
+        fixture.scheduler.runTick();
+
+        // Long enough to cover the longest jittered gap several times over.
+        Set<IdleBehaviour.OneShot> seen = new LinkedHashSet<>();
+        for (int step = 0; step < 240; step++) {
+            fixture.advanceSeconds(1);
+            IdleBehaviour.OneShot flourish = fixture.transform(pet).idle().flourish();
+            if (flourish != null) seen.add(flourish);
+        }
+        assertTrue(seen.size() >= 2, "an idle pet has to do more than one thing, saw " + seen);
+
+        // Walking cancels it outright: a flourish that outlived the owner leaving would play mid-chase.
+        boolean flourishedWhileWalking = false;
+        for (int step = 0; step < 60; step++) {
+            fixture.walkSeconds(1);
+            if (fixture.transform(pet).idle().flourish() != null) flourishedWhileWalking = true;
+        }
+        assertFalse(flourishedWhileWalking, "a pet being steered must not be performing idle flourishes");
+    }
+
+    @Test
+    void noIdleStateAdvancesWhileNobodyIsThereToSeeIt() {
+        // A pet's only viewer is its owner, so an absent owner is exactly the no-viewer case. The pet is
+        // torn down rather than left ticking, and it comes back unsettled rather than resuming a count
+        // that ran while the world was empty.
+        Fixture fixture = new Fixture(new PaperRuntimeSettings(
+                0, 1, 4, PetStorageLimits.MAX_ACTIVE_SLOT_COUNT, 0));
+        UUID owner = UUID.randomUUID();
+        PetInstance pet = RuntimeTestFixtures.pet(UUID.randomUUID(), "wolf");
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition("wolf")));
+        fixture.coordinator.start();
+        fixture.scheduler.runTick();
+
+        fixture.ownerPresent = false;
+        int updatesBefore = fixture.renderer.updateCounts.getOrDefault(pet.id(), 0);
+        fixture.advanceSeconds(120);
+        assertEquals(0, fixture.coordinator.activePetCount());
+        assertEquals(updatesBefore, fixture.renderer.updateCounts.getOrDefault(pet.id(), 0),
+                "an absent owner must cost zero renderer updates, not a tick of settling");
+
+        fixture.ownerPresent = true;
+        fixture.scheduler.runTick();
+        fixture.advanceSeconds(1);
+        assertEquals(IdleBehaviour.State.ATTENTIVE, fixture.transform(pet).idle().state(),
+                "time that passed with nobody watching must not count towards settling");
+    }
+
     private static final class Fixture {
         private final FakeScheduler scheduler = new FakeScheduler();
         private final RuntimeTestRenderer renderer = new RuntimeTestRenderer();
@@ -272,6 +384,10 @@ class PaperPetRuntimeCoordinatorTest {
          * wants: a frozen clock cannot trip a deadline by accident.
          */
         private long nanosPerRead;
+        /** Where every owner stands. Moved by a test to drive the pet's idle state. */
+        private RuntimeVector ownerPosition = new RuntimeVector(0, 64, 0);
+        /** Whether owners are reachable at all, which is the only sense in which a pet has a viewer. */
+        private boolean ownerPresent = true;
         private final List<PaperRuntimeFailure> failures = new ArrayList<>();
         private final PaperPetRuntimeCoordinator coordinator;
 
@@ -282,14 +398,53 @@ class PaperPetRuntimeCoordinatorTest {
                     new PetActivationService(new InteractionIndex()),
                     new MovementController(),
                     new HeadFallbackRendererResolver(request -> renderer, renderer),
-                    ownerId -> Optional.of(new PaperRuntimeOwnerPose(
-                            new RuntimeVector(0, 64, 0), new RuntimeVector(0, 0, 1), 0, 0, true)),
+                    ownerId -> ownerPresent
+                            ? Optional.of(new PaperRuntimeOwnerPose(
+                                    ownerPosition, new RuntimeVector(0, 0, 1), 0, 0, true))
+                            : Optional.empty(),
                     this::readClock,
                     failures::add);
         }
 
         private long readClock() {
             return clock.getAndAdd(nanosPerRead);
+        }
+
+        /**
+         * Runs ticks until {@code seconds} of pet-visible time has passed.
+         *
+         * <p>Twenty ticks a second, matching the real loop, because idle accumulates per update rather
+         * than from wall time: one tick that jumped a minute would settle a pet a real server would not.
+         */
+        private void advanceSeconds(double seconds) {
+            int ticks = (int) Math.round(seconds * 20);
+            for (int tick = 0; tick < ticks; tick++) {
+                clock.addAndGet(50_000_000L);
+                scheduler.runTick();
+            }
+        }
+
+        /** The last pose the renderer was handed for one pet. */
+        private RuntimeTransform transform(PetInstance pet) {
+            RuntimeTransform transform = renderer.updateTransforms.get(pet.id());
+            if (transform == null) throw new AssertionError("the renderer was never updated for this pet");
+            return transform;
+        }
+
+        /**
+         * Runs ticks with the owner walking in a straight line the whole time.
+         *
+         * <p>Distinct from moving them once and then advancing: a single jump is one moving tick followed
+         * by a stationary owner, which is a pet whose owner stopped, not a pet being walked.
+         */
+        private void walkSeconds(double seconds) {
+            int ticks = (int) Math.round(seconds * 20);
+            for (int tick = 0; tick < ticks; tick++) {
+                // 4 m/s, comfortably above the still threshold and roughly a sprinting player.
+                ownerPosition = ownerPosition.add(new RuntimeVector(0.2, 0, 0));
+                clock.addAndGet(50_000_000L);
+                scheduler.runTick();
+            }
         }
     }
 

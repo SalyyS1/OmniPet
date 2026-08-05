@@ -1,6 +1,6 @@
 # OmniPet — Hiệu năng, Gameplay, và Wiki
 
-**Trạng thái:** Phần A xong (Phase 1-3) · còn 12 phase · 841 test / 0 fail
+**Trạng thái:** Phần A xong (Phase 1-3) · Phần B xong (Phase 4-5) · còn 10 phase · 874 test / 0 fail
 
 ## Bối cảnh
 
@@ -34,7 +34,7 @@ Wiki: theme tốt, UX không. Nặng nhất — bấm mục lục **ghi đè URL
 | # | Phase | Tài liệu |
 |---|---|---|
 | 1-3 ✅ | Nền hiệu năng: cấp phát tick, packet ModelEngine, I/O trứng đặt | [part-a-performance-foundation.md](part-a-performance-foundation.md) |
-| 4-5 | Pet sống động: trứng rung lắc, hành vi nhàn rỗi | [part-b-living-pets.md](part-b-living-pets.md) |
+| 4-5 ✅ | Pet sống động: trứng rung lắc, hành vi nhàn rỗi | [part-b-living-pets.md](part-b-living-pets.md) |
 | 6-7 | Thức ăn và độ thân thiết | [part-c-food-and-bond.md](part-c-food-and-bond.md) |
 | 8-9 | Buff tạm thời: cơ chế hết hạn, hiển thị | [part-d-temporary-buffs.md](part-d-temporary-buffs.md) |
 | 10-11 | Nhiều pet: đội hình, GUI party + synergy | [part-e-party-and-formation.md](part-e-party-and-formation.md) |
@@ -73,7 +73,7 @@ Phase 13-14 không chung file với bất kỳ phase Java nào → chạy song s
 
 ## Nghiệm thu chung
 
-1. `gradlew build` — hiện 828 test / 0 fail; **không được** xấu đi.
+1. `gradlew build` — hiện 874 test / 0 fail; **không được** xấu đi.
 2. Mỗi phase: test hẹp trước, rồi mở rộng.
 3. Mỗi phase hiệu năng phải có test đếm được, không chỉ test xanh.
 4. Phase 15 là cổng cho mọi tuyên bố về hiệu năng. `docs/roadmap.md` nói rõ **chưa từng có smoke test trên server thật** — không đánh dấu shipped trước khi có số đo.
@@ -100,3 +100,4 @@ Phase 13-14 không chung file với bất kỳ phase Java nào → chạy song s
 
 1. **Có mở rộng sang trang bị cho pet không?** Giá trị cao nhưng rủi ro nhân bản vật phẩm — phải tái dùng codec escrow/identity, không dùng inventory thô. Hiện chưa đưa vào 15 phase.
 2. **Boss bar mặc định bật hay tắt?** Tôi đề xuất tắt. Legacy `lang.yml` từng có `hud.hatchingBossbar` nên đây từng là thiết kế gốc.
+3. **Phản ứng môi trường của pet đặt ở đâu?** Phase 5 hoãn có chủ ý (mưa, xuống nước, chủ bị đánh/lên cấp) vì nó là event-driven và không chung file với state machine. Không phase nào đang chặn nó — chỉ cần chốt nó là phase riêng hay ghép vào Phase 12.
