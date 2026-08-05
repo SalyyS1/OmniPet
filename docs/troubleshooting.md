@@ -1,5 +1,7 @@
 # Troubleshooting
 
+> The [wiki](https://salyys1.github.io/OmniPet/wiki.html#/troubleshooting) is the reference for this topic. Where this file disagrees with it, the wiki is correct.
+
 Start with the exact runtime facts: OmniPet version/commit, Paper build, Java version, optional plugin versions, and whether the problem reproduces without custom pet files.
 
 ## Plugin does not start

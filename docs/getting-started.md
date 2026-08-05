@@ -1,5 +1,7 @@
 # Getting started
 
+> The [wiki](https://salyys1.github.io/OmniPet/wiki.html#/install) is the reference for this topic. Where this file disagrees with it, the wiki is correct.
+
 This guide covers the verified Gradle foundation, Admin Pet Studio, player vault, provider-backed active-slot purchases, and the escrow-gated Paper hatch GUI/claim flow. Live Paper/provider certification, live renderers, pet skills/buffs, and progression remain later phases.
 
 ## Requirements

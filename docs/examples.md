@@ -1,5 +1,7 @@
 # Examples
 
+> The [wiki](https://salyys1.github.io/OmniPet/wiki.html#/config) is the reference for this topic. Where this file disagrees with it, the wiki is correct.
+
 These examples match contracts accepted by the current Gradle-built JAR. Pet, storage, and canonical egg examples are Paper-wired; egg catalog edits require restart. The examples below are the authoritative ones: the pre-rewrite `src/main/resources/example/` tree was never packaged by `omnipet-paper` and has been removed rather than left to read as a copy-safe starter.
 
 ## Minimal schema 2 definition

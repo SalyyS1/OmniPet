@@ -21,7 +21,9 @@ const INK = '#102a2b';
 const INK_SOFT = '#2d4a49';
 const PAPER = '#f3f0e7';
 const PAPER_DEEP = '#e7e0d0';
-const SIGNAL = '#e67532';
+// Mirrors the tokens in docs/styles.css so the diagrams and the pages around them stay one palette.
+// SIGNAL was darkened from #e67532, which measured 2.65:1 on paper and is used here for label text.
+const SIGNAL = '#9c4310';
 const MINT = '#85c8b2';
 
 const FONT = 'IBM Plex Mono, ui-monospace, monospace';
@@ -31,7 +33,7 @@ function frame(width, height, title, body) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${escapeAttr(title)}">
   <rect width="${width}" height="${height}" fill="${PAPER}"/>
   <text x="24" y="34" font-family="${FONT}" font-size="13" font-weight="600" fill="${SIGNAL}" letter-spacing="1.6">${escapeText(title.toUpperCase())}</text>
-  <line x1="24" y1="46" x2="${width - 24}" y2="46" stroke="${INK}" stroke-opacity="0.22"/>
+  <line x1="24" y1="46" x2="${width - 24}" y2="46" stroke="${INK}" stroke-opacity="0.32"/>
 ${body}
 </svg>
 `;

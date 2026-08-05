@@ -1,5 +1,7 @@
 # Commands and permissions
 
+> The [wiki](https://salyys1.github.io/OmniPet/wiki.html#/commands) is the reference for this topic. Where this file disagrees with it, the wiki is correct.
+
 The Gradle-built Paper runtime registers the player hub, the player vault, Admin Pet Studio, the durable hatch view, live pet rendering, right-click pet interaction, per-pet management and cultivation, active skills, and release reward administration. Riding is not implemented.
 
 ## Command entry point

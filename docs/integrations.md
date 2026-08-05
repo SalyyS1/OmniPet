@@ -1,8 +1,10 @@
 # Integrations
 
+> The [wiki](https://salyys1.github.io/OmniPet/wiki.html#/integrations) is the reference for this topic. Where this file disagrees with it, the wiki is correct.
+
 OmniPet's shipped definition/storage features do not require another plugin. Optional integrations are capability-gated; exact artifact availability is not a live compatibility guarantee.
 
-The deterministic incubation, egg catalog, item escrow, and structured core hatch-event seam are vendor-neutral. Paper now orchestrates the 27-slot hatch GUI, exact-hand paid start, commit-gated online ticks, bounded recovery, and capacity-safe claim. Live entities, vendor execution, native item distribution, and reducer/instant-hatch item redemption remain deferred.
+The deterministic incubation, egg catalog, item escrow, and structured core hatch-event seam are vendor-neutral. Paper orchestrates the 27-slot hatch GUI, exact-hand paid start, commit-gated online ticks, bounded recovery, capacity-safe claim, and the pet runtime that renders active pets. Vendor skill execution, native item distribution, and reducer/instant-hatch item redemption remain deferred.
 
 `HatchEvent`/`HatchEventListener` is an in-repo, low-level persisted-state notification seam: events carry `DeliveryStage.STATE_PERSISTED`, run only after changed player state is saved, emit nothing for unchanged mutations, and isolate observer failures. It is not a separately versioned addon API, and a `STARTED` event does not prove egg escrow/payment commit.
 
@@ -14,12 +16,20 @@ The deterministic incubation, egg catalog, item escrow, and structured core hatc
 | Owner stat application | MythicLib | Deferred | No runtime buff is applied. |
 | Item stats/expressions | MMOItems | Deferred | No hard MMOItems integration, item distribution, reducer, or instant-hatch redemption is active. |
 | Direct skill execution | MythicMobs | Deferred | No direct adapter is loaded. |
-| Live rendering | ModelEngine | Deferred | Definition metadata remains stored; no pet entity is rendered. |
+| Live rendering | ModelEngine | Reflection-safe renderer implemented, with gait and idle animation | Pets render through the built-in player-head renderer instead. Nothing is lost but the model. |
 | Decimal economy | Vault + economy service | Reflection-safe balance/withdraw/refund adapter implemented | Vault choice is unavailable; other storage features remain usable. |
 | Points economy | PlayerPoints | Reflection-safe UUID/int adapter implemented | PlayerPoints choice is unavailable. |
 | External slot nodes | LuckPerms | Reflection-safe idempotent grant/revoke and precedence implemented | OmniPet-authoritative mode remains usable. |
 
 The Paper descriptor declares MythicLib, MMOItems, Vault, PlayerPoints, and LuckPerms as optional server dependencies with isolated classpaths. Economy and LuckPerms use dedicated dynamic registries; no vendor classes appear in core contracts.
+
+## ModelEngine rendering
+
+A pet whose definition sets `display.provider: MODELENGINE` renders through the vendor's API; anything else, and any pet whose model fails to resolve, renders as a player head. The fallback is per pet rather than per server, so one bad `display.model` costs that pet its model and nothing else.
+
+Animation is bound **separately** from the methods the renderer cannot work without. That split is deliberate: losing `createModeledEntity` means there is nothing to show, but losing the animation API should cost clips, not models. A ModelEngine build that renamed an animation method therefore leaves every pet rendered and still, reported once in the log, with `RendererCapabilities.animation()` reading false.
+
+Clip names come from `behavior.animations` on the pet definition and default to the names Blockbench rigs conventionally use — `idle`, `walk`, `run`, `sit`, plus one per idle flourish. Naming a clip the model does not contain costs that gait its animation alone. See [configuration](configuration.md) for the full key list.
 
 ## Reference vendor builds
 

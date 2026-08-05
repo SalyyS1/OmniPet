@@ -31,26 +31,39 @@
         <input id="wiki-search" type="search" autocomplete="off" placeholder="Search…">
       </label>
 
-      <div class="language-switch" role="group" aria-label="Language">
-        <button type="button" data-language="en" aria-pressed="true">EN</button>
-        <button type="button" data-language="vi" aria-pressed="false">VI</button>
+      <!--
+        aria-pressed is left unset here and written by the script. Hardcoding EN=true meant a reader with
+        a stored Vietnamese preference had the DOM assert English for the first moment after load.
+      -->
+      <div class="language-switch" role="group" data-language-group aria-label="Language">
+        <button type="button" data-language="en">EN</button>
+        <button type="button" data-language="vi">VI</button>
       </div>
 
       <a class="wiki-source" href="https://github.com/SalyyS1/OmniPet">Source</a>
     </div>
   </header>
 
+  <!-- Page changes and result counts are announced here; without it both were silent. -->
+  <p id="wiki-announcer" class="sr-only" role="status" aria-live="polite"></p>
+
   <!--
-    The illustration is decoration and the SVG is the fallback: if the generated art is ever missing, the
-    committed vector masthead still renders, so the page is never broken by an absent binary.
+    The illustration is decoration, so its alt is empty: a described masthead meant a screen reader read
+    "a glowing dragon egg on a stone pedestal" before reaching any of the page's actual content. The SVG
+    is the fallback, so an absent generated image still leaves a rendered page.
   -->
-  <picture class="wiki-banner-frame">
+  <picture class="wiki-banner-frame" aria-hidden="true">
     <source srcset="img/wiki-hero.webp" type="image/webp">
-    <img class="wiki-banner" src="img/wiki-banner.svg" alt="A glowing dragon egg on a stone pedestal between two lit torches" width="1600" height="686" loading="eager" decoding="async">
+    <img class="wiki-banner" src="img/wiki-banner.svg" alt="" width="1600" height="686" loading="eager" decoding="async">
   </picture>
 
   <div class="wiki-shell">
     <nav id="wiki-nav" class="wiki-nav" aria-label="Wiki pages"></nav>
+    <!--
+      Results sit in the reading column rather than the aside, because the aside folds away on narrow
+      screens and a search whose results are unreachable on a phone is not a search.
+    -->
+    <div id="wiki-results" class="wiki-results" hidden></div>
     <main id="wiki-article" class="wiki-article" tabindex="-1"></main>
     <aside class="wiki-aside">
       <div id="wiki-toc" class="wiki-toc"></div>

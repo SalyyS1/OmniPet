@@ -1,14 +1,46 @@
+/*
+ * Design tokens.
+ *
+ * The contrast ratios in the comments are measured against `--paper`, which is the background behind
+ * almost everything here. They are recorded because two of these tokens were previously chosen for how
+ * they looked in isolation and turned out to be unreadable in place.
+ */
 :root {
-  --ink: #102a2b;
-  --ink-soft: #2d4a49;
+  --ink: #102a2b;        /* 13.28:1 */
+  --ink-soft: #2d4a49;   /*  8.43:1 */
   --paper: #f3f0e7;
   --paper-deep: #e7e0d0;
-  --signal: #e67532;
+  /*
+   * The accent, and not decoration: it colours the section eyebrow, every text link, and nav hover, so
+   * it is read as text. The original #e67532 measured 2.65:1 — below the 3:1 floor for large text, let
+   * alone the 4.5:1 for body. Darkened to 5.72:1, which also makes it usable as a button fill behind
+   * paper-coloured text (5.72:1 that way round too).
+   */
+  --signal: #9c4310;
   --mint: #85c8b2;
   --mint-light: #d3eadf;
-  --line: rgba(16, 42, 43, 0.22);
+  /*
+   * Two line weights, because one token was doing two jobs. Hairlines that merely group content may be
+   * faint; the edge of a control a reader has to find may not. At the old 0.22 alpha the search field
+   * and the nav borders measured 1.55:1 and were effectively invisible.
+   */
+  --line: rgba(16, 42, 43, 0.32);       /* 1.9:1 — decorative rules between rows and sections */
+  --line-strong: rgba(16, 42, 43, 0.6); /* 3.99:1 — borders of inputs, buttons, and other controls */
   --shadow: 0 20px 60px rgba(16, 42, 43, 0.14);
   --radius: 6px;
+  /*
+   * Long-form prose gets a proportional face; everything else on the site keeps its monospace look,
+   * which is deliberate there. Running text in IBM Plex Mono reads roughly 15% slower and, at this size,
+   * fitted about 80 characters per line against a 45-75 target.
+   *
+   * Georgia is deliberately NOT in this stack despite being the obvious choice. It has no precomposed
+   * Vietnamese glyphs, so the browser synthesises them by stacking a combining accent on a base letter —
+   * "ấp trứng" renders as "â ́p tr ứng", visibly broken, on half the pages this site serves. Every face
+   * listed here was measured to carry `ấ` and `ư` as single glyphs. No webfont, so this costs no request
+   * and still works from `file://`.
+   */
+  --font-prose: Cambria, Constantia, "Palatino Linotype", "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +51,7 @@ body {
   color: var(--ink);
   background:
     radial-gradient(circle at 84% 9%, rgba(133, 200, 178, 0.38), transparent 27rem),
-    linear-gradient(115deg, transparent 0 65%, rgba(230, 117, 50, 0.08) 65% 66%, transparent 66%),
+    linear-gradient(115deg, transparent 0 65%, rgba(156, 67, 16, 0.08) 65% 66%, transparent 66%),
     var(--paper);
   font-family: "IBM Plex Mono", monospace;
   font-size: 16px;
@@ -54,7 +86,7 @@ a { color: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   background: rgba(243, 240, 231, 0.9);
   box-shadow: 0 8px 30px rgba(16, 42, 43, 0.08);
   backdrop-filter: blur(14px);
@@ -71,9 +103,14 @@ a { color: inherit; }
 }
 .brand strong { display: block; font-family: "Fraunces", serif; font-size: 1.15rem; line-height: 1; }
 .brand small { display: block; margin-top: 0.2rem; color: var(--ink-soft); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; }
-nav { display: flex; align-items: center; gap: 1.25rem; }
-nav a { font-size: 0.78rem; font-weight: 600; text-decoration: none; text-transform: uppercase; letter-spacing: 0.06em; }
-nav a:hover { color: var(--signal); }
+/*
+ * Scoped to the landing header rather than every `nav` on the site. As a bare element selector this hit
+ * the wiki's page rail too, and once that rail grew section headings the flex row squeezed it to a column
+ * of one-word lines.
+ */
+.site-header nav { display: flex; align-items: center; gap: 1.25rem; }
+.site-header nav a { font-size: 0.78rem; font-weight: 600; text-decoration: none; text-transform: uppercase; letter-spacing: 0.06em; }
+.site-header nav a:hover { color: var(--signal); }
 
 main, footer { width: min(1180px, calc(100% - 2rem)); margin-inline: auto; }
 .hero {
@@ -196,8 +233,8 @@ a:focus-visible, input:focus-visible, .table-wrap:focus-visible { outline: 3px s
 
 @media (max-width: 700px) {
   .site-header { display: block; }
-  nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.9rem; margin-top: 1rem; }
-  nav a { min-height: 44px; }
+  .site-header nav { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.9rem; margin-top: 1rem; }
+  .site-header nav a { min-height: 44px; }
   .hero { padding: 4rem 0; }
   h1 { font-size: clamp(3rem, 13vw, 4.2rem); }
   .split, .callout { grid-template-columns: 1fr; }

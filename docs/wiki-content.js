@@ -23,34 +23,145 @@ window.OMNIPET_WIKI = {
       searchLabel: 'Search the manual',
       searchPlaceholder: 'Search pages, commands, config keys…',
       noResults: 'Nothing matched. Try a command name or a config key.',
+      resultCount: '{n} results',
       onThisPage: 'On this page',
       languageLabel: 'Language',
+      pagerLabel: 'Previous and next page',
+      previousPage: 'Previous',
+      nextPage: 'Next',
+      copy: 'Copy',
+      copied: 'Copied',
+      copyFailed: 'Select and copy',
       sections: {
         start: 'Getting started',
         player: 'For players',
         operator: 'For operators',
         reference: 'Reference',
       },
-      editedNote: 'Documentation lives in the repository; every page cites the command or config key it describes.',
+      editedNote: 'This wiki is the reference. Where a Markdown file in the repository disagrees with a page here, this page is correct.',
     },
     vi: {
       brandTagline: 'Sổ tay',
       searchLabel: 'Tìm trong sổ tay',
       searchPlaceholder: 'Tìm trang, lệnh, khoá cấu hình…',
       noResults: 'Không có kết quả. Thử tên lệnh hoặc khoá cấu hình.',
+      resultCount: '{n} kết quả',
       onThisPage: 'Trong trang này',
       languageLabel: 'Ngôn ngữ',
+      pagerLabel: 'Trang trước và trang sau',
+      previousPage: 'Trang trước',
+      nextPage: 'Trang sau',
+      copy: 'Sao chép',
+      copied: 'Đã chép',
+      copyFailed: 'Hãy chọn và chép',
       sections: {
         start: 'Bắt đầu',
         player: 'Cho người chơi',
         operator: 'Cho người quản trị',
         reference: 'Tra cứu',
       },
-      editedNote: 'Tài liệu nằm trong repository; mỗi trang đều dẫn ra lệnh hoặc khoá cấu hình mà nó mô tả.',
+      editedNote: 'Wiki này là tài liệu chuẩn. Nếu một tệp Markdown trong repository nói khác trang này, thì trang này mới đúng.',
     },
   },
 
   pages: [
+    {
+      id: 'overview',
+      section: 'start',
+      icon: 'map',
+      title: { en: 'Start here', vi: 'Bắt đầu từ đây' },
+      summary: {
+        en: 'What OmniPet is, what actually ships, and which page you want.',
+        vi: 'OmniPet là gì, cái gì đã có thật, và bạn nên đọc trang nào.',
+      },
+      body: {
+        en: `OmniPet is a pet plugin for Paper servers. A player hatches an egg, gets a pet, and that pet
+follows them around, levels up, and can be traded back for rewards. An operator authors those pets in an
+in-game editor rather than by writing YAML.
+
+This wiki is the reference. The repository also carries Markdown copies of most of it, and where the two
+disagree, the page you are reading is the correct one.
+
+## Pick a page
+
+**Setting up a server.** [Install and first run](#/install) covers the JAR, the files that appear, and
+how to tell it loaded. Then [Configuring OmniPet](#/config) for what you can tune, and
+[Compatibility](#/compatibility) for exactly which Paper builds have been tested and what that evidence
+does and does not prove.
+
+**Playing.** [Playing with pets](#/player-guide) is the whole loop: hatching, the vault, levelling, and
+release. [Commands and permissions](#/commands) is the full list if you would rather type than click.
+
+**Making pets.** [Creating pets](#/pet-studio) walks through the Studio and how a saved pet reaches a
+player's hands.
+
+**Something is broken.** [When something is wrong](#/troubleshooting) is arranged by symptom.
+[Migrating from PassivePet](#/migration) is for an existing install with older data.
+
+**Extending it.** [Integrations](#/integrations) covers ModelEngine, the economy providers, and what
+happens when a plugin is absent. [Developing against OmniPet](#/developer-guide) covers the module
+boundary and the build.
+
+## What actually ships
+
+An honest summary, because a roadmap that reads as a promise is worse than no roadmap.
+
+| Area | State |
+| --- | --- |
+| Pet authoring, vault, active slots, economy, recovery | Shipped and covered by tests. |
+| Incubation, both held and placed | Shipped. A placed egg rocks as it nears hatching. |
+| Visible pets that follow you | Shipped. Player-head renderer built in, ModelEngine when present. |
+| Idle behaviour and per-pet temperament | Shipped. |
+| Feeding, bonding, temporary buffs, multiple pets at once | Not yet. |
+| Vendor skill execution, MMOItems item bridge | Not yet. |
+
+Every number and claim on this site comes from the build. See [the roadmap](#/roadmap) for what is
+deferred and why, including the one gap that matters most: **no live-server smoke certification has been
+completed.** Compile probes and unit tests are necessary, and they are not sufficient.`,
+        vi: `OmniPet là plugin pet cho server Paper. Người chơi ấp trứng, nhận pet, và pet đó đi theo họ, lên
+cấp, và có thể đổi lại thành phần thưởng. Người quản trị tạo pet trong một trình chỉnh sửa ngay trong game
+thay vì phải viết YAML.
+
+Wiki này là tài liệu chuẩn. Repository cũng có bản Markdown cho phần lớn nội dung, và nếu hai bên nói khác
+nhau thì trang bạn đang đọc mới là bản đúng.
+
+## Chọn trang cần đọc
+
+**Dựng server.** [Cài đặt và lần chạy đầu](#/install) nói về file JAR, các tệp sẽ xuất hiện, và cách biết
+plugin đã nạp. Sau đó là [Cấu hình OmniPet](#/config) cho những gì bạn điều chỉnh được, và
+[Tương thích](#/compatibility) cho biết chính xác bản Paper nào đã được kiểm tra, cùng với việc bằng chứng
+đó chứng minh được gì và không chứng minh được gì.
+
+**Chơi.** [Chơi với pet](#/player-guide) là toàn bộ vòng chơi: ấp trứng, vault, lên cấp, và phóng thích.
+[Lệnh và quyền](#/commands) là danh sách đầy đủ nếu bạn thích gõ hơn là bấm.
+
+**Tạo pet.** [Tạo pet](#/pet-studio) đi qua Studio và cách một pet đã lưu tới được tay người chơi.
+
+**Có sự cố.** [Khi có sự cố](#/troubleshooting) được sắp theo hiện tượng.
+[Chuyển từ PassivePet](#/migration) dành cho bản cài đã có dữ liệu cũ.
+
+**Mở rộng.** [Tích hợp](#/integrations) nói về ModelEngine, các nhà cung cấp tiền tệ, và điều gì xảy ra khi
+thiếu plugin. [Phát triển với OmniPet](#/developer-guide) nói về ranh giới module và cách build.
+
+## Thực tế đã có những gì
+
+Một bản tóm tắt trung thực, vì một lộ trình bị đọc thành lời hứa còn tệ hơn là không có lộ trình.
+
+| Phần | Trạng thái |
+| --- | --- |
+| Tạo pet, vault, ô hoạt động, tiền tệ, khôi phục | Đã có và có test bao phủ. |
+| Ấp trứng, cả trên tay và đặt xuống đất | Đã có. Trứng đặt xuống rung lắc khi gần nở. |
+| Pet hiện hình đi theo người chơi | Đã có. Renderer đầu người dựng sẵn, dùng ModelEngine khi có. |
+| Hành vi nhàn rỗi và tính cách riêng từng pet | Đã có. |
+| Cho ăn, độ thân thiết, buff tạm thời, nhiều pet cùng lúc | Chưa. |
+| Thực thi kỹ năng qua vendor, cầu nối vật phẩm MMOItems | Chưa. |
+
+Mọi số liệu và tuyên bố trên site này đều lấy từ bản build. Xem [lộ trình](#/roadmap) để biết cái gì còn
+hoãn và vì sao, gồm cả khoảng trống quan trọng nhất: **chưa có chứng nhận smoke test trên server thật.**
+Compile probe và unit test là cần thiết, nhưng chưa đủ.`,
+      },
+    },
+
     {
       id: 'install',
       section: 'start',
@@ -83,7 +194,7 @@ Every integration is optional. OmniPet runs with no other plugin installed; Vaul
 | --- | --- |
 | \`config.yml\` | Everything you tune. Written from the shipped defaults. |
 | \`messages.yml\` | Every player-facing line, generated from the built-in defaults. |
-| \`pets/\` | Pet definitions. Use \`/pet admin browse\` rather than editing by hand. |
+| \`pets/\` | Pet definitions. Use \`/petadmin browse\` rather than editing by hand. |
 | \`eggs/\` | The egg catalog. Saving a pet in the Studio writes one automatically. |
 | \`data/\` | Player state, journals, and recovery records. Do not edit while running. |
 
@@ -114,7 +225,7 @@ Mọi tích hợp đều là tuỳ chọn. OmniPet chạy được khi không c�
 | --- | --- |
 | \`config.yml\` | Mọi thứ bạn điều chỉnh. Được ghi từ mặc định đóng kèm. |
 | \`messages.yml\` | Toàn bộ dòng chữ người chơi thấy, sinh từ mặc định trong code. |
-| \`pets/\` | Định nghĩa pet. Dùng \`/pet admin browse\` thay vì sửa tay. |
+| \`pets/\` | Định nghĩa pet. Dùng \`/petadmin browse\` thay vì sửa tay. |
 | \`eggs/\` | Danh mục trứng. Lưu pet trong Studio sẽ tự ghi một mục. |
 | \`data/\` | Dữ liệu người chơi, sổ ghi và bản ghi khôi phục. Không sửa khi đang chạy. |
 
@@ -172,6 +283,21 @@ Accelerator items shorten the wait. Hold one and click the matching button in \`
 
 Slot 46 cycles the sort order and slot 47 cycles the filter, so a large vault stays usable.
 
+## What your pet does on its own
+
+An active pet follows you, turns to face where it is going, and speeds up to catch you when you get ahead.
+
+When you stop, it stops watching the road and starts watching you. Stand still long enough and it settles
+down — sits, curls up, whatever its model has for that. Move again and it gets up.
+
+In between, it fidgets: looks around, shakes, hops, sniffs. **Two pets of the same kind are not the same
+creature.** How often one fidgets, what it prefers doing, and how quickly it gives up waiting when you stop
+are all rolled from that individual pet's identity — so your wolf and somebody else's wolf behave
+differently, and yours behaves the same way tomorrow.
+
+If your server has ModelEngine and the pet's model carries the matching clips, all of this is animated. If
+not, the pet still behaves this way; you just see less of it.
+
 ## Levelling
 
 EXP candy raises a pet's level; a breakthrough stone raises its evolution once the level requirement is met. Both are used from the pet's management screen — right-click the pet, then click the item.
@@ -218,6 +344,21 @@ Vật phẩm tăng tốc giúp giảm thời gian chờ. Giữ nó và bấm nú
 - **Click phải chính pet của bạn ngoài thế giới** cũng mở đúng màn hình đó.
 
 Ô 46 đổi thứ tự sắp xếp và ô 47 đổi bộ lọc, nên vault nhiều pet vẫn dễ dùng.
+
+## Pet tự làm gì khi bạn không ra lệnh
+
+Pet đang hoạt động sẽ đi theo bạn, quay về hướng nó đang đi, và tăng tốc để bắt kịp khi bạn đi trước.
+
+Khi bạn dừng, nó ngừng nhìn đường và bắt đầu nhìn bạn. Đứng yên đủ lâu thì nó ngồi nghỉ — ngồi, cuộn tròn,
+tuỳ model của nó có gì cho dáng đó. Bạn đi tiếp thì nó đứng lên.
+
+Ở giữa những lúc đó, nó cựa quậy: nhìn quanh, rũ mình, nhảy, hít hà. **Hai pet cùng loại không phải cùng một
+con.** Tần suất cựa quậy, việc nó thích làm gì, và nó bỏ chờ nhanh hay chậm khi bạn dừng — tất cả đều roll từ
+định danh riêng của chính con pet đó, nên con sói của bạn và con sói của người khác hành xử khác nhau, còn
+con của bạn thì ngày mai vẫn y như vậy.
+
+Nếu server có ModelEngine và model của pet có các clip tương ứng, tất cả những điều trên đều có animation.
+Nếu không, pet vẫn hành xử như vậy; chỉ là bạn thấy ít hơn.
 
 ## Lên cấp
 
@@ -423,7 +564,73 @@ The vault accepts materials but not slots or size: its pet rows fill slots 0-44 
 | --- | --- |
 | \`messages.yml\`, \`gui.feedback.*\`, \`gui.menus.*\`, \`gui.help.linesPerPage\`, item appearance | **Live.** |
 | \`gui.vault.petsPerPage\`, \`gui.studio.promptTimeoutSeconds\` | **Restart only**, and documented as such in the file. |
-| \`runtime.*\` | **Restart only.** A reload warns you it ignored the change rather than pretending. |`,
+| \`runtime.*\` | **Restart only.** A reload warns you it ignored the change rather than pretending. |
+
+## runtime — how hard the pet loop may work
+\`\`\`yaml
+runtime:
+  maximumOwnersPerTick: 64
+  maximumPetsPerOwner: 10
+  maximumMicrosPerTick: 2000
+\`\`\`
+
+The two counts bound how **much** work is attempted. The microsecond ceiling bounds how **long** it takes,
+and it exists because those are different questions: sixty-four owners of ten pets each is a fixed amount
+of work only if every pet costs the same, and a distant pet crossing a chunk boundary does not cost what a
+nearby one standing still costs. 2000 µs is 2 ms of a 50 ms tick.
+
+Owners are visited round-robin, so a large fleet degrades **update rate** rather than tick time — pets move
+slightly less smoothly instead of the server losing TPS. An owner the budget stopped short of is the one
+the next tick starts on, rather than being skipped until the cursor wraps.
+
+The time budget is checked **after** each owner rather than before, so a budget too small for even one
+owner degrades to one-owner-per-tick instead of stalling the runtime completely. Set it to \`0\` to switch
+the time ceiling off and rely on the counts alone; that is the setting for diagnosing the counts, not a
+production value.
+
+\`maximumPetsPerOwner\` is what the server agrees to **draw** every tick. That is not the same as what a
+player may **own** — the vault ceiling is separate and much higher. Each rendered pet costs three tracked
+entities, which is why this number is 10 and not 64.
+
+## behavior.animations — clip names per pet
+
+On the pet definition rather than in \`config.yml\`, and only used by pets whose \`display.provider\` is
+\`MODELENGINE\`.
+
+\`\`\`yaml
+behavior:
+  animations:
+    idle: idle
+    walk: walk
+    run: run
+    rest: sit
+    look_around: look_around
+    shake: shake
+    hop: hop
+    sniff: sniff
+    stretch: stretch
+\`\`\`
+
+The first four are gaits. \`idle\` is standing still, \`walk\` is ordinary following, \`run\` is either reaching
+the velocity ceiling or the controller's own catch-up dash, and \`rest\` is a pet that has settled because its
+owner stopped moving for a while.
+
+The last five are idle flourishes — short one-shots between idle loops. Which one a pet performs, and how
+often, comes from a temperament rolled from that pet's own identity, so two pets sharing a model are not the
+same creature. Nothing is stored for this, so it needs no migration.
+
+An empty string means "this gait has no clip", which is how a model carrying only an idle loop avoids being
+asked for a walk.
+
+The two kinds fall back differently, on purpose:
+
+| Missing | Result |
+| --- | --- |
+| \`rest\` | Falls back to \`idle\`. A settled pet keeps animating. |
+| A flourish | Plays **nothing**. Substituting \`idle\` would restart the loop and make a settled pet twitch. |
+
+Naming a clip the model does not contain costs that gait its animation and nothing else — the pet still
+renders. See [Integrations](#/integrations) for what happens when the animation API itself is unavailable.`,
         vi: `![Sổ ghi của người quản trị](img/art-operator.webp)
 
 ## Hai loại mục cấu hình
@@ -499,7 +706,71 @@ Vault nhận material nhưng không nhận ô hay kích thước: các hàng pet
 | --- | --- |
 | \`messages.yml\`, \`gui.feedback.*\`, \`gui.menus.*\`, \`gui.help.linesPerPage\`, hình thức vật phẩm | **Áp dụng ngay.** |
 | \`gui.vault.petsPerPage\`, \`gui.studio.promptTimeoutSeconds\` | **Chỉ khi khởi động lại**, và được ghi rõ trong tệp. |
-| \`runtime.*\` | **Chỉ khi khởi động lại.** Reload sẽ cảnh báo là đã bỏ qua thay đổi, chứ không giả vờ đã áp dụng. |`,
+| \`runtime.*\` | **Chỉ khi khởi động lại.** Reload sẽ cảnh báo là đã bỏ qua thay đổi, chứ không giả vờ đã áp dụng. |
+
+## runtime — vòng lặp pet được làm việc tới mức nào
+
+\`\`\`yaml
+runtime:
+  maximumOwnersPerTick: 64
+  maximumPetsPerOwner: 10
+  maximumMicrosPerTick: 2000
+\`\`\`
+
+Hai con số đếm giới hạn **lượng** việc được thử làm. Trần micro-giây giới hạn việc đó mất **bao lâu**, và nó
+tồn tại vì đây là hai câu hỏi khác nhau: sáu mươi bốn chủ mỗi người mười pet chỉ là một lượng việc cố định
+nếu mọi pet đều tốn như nhau, mà một pet ở xa đang băng qua ranh giới chunk thì không tốn bằng một pet gần
+đang đứng yên. 2000 µs là 2 ms trong một tick 50 ms.
+
+Các chủ được thăm theo vòng tròn, nên một đàn lớn làm giảm **tần suất cập nhật** chứ không làm tăng thời gian
+tick — pet di chuyển hơi kém mượt thay vì server tụt TPS. Chủ nào bị ngân sách chặn lại sẽ đúng là chủ mà
+tick sau bắt đầu từ đó, chứ không bị bỏ qua tới khi con trỏ quay hết một vòng.
+
+Ngân sách thời gian được kiểm tra **sau** mỗi chủ chứ không phải trước, nên một ngân sách nhỏ đến mức không
+đủ cho một chủ sẽ suy giảm thành một-chủ-mỗi-tick chứ không làm runtime đứng hẳn. Đặt \`0\` để tắt trần thời
+gian và chỉ dựa vào số đếm; đó là thiết lập để chẩn đoán các số đếm, không phải giá trị dùng thật.
+
+\`maximumPetsPerOwner\` là số pet server đồng ý **vẽ ra** mỗi tick. Nó không phải số pet người chơi được
+**sở hữu** — trần vault là con số riêng và lớn hơn nhiều. Mỗi pet được dựng tốn ba thực thể được theo dõi, đó
+là lý do con số này là 10 chứ không phải 64.
+
+## behavior.animations — tên clip cho từng pet
+
+Đặt trong định nghĩa pet chứ không phải \`config.yml\`, và chỉ dùng cho pet có \`display.provider\` là
+\`MODELENGINE\`.
+
+\`\`\`yaml
+behavior:
+  animations:
+    idle: idle
+    walk: walk
+    run: run
+    rest: sit
+    look_around: look_around
+    shake: shake
+    hop: hop
+    sniff: sniff
+    stretch: stretch
+\`\`\`
+
+Bốn khoá đầu là dáng đi. \`idle\` là đứng yên, \`walk\` là đi theo bình thường, \`run\` là khi đạt trần tốc độ
+hoặc khi bộ điều khiển tự bật chế độ đuổi theo, và \`rest\` là pet đã ngồi nghỉ vì chủ nó đứng yên một lúc.
+
+Năm khoá cuối là động tác nhàn rỗi — những shot ngắn giữa các vòng lặp idle. Pet làm động tác nào, và bao lâu
+một lần, đến từ tính cách roll ra từ định danh riêng của chính nó, nên hai pet dùng chung một model không phải
+cùng một con. Không có gì được lưu cho việc này, nên không cần migration.
+
+Chuỗi rỗng nghĩa là "dáng này không có clip", đó là cách một model chỉ có vòng lặp idle tránh bị hỏi clip đi.
+
+Hai loại này có cách dự phòng khác nhau, và đó là chủ ý:
+
+| Thiếu | Kết quả |
+| --- | --- |
+| \`rest\` | Lùi về \`idle\`. Pet ngồi nghỉ vẫn có animation. |
+| Một động tác | **Không phát gì.** Thay bằng \`idle\` sẽ khởi động lại vòng lặp và làm pet đang nghỉ bị giật. |
+
+Đặt tên clip mà model không có chỉ làm dáng đó mất animation, không mất gì thêm — pet vẫn hiện hình. Xem
+[Tích hợp](#/integrations) để biết điều gì xảy ra khi bản thân API animation không dùng được.`,
       },
     },
 
@@ -586,7 +857,25 @@ Trứng không bao giờ bị ghi đè âm thầm — có thể bạn đã tự 
 
 ## A player cannot see their pet
 
-Pets are intent, not entities, until the runtime renders them. Check that the pet is active in \`/pet vault\` — an active pet shows a lime marker — and that the player is under their active-slot limit.
+Check first that the pet is actually active in \`/pet vault\` — an active pet shows a lime marker — and that
+the player is under their active-slot limit.
+
+If it is active and still invisible, the runtime budget is the next thing to check. \`maximumPetsPerOwner\`
+defaults to 10 and is what the server agrees to **draw**, which is not the same as what a player may own;
+a vault of 30 pets with all of them marked active will not render 30 pets.
+
+A pet whose model fails to resolve falls back to a player head rather than disappearing, so an invisible
+pet is not a ModelEngine problem. A pet rendering as a head **is** the ModelEngine path failing — check the
+log for the reason it reported once at startup.
+
+## A pet renders but never animates
+
+Animation is bound separately from the calls the renderer cannot work without, so losing it costs clips and
+not models. That is the case you are looking at.
+
+Check the log for the reason, reported once rather than every tick. The usual cause is a clip name in
+\`behavior.animations\` that the model does not contain; the less usual one is a ModelEngine build whose
+animation method signature moved.
 
 ## Money moved but the slot did not appear
 
@@ -618,7 +907,25 @@ Check the server log on startup or reload. A bad material name, an out-of-range 
 
 ## Người chơi không thấy pet của mình
 
-Pet là ý định, chưa phải thực thể, cho tới khi runtime dựng nó lên. Kiểm tra pet có đang hoạt động trong \`/pet vault\` — pet hoạt động có dấu màu xanh lá — và người chơi chưa vượt giới hạn ô hoạt động.
+Trước tiên hãy kiểm tra pet có thực sự đang hoạt động trong \`/pet vault\` — pet hoạt động có dấu màu xanh lá —
+và người chơi chưa vượt giới hạn ô hoạt động.
+
+Nếu pet đang hoạt động mà vẫn không thấy, thì thứ cần kiểm tra tiếp là ngân sách runtime.
+\`maximumPetsPerOwner\` mặc định là 10 và đó là số pet server đồng ý **vẽ ra**, không phải số pet người chơi
+được sở hữu; một vault 30 pet mà đánh dấu hoạt động hết thì cũng không dựng ra 30 pet.
+
+Pet có model không giải được sẽ lùi về đầu người chơi chứ không biến mất, nên pet vô hình không phải là lỗi
+ModelEngine. Pet hiện ra dưới dạng đầu người **mới** là đường ModelEngine đang thất bại — xem log để biết lý
+do nó đã báo một lần lúc khởi động.
+
+## Pet hiện ra nhưng không có animation
+
+Animation được bind riêng khỏi những hàm mà renderer không thể thiếu, nên mất nó chỉ mất clip chứ không mất
+model. Đây đúng là trường hợp bạn đang gặp.
+
+Xem log để biết lý do, nó chỉ báo một lần chứ không báo mỗi tick. Nguyên nhân thường gặp là một tên clip trong
+\`behavior.animations\` mà model không có; nguyên nhân ít gặp hơn là bản ModelEngine có signature của hàm
+animation đã đổi chỗ.
 
 ## Tiền đã trừ nhưng ô không xuất hiện
 
@@ -640,6 +947,613 @@ Xem log server lúc khởi động hoặc reload. Tên material sai, ô ngoài p
 ## Không có âm thanh nào
 
 \`gui.feedback.enabled: false\` là công tắc tổng. Kiểm tra nó trước, rồi tới từng loại — có thể ai đó chỉ tắt một loại.`,
+      },
+    },
+
+    {
+      id: 'integrations',
+      section: 'operator',
+      icon: 'plug',
+      title: { en: 'Integrations', vi: 'Tích hợp' },
+      summary: {
+        en: 'Which plugins add what, and what happens when one is missing.',
+        vi: 'Plugin nào thêm gì, và thiếu một cái thì sao.',
+      },
+      body: {
+        en: `## Nothing is required
+
+OmniPet runs on a server with no other plugin installed. Every integration below adds capability when
+present and is skipped when absent, and "skipped" always means a documented fallback rather than an error.
+
+| Capability | Plugin | State | Without it |
+| --- | --- | --- | --- |
+| Model rendering | ModelEngine | Shipped, uncertified | Pets render as player heads. |
+| Decimal currency | Vault + an economy | Shipped | That currency is not offered. |
+| Point currency | PlayerPoints | Shipped | That currency is not offered. |
+| Slot permission nodes | LuckPerms | Shipped | OmniPet stays authoritative over slots. |
+| Studio stat catalog | MythicLib | Shipped | The picker is gone; typing stat IDs still works. |
+| Skill execution | MythicMobs | Shipped, uncertified | Bindings persist; nothing is cast. |
+| Owner stat buffs | MythicLib | Not yet | No runtime buff is applied. |
+| Item stats | MMOItems | Not yet | No item bridge exists. |
+
+## How rendering falls back
+
+A pet whose definition sets \`display.provider: MODELENGINE\` renders through the vendor API. Anything
+else — including a pet whose model fails to resolve — renders as a player head. The decision is made **per
+pet**, so one bad \`display.model\` costs that pet its model and leaves every other pet alone.
+
+Animation is bound separately from the calls the renderer cannot work without. That split is deliberate:
+without \`createModeledEntity\` there is nothing to show at all, but losing the animation API should only
+cost clips. A ModelEngine build that renamed an animation method therefore leaves pets rendered and still,
+reports once, and stops asking.
+
+## Clip names
+
+\`\`\`yaml
+behavior:
+  animations:
+    idle: idle
+    walk: walk
+    run: run
+    rest: sit
+\`\`\`
+
+Those defaults match what Blockbench rigs conventionally use, so a typical model animates with no
+configuration at all. An empty string means "this gait has no clip", which is how a model carrying only an
+idle loop avoids being asked for a walk. There are five more keys for idle flourishes — see
+[Configuring OmniPet](#/config).
+
+## Currency choice is never made for you
+
+Every currency an operator lists is offered as a separate button showing that provider's balance. OmniPet
+picks none of them.
+
+When a provider throws, times out, or returns null, the result is recorded as **needing reconciliation**
+rather than retried. Retrying a payment you cannot prove failed is how a player gets charged twice. See
+[When something is wrong](#/troubleshooting) for the reconciliation screen.
+
+## What the reference builds mean
+
+The adapters were written against MythicLib \`1.7.1-SNAPSHOT\` build 106, MythicMobs \`5.9.0\`, and
+ModelEngine \`R4.0.9\`. That is a record of what was probed, not a support range: every adapter degrades to
+its documented fallback on any version it cannot bind to.`,
+        vi: `## Không có gì là bắt buộc
+
+OmniPet chạy được trên server không cài plugin nào khác. Mọi tích hợp dưới đây chỉ bổ sung tính năng khi có
+mặt và được bỏ qua khi không có, và "bỏ qua" luôn nghĩa là có phương án dự phòng đã ghi rõ, không phải lỗi.
+
+| Tính năng | Plugin | Trạng thái | Khi không có |
+| --- | --- | --- | --- |
+| Dựng model | ModelEngine | Đã có, chưa chứng nhận | Pet hiện dưới dạng đầu người chơi. |
+| Tiền thập phân | Vault + một economy | Đã có | Loại tiền đó không được đưa ra. |
+| Tiền điểm | PlayerPoints | Đã có | Loại tiền đó không được đưa ra. |
+| Node quyền cho ô | LuckPerms | Đã có | OmniPet tự quyết định số ô. |
+| Danh mục chỉ số Studio | MythicLib | Đã có | Mất bộ chọn; gõ tay ID chỉ số vẫn được. |
+| Thực thi kỹ năng | MythicMobs | Đã có, chưa chứng nhận | Binding vẫn lưu; không có gì được thi triển. |
+| Buff chỉ số cho chủ | MythicLib | Chưa | Không buff nào được áp. |
+| Chỉ số vật phẩm | MMOItems | Chưa | Chưa có cầu nối vật phẩm. |
+
+## Cách dự phòng khi dựng hình
+
+Pet có \`display.provider: MODELENGINE\` sẽ dựng qua API của vendor. Còn lại — kể cả pet có model không giải
+được — sẽ hiện dưới dạng đầu người chơi. Quyết định này là **theo từng pet**, nên một \`display.model\` sai
+chỉ làm pet đó mất model và không ảnh hưởng pet khác.
+
+Animation được bind riêng khỏi những hàm mà renderer không thể thiếu. Sự tách biệt này là chủ ý: không có
+\`createModeledEntity\` thì chẳng có gì để hiện, nhưng mất API animation thì chỉ nên mất clip. Vì vậy một bản
+ModelEngine đổi tên hàm animation vẫn để pet hiện hình và đứng yên, báo một lần, rồi thôi không hỏi nữa.
+
+## Tên clip
+
+\`\`\`yaml
+behavior:
+  animations:
+    idle: idle
+    walk: walk
+    run: run
+    rest: sit
+\`\`\`
+
+Các mặc định đó khớp với tên mà rig Blockbench thường dùng, nên model thông thường chạy animation mà không
+cần cấu hình gì. Chuỗi rỗng nghĩa là "dáng này không có clip", đó là cách một model chỉ có vòng lặp idle
+tránh bị hỏi clip đi. Còn năm khoá nữa cho các động tác nhàn rỗi — xem [Cấu hình OmniPet](#/config).
+
+## Không ai chọn loại tiền thay bạn
+
+Mỗi loại tiền người quản trị liệt kê sẽ là một nút riêng hiện số dư của nhà cung cấp đó. OmniPet không chọn
+loại nào cả.
+
+Khi nhà cung cấp báo lỗi, hết thời gian chờ, hoặc trả về null, kết quả được ghi là **cần đối soát** chứ
+không thử lại. Thử lại một giao dịch mà bạn không chứng minh được là đã thất bại chính là cách người chơi bị
+trừ tiền hai lần. Xem [Khi có sự cố](#/troubleshooting) để biết về màn hình đối soát.
+
+## Các bản tham chiếu nghĩa là gì
+
+Các adapter được viết dựa trên MythicLib \`1.7.1-SNAPSHOT\` build 106, MythicMobs \`5.9.0\`, và ModelEngine
+\`R4.0.9\`. Đó là ghi nhận những gì đã được thử, không phải khoảng hỗ trợ: mọi adapter đều lùi về phương án
+dự phòng đã ghi rõ với bất kỳ phiên bản nào nó không bind được.`,
+      },
+    },
+
+    {
+      id: 'compatibility',
+      section: 'reference',
+      icon: 'shield',
+      title: { en: 'Compatibility', vi: 'Tương thích' },
+      summary: {
+        en: 'Exactly which builds were tested, and what that does not prove.',
+        vi: 'Chính xác bản nào đã kiểm tra, và điều đó chưa chứng minh được gì.',
+      },
+      body: {
+        en: `## Read this first
+
+The evidence behind this page is **automated tests and compile probes**. No live Paper server smoke test,
+gameplay certification, or vendor certification has been completed.
+
+That distinction is not pedantry. A compile probe proves the API shapes OmniPet uses exist on that
+coordinate. It does not prove the plugin boots, that a menu opens, or that a payment settles.
+
+## The compile matrix
+
+| Paper API coordinate | Probe Java | Status |
+| --- | ---: | --- |
+| \`1.21-R0.1-SNAPSHOT\` | 21 | Passed — primary baseline |
+| \`1.21.1-R0.1-SNAPSHOT\` | 21 | Passed |
+| \`1.21.11-R0.1-SNAPSHOT\` | 21 | Passed |
+| \`26.1.1.build.29-alpha\` | 25 | Passed — preview coordinate |
+| \`26.1.2.build.74-stable\` | 25 | Passed |
+| \`26.2.build.87-stable\` | 25 | Passed — forward guard |
+
+**Do not read these rows as "1.21.x supported" or "latest supported."** Each row is evidence about one
+exact coordinate. \`api-version: '1.21'\` in the descriptor is a compatibility declaration, not a runtime
+guarantee.
+
+OmniPet compiles with Java 21 and emits Java 21 bytecode. The 26.x probes use a Java 25 compiler because
+that Paper line requires it, while the compile task still targets \`--release 21\`.
+
+## The bug that shaped this page
+
+\`org.bukkit.Sound\` is an **enum** on Paper 1.21 and 1.21.1 and an **interface** from 1.21.11 onward.
+
+Code compiled as \`Sound.valueOf(name)\` against the older line emits a \`Methodref\` constant. Loading that
+class on the newer line throws \`IncompatibleClassChangeError\` and **the plugin fails to enable at all** —
+not one broken sound, the whole plugin.
+
+A compile probe does not catch it: compiling against 1.21.11 succeeds with only a deprecation warning,
+because only the compiled reference *kind* differs. This reached production.
+
+Two guards now exist. Every sound lookup routes through \`Registry.SOUNDS\`, and a test walks the constant
+pool of every compiled class and fails on any \`Methodref\` against \`org/bukkit/Sound\`. The guard was
+verified by reintroducing the exact regression and confirming it fails.
+
+Two further Paper types changed kind the same way and OmniPet does not use either: \`Biome\` and
+\`Attribute\`. \`Material\`, \`EntityType\`, and \`Statistic\` did not change.
+
+## Before you advertise a build
+
+Run at least these on the exact Paper and Java pair:
+
+1. Clean boot and clean disable.
+2. \`/pet\` and \`/pets\` permission behaviour.
+3. Valid, invalid, archived, duplicate, and legacy definition loads.
+4. Player migration, \`.bak\`, quarantine, restart, and explicit recovery.
+5. Every shipped gameplay system once.
+6. Every optional integration permutation the release advertises.
+7. Hatch: exact-hand removal, commit-gated online-time checkpoints, restart recovery, capacity-safe claim.
+
+Record the exact build strings and the dates. Passing compilation stays necessary and insufficient.`,
+        vi: `## Đọc phần này trước
+
+Bằng chứng cho trang này là **test tự động và compile probe**. Chưa có smoke test trên server Paper thật,
+chưa chứng nhận gameplay, chưa chứng nhận vendor.
+
+Phân biệt này không phải bắt bẻ. Một compile probe chứng minh các API mà OmniPet dùng có tồn tại trên toạ độ
+đó. Nó không chứng minh plugin khởi động được, menu mở được, hay giao dịch hoàn tất.
+
+## Bảng compile
+
+| Toạ độ Paper API | Java probe | Trạng thái |
+| --- | ---: | --- |
+| \`1.21-R0.1-SNAPSHOT\` | 21 | Đạt — nền chính |
+| \`1.21.1-R0.1-SNAPSHOT\` | 21 | Đạt |
+| \`1.21.11-R0.1-SNAPSHOT\` | 21 | Đạt |
+| \`26.1.1.build.29-alpha\` | 25 | Đạt — toạ độ preview |
+| \`26.1.2.build.74-stable\` | 25 | Đạt |
+| \`26.2.build.87-stable\` | 25 | Đạt — chốt phòng xa |
+
+**Đừng đọc các dòng này thành "hỗ trợ 1.21.x" hay "hỗ trợ bản mới nhất".** Mỗi dòng là bằng chứng cho đúng
+một toạ độ. \`api-version: '1.21'\` trong descriptor là lời khai tương thích, không phải bảo đảm lúc chạy.
+
+OmniPet biên dịch bằng Java 21 và sinh bytecode Java 21. Các probe 26.x dùng compiler Java 25 vì dòng Paper
+đó yêu cầu vậy, còn task biên dịch vẫn nhắm \`--release 21\`.
+
+## Con bug định hình trang này
+
+\`org.bukkit.Sound\` là **enum** trên Paper 1.21 và 1.21.1, nhưng là **interface** từ 1.21.11 trở đi.
+
+Code viết \`Sound.valueOf(name)\` biên dịch trên dòng cũ sinh ra một hằng \`Methodref\`. Nạp class đó trên dòng
+mới sẽ ném \`IncompatibleClassChangeError\` và **plugin không bật lên được** — không phải mất một âm thanh, mà
+là mất cả plugin.
+
+Compile probe không bắt được: biên dịch với 1.21.11 vẫn thành công, chỉ có cảnh báo deprecated, vì chỉ *loại*
+tham chiếu đã biên dịch là khác. Lỗi này đã lên tới production.
+
+Giờ có hai lớp bảo vệ. Mọi lần tra âm thanh đều đi qua \`Registry.SOUNDS\`, và một test đi qua constant pool
+của mọi class đã biên dịch rồi fail nếu thấy bất kỳ \`Methodref\` nào tới \`org/bukkit/Sound\`. Lớp bảo vệ này
+được kiểm chứng bằng cách tái tạo đúng lỗi cũ và xác nhận nó fail.
+
+Hai kiểu Paper nữa cũng đổi loại tương tự và OmniPet không dùng cả hai: \`Biome\` và \`Attribute\`.
+\`Material\`, \`EntityType\` và \`Statistic\` thì không đổi.
+
+## Trước khi bạn công bố một bản
+
+Chạy tối thiểu những mục sau trên đúng cặp Paper và Java đó:
+
+1. Khởi động sạch và tắt sạch.
+2. Hành vi quyền của \`/pet\` và \`/pets\`.
+3. Nạp định nghĩa hợp lệ, sai, đã lưu trữ, trùng, và bản cũ.
+4. Chuyển dữ liệu người chơi, \`.bak\`, cách ly, khởi động lại, và khôi phục tường minh.
+5. Mỗi hệ thống gameplay đã có, một lần.
+6. Mọi tổ hợp tích hợp tuỳ chọn mà bản phát hành công bố.
+7. Ấp trứng: lấy đúng vật phẩm trên tay, mốc thời gian online sau khi commit, khôi phục sau khởi động lại,
+   và nhận pet an toàn theo dung lượng.
+
+Ghi lại chính xác chuỗi build và ngày kiểm tra. Biên dịch thành công vẫn là cần và vẫn là chưa đủ.`,
+      },
+    },
+
+    {
+      id: 'migration',
+      section: 'operator',
+      icon: 'archive',
+      title: { en: 'Migrating from PassivePet', vi: 'Chuyển từ PassivePet' },
+      summary: {
+        en: 'Move older data across without losing or duplicating a pet.',
+        vi: 'Chuyển dữ liệu cũ sang mà không mất hay nhân đôi pet nào.',
+      },
+      body: {
+        en: `## Before you touch anything
+
+Stop the server and take a complete, restorable backup. Never run PassivePet and OmniPet against the same
+data at the same time. Rehearse on a staging copy and leave the original untouched until you have verified
+the result.
+
+Keep separate archives of \`plugins/PassivePet/\`, of \`plugins/OmniPet/\` including any failed attempt,
+of a few representative old items, and of the exact Paper, Java, and optional-plugin versions.
+
+## Folders are not merged for you
+
+OmniPet's descriptor and package are new, so a first boot creates \`plugins/OmniPet/\` and leaves a
+non-empty \`plugins/PassivePet/\` alone. Copy across only after a per-file backup and a deliberate decision
+about each conflict. A silent folder merge is exactly the kind of convenience that loses data.
+
+## What the reader does to player data
+
+The legacy shape is read and rewritten as the current envelope. In the process it:
+
+- gives each legacy pet a **deterministic** UUID from the player UUID, the list position, and the pet's raw
+  content — so the same input always produces the same pet ID, and re-running does not create duplicates;
+- preserves the definition ID, revision, raw component nodes, and any field it does not recognise;
+- converts a non-negative \`capacity\` once into the persisted vault floor;
+- converts the old \`currentPetIndex\` once into an ordered active-intent list;
+- keeps \`currentEgg\` as raw legacy data rather than guessing at it;
+- normalises an out-of-range \`currentPetIndex\` to an empty list and warns;
+- reads the old \`capacity: -1\` cache-invalid sentinel as zero, with a warning;
+- writes atomically and keeps the previous file as \`<uuid>.yml.bak\`.
+
+A second read is idempotent and does not make another backup.
+
+## Two behaviours that look like bugs and are not
+
+**Pets above the capacity limit are not deleted.** If configuration or permissions later lower the limit
+below the number of pets someone owns, the extra pets become read-only overflow. Deleting them would be
+the alternative.
+
+**An unresolved legacy egg blocks a new incubation.** Raw \`currentEgg\` or preserved pre-v4 incubation data
+stops a new hatch from starting until it is explicitly resolved. This is fail-closed on purpose: the
+alternative is silently losing an egg the player paid for, or handing them two.
+
+## A missing file is never an empty profile
+
+Invalid input is quarantined and the repository throws. If the main file is missing while a matching
+quarantine file exists, reads and mutations fail closed until an operator explicitly restores or recovers
+the data. Treating a missing profile as a new one would silently reset somebody's pets.
+
+## Definitions
+
+Legacy pet YAML carrying \`general.texture\` is converted to the current schema with a texture head icon,
+tier \`D\`, and the \`HEAD\` display provider. The complete legacy map is retained as raw extension data, so
+components this version does not understand are not discarded — a later version may understand them. The
+converted file replaces the original atomically and the prior file stays as \`.bak\`.`,
+        vi: `## Trước khi chạm vào bất cứ thứ gì
+
+Tắt server và sao lưu đầy đủ, có thể phục hồi được. Đừng bao giờ chạy PassivePet và OmniPet trên cùng một
+bộ dữ liệu cùng lúc. Hãy diễn tập trên bản staging và giữ nguyên bản gốc cho tới khi bạn đã kiểm chứng kết
+quả.
+
+Lưu riêng các bản sao của \`plugins/PassivePet/\`, của \`plugins/OmniPet/\` gồm cả lần thử thất bại, của vài
+vật phẩm cũ tiêu biểu, và của đúng phiên bản Paper, Java, cùng các plugin tuỳ chọn.
+
+## Không ai gộp thư mục thay bạn
+
+Descriptor và package của OmniPet là mới, nên lần khởi động đầu tạo \`plugins/OmniPet/\` và để nguyên
+\`plugins/PassivePet/\` nếu nó không rỗng. Chỉ sao chép sang sau khi đã sao lưu từng tệp và cân nhắc từng
+xung đột. Gộp thư mục âm thầm đúng là loại tiện lợi làm mất dữ liệu.
+
+## Bộ đọc làm gì với dữ liệu người chơi
+
+Cấu trúc cũ được đọc và ghi lại theo envelope hiện tại. Trong quá trình đó nó:
+
+- gán cho mỗi pet cũ một UUID **tất định** từ UUID người chơi, vị trí trong danh sách, và nội dung thô của
+  pet — nên cùng dữ liệu vào luôn cho cùng ID pet, và chạy lại không tạo bản trùng;
+- giữ nguyên ID định nghĩa, revision, các node component thô, và mọi trường nó không nhận ra;
+- chuyển \`capacity\` không âm một lần thành mức dung lượng vault lưu bền;
+- chuyển \`currentPetIndex\` cũ một lần thành danh sách pet hoạt động có thứ tự;
+- giữ \`currentEgg\` ở dạng dữ liệu cũ thô chứ không đoán;
+- chuẩn hoá \`currentPetIndex\` ngoài phạm vi thành danh sách rỗng kèm cảnh báo;
+- đọc sentinel \`capacity: -1\` (cache không hợp lệ) thành 0, kèm cảnh báo;
+- ghi nguyên tử và giữ tệp cũ thành \`<uuid>.yml.bak\`.
+
+Lần đọc thứ hai là bất biến và không tạo thêm bản sao lưu.
+
+## Hai hành vi trông như bug mà không phải
+
+**Pet vượt giới hạn dung lượng không bị xoá.** Nếu cấu hình hay quyền về sau hạ giới hạn xuống dưới số pet
+một người đang có, các pet dư trở thành phần tràn chỉ-đọc. Phương án còn lại là xoá chúng.
+
+**Trứng cũ chưa xử lý sẽ chặn lần ấp mới.** Dữ liệu \`currentEgg\` thô hoặc dữ liệu ấp trước v4 được giữ lại
+sẽ ngăn một lần ấp mới bắt đầu cho tới khi được xử lý tường minh. Đây là chủ ý fail-closed: phương án còn lại
+là âm thầm làm mất quả trứng người chơi đã trả tiền, hoặc đưa cho họ hai quả.
+
+## Thiếu tệp không bao giờ nghĩa là hồ sơ rỗng
+
+Dữ liệu vào không hợp lệ bị cách ly và repository ném lỗi. Nếu tệp chính bị thiếu mà lại có tệp cách ly khớp,
+thì việc đọc và thay đổi đều fail closed cho tới khi người quản trị phục hồi hoặc khôi phục tường minh. Coi
+hồ sơ thiếu là hồ sơ mới sẽ âm thầm xoá sạch pet của ai đó.
+
+## Định nghĩa pet
+
+YAML pet cũ có \`general.texture\` được chuyển sang schema hiện tại với icon đầu dạng texture, tier \`D\`, và
+provider hiển thị \`HEAD\`. Toàn bộ map cũ được giữ làm dữ liệu mở rộng thô, nên những component mà bản này
+chưa hiểu không bị bỏ đi — một bản sau có thể hiểu chúng. Tệp đã chuyển thay thế bản gốc một cách nguyên tử
+và tệp cũ ở lại dưới dạng \`.bak\`.`,
+      },
+    },
+
+    {
+      id: 'developer-guide',
+      section: 'reference',
+      icon: 'code',
+      title: { en: 'Developing against OmniPet', vi: 'Phát triển với OmniPet' },
+      summary: {
+        en: 'The build, the two-module boundary, and why core has no Bukkit.',
+        vi: 'Cách build, ranh giới hai module, và vì sao core không có Bukkit.',
+      },
+      body: {
+        en: `## Build
+
+\`\`\`text
+gradlew.bat clean build     # Windows
+./gradlew clean build       # Linux and macOS
+\`\`\`
+
+The Gradle Wrapper is pinned with a distribution checksum, the toolchain and \`--release\` are both 21, and
+encoding is UTF-8. There is one release artifact. Maven metadata and \`target\` directories are rejected by
+the build rather than ignored.
+
+## Two modules, one rule
+
+\`\`\`text
+omnipet-core  ->  omnipet-paper  ->  OmniPet-<version>.jar
+domain            Paper bootstrap    installable distribution
+persistence       renderers
+migration         GUI and commands
+\`\`\`
+
+\`omnipet-core\` depends on SnakeYAML and nothing else. **The build fails if core imports Bukkit, Paper,
+MythicLib, MMOItems, MythicMobs, or ModelEngine.** That is enforced, not merely encouraged.
+
+The reason is testability. Movement, incubation, hatch outcomes, idle behaviour, and every storage
+invariant are decided in core, which means they are tested without a server — and a test that needs a
+running Paper instance is a test nobody runs.
+
+## Ports, not vendor calls
+
+Core defines what it needs and Paper supplies it. \`PetRendererPort\` is the clearest example: four
+implementations exist, including a test double, and none of them appears in a core signature. Adding a
+method to that interface costs every implementor, which is why motion and idle state travel *inside* the
+transform record rather than as new port methods.
+
+## What is preserved rather than understood
+
+Unknown top-level fields, pet-instance fields, component maps, legacy egg data, and definition raw nodes
+are all copied into immutable raw maps and written back unchanged.
+
+This is deliberate. A later version may understand data this one does not, and the cost of dropping it is
+unrecoverable. It is also what makes the \`extensions\` maps usable for new state without a migration.
+
+## Where the interesting invariants live
+
+| Concern | Type |
+| --- | --- |
+| Hatch outcome | Deterministic \`splitmix64-v1\`, so a roll replays exactly |
+| Steering and gait | \`MovementController\`, \`MovementGait\`, \`MovementFacing\` |
+| Idle behaviour | \`IdleBehaviour\` — state, temperament, flourish choice |
+| Runtime budget | \`PaperRuntimeSettings\` — count and time ceilings |
+| Item identity | \`ItemEscrowService\` — exactly-once, fails closed when ambiguous |
+
+## Not a public API
+
+There is no separately versioned addon API. \`HatchEvent\` is an in-repo persisted-state seam: it fires
+only after a changed player state is saved, emits nothing for an unchanged mutation, and isolates observer
+failures. A \`STARTED\` event reports that state was persisted — it does **not** prove payment settled.
+
+Treat every type here as internal until a release says otherwise.`,
+        vi: `## Build
+
+\`\`\`text
+gradlew.bat clean build     # Windows
+./gradlew clean build       # Linux và macOS
+\`\`\`
+
+Gradle Wrapper được ghim kèm checksum bản phân phối, toolchain và \`--release\` đều là 21, encoding là UTF-8.
+Chỉ có một artifact phát hành. Metadata Maven và thư mục \`target\` bị build từ chối chứ không phải bỏ qua.
+
+## Hai module, một nguyên tắc
+
+\`\`\`text
+omnipet-core  ->  omnipet-paper  ->  OmniPet-<version>.jar
+domain            Paper bootstrap    bản phân phối cài được
+persistence       renderer
+migration         GUI và lệnh
+\`\`\`
+
+\`omnipet-core\` phụ thuộc SnakeYAML và không gì khác. **Build sẽ fail nếu core import Bukkit, Paper,
+MythicLib, MMOItems, MythicMobs, hoặc ModelEngine.** Đây là điều được cưỡng chế, không phải khuyến khích.
+
+Lý do là khả năng test. Di chuyển, ấp trứng, kết quả nở, hành vi nhàn rỗi, và mọi bất biến lưu trữ đều được
+quyết trong core, nghĩa là chúng test được mà không cần server — và một test cần Paper đang chạy là test
+không ai chạy.
+
+## Port, không phải gọi vendor
+
+Core khai báo nó cần gì và Paper cung cấp. \`PetRendererPort\` là ví dụ rõ nhất: có bốn hiện thực, gồm cả một
+test double, và không cái nào xuất hiện trong signature của core. Thêm một method vào interface đó là bắt mọi
+hiện thực phải trả giá, nên chuyển động và trạng thái nhàn rỗi đi *bên trong* record transform chứ không
+thành method mới của port.
+
+## Cái được giữ chứ không được hiểu
+
+Các trường cấp cao lạ, trường của pet instance, map component, dữ liệu trứng cũ, và node thô của định nghĩa
+đều được sao vào các map thô bất biến rồi ghi lại nguyên vẹn.
+
+Đây là chủ ý. Một bản sau có thể hiểu dữ liệu mà bản này chưa hiểu, và mất nó là mất không lấy lại được. Đó
+cũng là điều làm các map \`extensions\` dùng được cho trạng thái mới mà không cần migration.
+
+## Các bất biến đáng chú ý nằm ở đâu
+
+| Vấn đề | Kiểu |
+| --- | --- |
+| Kết quả nở | \`splitmix64-v1\` tất định, nên một lần roll tái lập chính xác |
+| Điều hướng và dáng đi | \`MovementController\`, \`MovementGait\`, \`MovementFacing\` |
+| Hành vi nhàn rỗi | \`IdleBehaviour\` — trạng thái, tính cách, chọn động tác |
+| Ngân sách runtime | \`PaperRuntimeSettings\` — trần theo số lượng và theo thời gian |
+| Định danh vật phẩm | \`ItemEscrowService\` — đúng một lần, fail closed khi không rõ ràng |
+
+## Không phải API công khai
+
+Chưa có API addon được đánh phiên bản riêng. \`HatchEvent\` là một seam trạng-thái-đã-lưu nội bộ: nó chỉ phát
+sau khi trạng thái người chơi đã đổi được lưu, không phát gì khi thay đổi không có tác dụng, và cô lập lỗi
+của observer. Sự kiện \`STARTED\` báo rằng trạng thái đã được lưu — nó **không** chứng minh tiền đã trừ xong.
+
+Hãy coi mọi kiểu ở đây là nội bộ cho tới khi một bản phát hành nói khác.`,
+      },
+    },
+
+    {
+      id: 'roadmap',
+      section: 'reference',
+      icon: 'flag',
+      title: { en: 'What is shipped and what is not', vi: 'Cái gì đã có, cái gì chưa' },
+      summary: {
+        en: 'An honest ledger, including the certification gap.',
+        vi: 'Một bản kê trung thực, gồm cả khoảng trống chứng nhận.',
+      },
+      body: {
+        en: `## The one thing to know
+
+**No live-server certification has been run.** No crash-injection, process-kill, live lifecycle, real
+inventory-event, live performance, or vendor certification. Everything below rests on automated tests and
+compile probes, which are necessary and not sufficient.
+
+A feature is only called shipped here when its code, tests, and documented fallback exist. That is a lower
+bar than "certified", and the difference is stated rather than blurred.
+
+## Shipped
+
+| Area | Notes |
+| --- | --- |
+| Build and storage foundation | Two-module boundary, atomic writes, backup, quarantine, fail-closed recovery |
+| Player state and vault | Separate owned capacity and ordered active intent, coalesced reads, serialised per-player I/O |
+| Economy-backed slots | Vault and PlayerPoints choices, LuckPerms precedence, audited reconciliation |
+| Pet Studio | Tier browser, stat picker with manual fallback, archive, reference-blocked delete, audit record |
+| Incubation | Deterministic outcomes, escrow-gated paid start, bounded recovery, capacity-safe claim |
+| Placed eggs | Incubate where placed, requirement re-checked, rocks as hatching nears |
+| Renderers and movement | Bounded main-thread coordinator, head renderer, optional ModelEngine adapter |
+| Idle behaviour | Settling, owner-facing, flourishes, per-pet temperament rolled from the pet's ID |
+| Progression and release | Bounded EXP and stamina, breakthrough, preview-and-commit release with an outbox |
+| Skills | Provider-neutral bindings, reservation and rollback, cooldown persistence |
+| Entity click | Right-clicking your own pet opens its management screen |
+| Player hub, help, messages, language packs | Including a complete Vietnamese translation |
+
+## Not shipped
+
+| Capability | Why it is listed as absent |
+| --- | --- |
+| Feeding and bonding | No food or affinity state exists yet |
+| Temporary buffs | The stat-buff type has no duration field |
+| Multiple pets out at once, formation | Data layer supports it; no formation or party UI |
+| Riding | No ride service; the renderer advertises \`riding=false\` |
+| Owner stat buffs from MythicLib | Deferred |
+| MMOItems item bridge | Deferred; standalone item identities only |
+| A versioned public addon API | Deferred; treat every type as internal |
+| Folia | Out of scope. It is a coordinator rewrite, not an addition |
+
+## Why the gaps are stated this plainly
+
+A roadmap that reads as a promise is worse than no roadmap: an operator plans a season around it. Every
+row above is checkable against the repository, and anything that turns out to be wrong is a documentation
+bug worth reporting.
+
+Release gates for anything new: focused unit tests, migration and rollback coverage, exact Paper evidence,
+a clean boot without the optional plugins where applicable, and a documented fail-closed path.`,
+        vi: `## Điều quan trọng nhất cần biết
+
+**Chưa chạy chứng nhận nào trên server thật.** Không crash-injection, không kill tiến trình, không kiểm tra
+lifecycle thật, không kiểm tra sự kiện túi đồ thật, không đo hiệu năng thật, không chứng nhận vendor. Mọi
+thứ dưới đây dựa trên test tự động và compile probe — cần thiết, nhưng chưa đủ.
+
+Một tính năng chỉ được gọi là đã có khi code, test, và phương án dự phòng đã ghi rõ đều tồn tại. Đó là mức
+thấp hơn "đã chứng nhận", và khác biệt này được nói rõ chứ không làm mờ đi.
+
+## Đã có
+
+| Phần | Ghi chú |
+| --- | --- |
+| Nền build và lưu trữ | Ranh giới hai module, ghi nguyên tử, sao lưu, cách ly, khôi phục fail-closed |
+| Trạng thái người chơi và vault | Dung lượng sở hữu và ý định hoạt động có thứ tự tách biệt, đọc gộp, I/O tuần tự theo người |
+| Ô hoạt động mua bằng tiền | Lựa chọn Vault và PlayerPoints, ưu tiên LuckPerms, đối soát có ghi vết |
+| Pet Studio | Bộ duyệt theo tier, bộ chọn chỉ số kèm nhập tay, lưu trữ, chặn xoá khi còn tham chiếu, bản ghi audit |
+| Ấp trứng | Kết quả tất định, khởi động có trả phí qua escrow, khôi phục có giới hạn, nhận pet an toàn theo dung lượng |
+| Trứng đặt xuống đất | Ấp ngay tại chỗ, kiểm tra lại điều kiện, rung lắc khi gần nở |
+| Renderer và di chuyển | Coordinator main-thread có giới hạn, renderer đầu người, adapter ModelEngine tuỳ chọn |
+| Hành vi nhàn rỗi | Ngồi nghỉ, quay về phía chủ, động tác lẻ, tính cách riêng roll từ ID của pet |
+| Tiến trình và phóng thích | EXP và thể lực có giới hạn, đột phá, phóng thích xem-trước-rồi-chốt kèm outbox |
+| Kỹ năng | Binding trung lập nhà cung cấp, giữ chỗ và hoàn tác, lưu bền thời gian hồi |
+| Click vào pet | Click phải pet của mình mở màn hình quản lý |
+| Hub người chơi, trợ giúp, tin nhắn, gói ngôn ngữ | Gồm bản dịch tiếng Việt hoàn chỉnh |
+
+## Chưa có
+
+| Tính năng | Vì sao ghi là chưa có |
+| --- | --- |
+| Cho ăn và độ thân thiết | Chưa có trạng thái thức ăn hay độ thân thiết |
+| Buff tạm thời | Kiểu buff chỉ số chưa có trường thời hạn |
+| Nhiều pet ra cùng lúc, đội hình | Tầng dữ liệu hỗ trợ; chưa có UI đội hình hay party |
+| Cưỡi pet | Chưa có service cưỡi; renderer khai \`riding=false\` |
+| Buff chỉ số cho chủ từ MythicLib | Còn hoãn |
+| Cầu nối vật phẩm MMOItems | Còn hoãn; chỉ có định danh vật phẩm độc lập |
+| API addon công khai có phiên bản | Còn hoãn; hãy coi mọi kiểu là nội bộ |
+| Folia | Ngoài phạm vi. Đó là viết lại coordinator, không phải phần thêm vào |
+
+## Vì sao các khoảng trống được nói thẳng như vậy
+
+Một lộ trình bị đọc thành lời hứa còn tệ hơn không có lộ trình: người quản trị sẽ lên kế hoạch cả một mùa
+dựa vào nó. Mọi dòng ở trên đều kiểm chứng được với repository, và nếu có dòng nào sai thì đó là lỗi tài liệu
+đáng được báo lại.
+
+Cổng phát hành cho mọi thứ mới: test đơn vị tập trung, bao phủ migration và rollback, bằng chứng Paper chính
+xác, khởi động sạch khi không có plugin tuỳ chọn (nếu áp dụng được), và một đường fail-closed đã ghi rõ.`,
       },
     },
   ],

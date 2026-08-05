@@ -1,5 +1,7 @@
 # Developer guide
 
+> The [wiki](https://salyys1.github.io/OmniPet/wiki.html#/developer-guide) is the reference for this topic. Where this file disagrees with it, the wiki is correct.
+
 OmniPet is a Java 21, Gradle Kotlin DSL, multi-project rewrite. The implementation lives entirely in `omnipet-core` and `omnipet-paper` — the two projects `settings.gradle.kts` includes. The pre-rewrite `src/` tree at the repository root was removed once nothing referenced it; it was never on the build path, so it could not have been the gameplay authority. Read it in Git history when you need the pre-rewrite behavior.
 
 ## Build contract

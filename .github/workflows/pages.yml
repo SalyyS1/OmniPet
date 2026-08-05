@@ -7,6 +7,7 @@ on:
       - 'docs/**'
       - 'tools/build-wiki-diagrams.mjs'
       - 'tools/verify-wiki-render.mjs'
+      - 'tools/verify-wiki-browser.mjs'
       - 'tools/build-wiki-art.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -47,6 +48,20 @@ jobs:
       # publishing it and finding out from a reader.
       - name: Verify the wiki renders
         run: node tools/verify-wiki-render.mjs
+
+      # The checks a layout engine has to answer: measured line length, deep links surviving a reload,
+      # the contents list still being reachable at 375px. Gating too, because these were real defects
+      # rather than preferences, and the stub DOM above cannot see any of them.
+      - name: Verify the wiki in a browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          python3 -m http.server 8899 --directory docs &
+          for _ in $(seq 1 20); do
+            curl -sf -o /dev/null http://localhost:8899/wiki.html && break
+            sleep 0.5
+          done
+          node tools/verify-wiki-browser.mjs http://localhost:8899
 
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3

@@ -1,5 +1,7 @@
 # Configuration reference
 
+> The [wiki](https://salyys1.github.io/OmniPet/wiki.html#/config) is the reference for this topic. Where this file disagrees with it, the wiki is correct.
+
 OmniPet reads current configuration and data from `plugins/OmniPet/`. Files are UTF-8 YAML; use spaces, not tabs. This page separates Paper-wired configuration from verified dependency-neutral core contracts.
 
 ## Authoritative files
@@ -152,6 +154,7 @@ runtime:
   periodTicks: 1
   maximumOwnersPerTick: 64
   maximumPetsPerOwner: 10
+  maximumMicrosPerTick: 2000
 
 progression:
   maxLevel: 100
@@ -171,7 +174,7 @@ items:
     requiredEvolution: 0
 ```
 
-- `runtime` bounds the single pet coordinator. `maximumOwnersPerTick` and `maximumPetsPerOwner` cap work per tick; owners are visited round-robin so a large fleet degrades update rate instead of tick time. Scheduler values are read at enable; changing them logs a warning and requires a restart.
+- `runtime` bounds the single pet coordinator. `maximumOwnersPerTick` and `maximumPetsPerOwner` cap work per tick; owners are visited round-robin so a large fleet degrades update rate instead of tick time. `maximumMicrosPerTick` is the wall-clock ceiling — 2000 µs of a 50,000 µs tick by default — and it exists because the count ceilings bound how *much* work is attempted but not how *long* it takes: a distant pet crossing a chunk boundary does not cost what a nearby one standing still costs. The budget is checked after each owner rather than before, so a budget too small for even one owner degrades to one-owner-per-tick instead of stalling, and owners the budget stopped short of are the ones the next tick starts on. Set it to `0` to disable the time ceiling and fall back to the counts alone, which is the setting for diagnosing them. `maximumPetsPerOwner` is capped at the active-slot maximum; note that it is what the server agrees to *draw* every tick, which is not the same as what a player may *own*. Scheduler values are read at enable; changing them logs a warning and requires a restart.
 - `progression.defaultExperienceFormula` is compiled and evaluated against `formulaSamples` before activation. A non-finite or non-positive sample rejects the config. A pet definition may override the formula; an invalid override falls back to this validated global one. The formula text is retained beside the compiled result, so a legacy migration rewrites your formula rather than resetting it to the default.
 - `overflowPolicy` is `CARRY` or `DISCARD` and decides what happens to experience granted at `maxLevel`.
 - `items` defines the standalone material identities for EXP candy and breakthrough stones. MMOItems identities are not supported yet.

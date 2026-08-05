@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 471 273" width="471" height="273" role="img" aria-label="Hub layout">
   <rect width="471" height="273" fill="#f3f0e7"/>
-  <text x="24" y="34" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#e67532" letter-spacing="1.6">HUB LAYOUT</text>
-  <line x1="24" y1="46" x2="447" y2="46" stroke="#102a2b" stroke-opacity="0.22"/>
+  <text x="24" y="34" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" font-weight="600" fill="#9c4310" letter-spacing="1.6">HUB LAYOUT</text>
+  <line x1="24" y1="46" x2="447" y2="46" stroke="#102a2b" stroke-opacity="0.32"/>
 
   <rect x="24" y="70" width="44" height="44" rx="3" fill="#e7e0d0" stroke="#102a2b" stroke-opacity="0.28"/>
   <text x="28" y="83" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="9" fill="#2d4a49">0</text>

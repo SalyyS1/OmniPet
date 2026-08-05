@@ -1,5 +1,7 @@
 # Migration from PassivePet
 
+> The [wiki](https://salyys1.github.io/OmniPet/wiki.html#/migration) is the reference for this topic. Where this file disagrees with it, the wiki is correct.
+
 > **Warning:** Stop the server and make a complete, restorable backup before changing the plugin JAR or data-folder name. Do not run PassivePet and OmniPet against the same data at the same time. Preserve every pet, egg, component, expression, command, and user-defined ID.
 
 The current checkpoint provides read/migration contracts in `omnipet-core`, schema 4 incubation/catalog/escrow core services, Admin Pet Studio, the player vault/active-intent slice, and transaction-backed active-slot purchases. It does not promise a complete gameplay cutover or a silent folder merge. Rehearse on a staging copy and keep the original source untouched until verification is complete.

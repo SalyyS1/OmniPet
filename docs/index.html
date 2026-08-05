@@ -26,6 +26,7 @@
       <a href="#start">Start</a>
       <a href="#compatibility">Compatibility</a>
       <a href="#manuals">Manuals</a>
+      <a href="wiki.html#/roadmap">Roadmap</a>
       <a href="https://github.com/SalyyS1/OmniPet">Source</a>
     </nav>
   </header>
@@ -35,11 +36,11 @@
       <div class="hero-copy">
         <p class="eyebrow">Paper pet data, documented like infrastructure</p>
         <h1 id="hero-title">Author safely. Store durably. Recover explicitly.</h1>
-        <p class="lede">OmniPet currently ships Admin Pet Studio, schema-v3 player vault and active intent, explicit-currency slot purchases, and audited recovery. Incubation, visible companions, renderers, skills, items, and progression remain roadmap work.</p>
+        <p class="lede">OmniPet ships the Admin Pet Studio, a schema-4 player vault with ordered active intent, explicit-currency slot purchases, audited recovery, incubation both in hand and on the ground, and visible pets that follow their owner and settle down when it stops. Feeding, bonding, temporary buffs, and multi-pet formations remain roadmap work.</p>
         <div class="hero-actions">
           <a class="button primary" href="wiki.html">Open the wiki</a>
           <a class="button ghost" href="#start">Stage OmniPet</a>
-          <a class="button ghost" href="https://github.com/SalyyS1/OmniPet/tree/main/docs">Browse source docs</a>
+          <a class="button ghost" href="wiki.html#/roadmap">What is not shipped</a>
         </div>
       </div>
       <aside class="status-panel" aria-label="Verification status">
@@ -48,8 +49,8 @@
           <div><dt>Build</dt><dd><a href="wiki.html">see wiki</a></dd></div>
           <div><dt>Runtime target</dt><dd>Java 21 bytecode</dd></div>
           <div><dt>Paper evidence</dt><dd>Exact compile probes only</dd></div>
-          <div><dt>Shipped UI</dt><dd>Studio + vault + slot flow</dd></div>
-          <div><dt>Visible pets</dt><dd>Deferred</dd></div>
+          <div><dt>Shipped UI</dt><dd>Hub, Studio, vault, hatch, slots</dd></div>
+          <div><dt>Visible pets</dt><dd>Shipped, uncertified</dd></div>
         </dl>
         <p class="warning"><strong>Certification:</strong> no live Paper/provider smoke matrix has been completed.</p>
       </aside>
@@ -72,7 +73,7 @@
     <section id="compatibility" class="section" aria-labelledby="compat-title">
       <div class="section-heading">
         <div><p class="section-index">02 / Compatibility truth table</p><h2 id="compat-title">Exact probes beat hopeful ranges.</h2></div>
-        <a class="text-link" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/compatibility.md">Full matrix</a>
+        <a class="text-link" href="wiki.html#/compatibility">Full matrix</a>
       </div>
       <div class="table-wrap" tabindex="0" role="region" aria-label="Compatibility table">
         <table>
@@ -91,23 +92,31 @@
         <div><p class="section-index">03 / Operator and developer manuals</p><h2 id="manuals-title">Choose the page that matches the job.</h2></div>
         <label class="search"><span class="sr-only">Filter manuals</span><input id="doc-search" type="search" placeholder="Filter manuals..." autocomplete="off"></label>
       </div>
+      <!--
+        Every card points into the wiki rather than at a GitHub raw Markdown file. The wiki is the
+        reference: sending a reader to the repository copy meant sending them to the version most likely
+        to have drifted, in a reader with no search, no translation, and no navigation.
+      -->
       <div id="doc-grid" class="doc-grid">
-        <a class="doc-card" data-search="build staging setup operator artifact" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/getting-started.md"><span>OPS / 01</span><h3>Getting started</h3><p>Build with Gradle, locate the verified artifact, and run a scoped staging check.</p></a>
-        <a class="doc-card" data-search="yaml config definitions storage slots entitlement" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/configuration.md"><span>OPS / 02</span><h3>Configuration</h3><p>Current schema-v2 definitions, schema-v3 player state, pricing, and provider policy.</p></a>
-        <a class="doc-card" data-search="commands permissions admin transactions reconcile" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/commands-and-permissions.md"><span>OPS / 03</span><h3>Commands and permissions</h3><p>Shipped player, Studio, transaction, and reconciliation commands.</p></a>
-        <a class="doc-card" data-search="vault playerpoints luckperms mythiclib modelengine integrations" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/integrations.md"><span>OPS / 04</span><h3>Integrations</h3><p>Implemented adapters, selective refresh behavior, and deferred runtime boundaries.</p></a>
-        <a class="doc-card" data-search="passivepet migration backup rollback journal schema" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/migration.md"><span>OPS / 05</span><h3>Migration</h3><p>Preserve legacy data and recover schema-v1 purchase journals safely.</p></a>
-        <a class="doc-card" data-search="java api gradle developer module architecture" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/developer-guide.md"><span>DEV / 01</span><h3>Developer guide</h3><p>Gradle workflow, module boundaries, lifecycle contracts, and release evidence.</p></a>
-        <a class="doc-card" data-search="examples yaml definition slots recovery" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/examples.md"><span>DEV / 02</span><h3>Current examples</h3><p>Copy-safe definition metadata, slot pricing, and recovery commands.</p></a>
-        <a class="doc-card" data-search="troubleshooting errors yaml providers journal" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/troubleshooting.md"><span>OPS / 06</span><h3>Troubleshooting</h3><p>Diagnose startup, storage, provider refresh, and recovery failures.</p></a>
-        <a class="doc-card" data-search="roadmap hatching renderer progression future" href="https://github.com/SalyyS1/OmniPet/blob/main/docs/roadmap.md"><span>PLAN / 01</span><h3>Roadmap</h3><p>Shipped code slices and deferred gameplay gates without release promises.</p></a>
+        <a class="doc-card" data-search="overview start here what ships map" href="wiki.html#/overview"><span>START / 01</span><h3>Start here</h3><p>What OmniPet is, what actually ships, and which page answers your question.</p></a>
+        <a class="doc-card" data-search="build staging setup operator artifact install first run" href="wiki.html#/install"><span>OPS / 01</span><h3>Install and first run</h3><p>Drop the JAR in, start once, and know which files appear.</p></a>
+        <a class="doc-card" data-search="yaml config definitions storage slots entitlement runtime animations" href="wiki.html#/config"><span>OPS / 02</span><h3>Configuration</h3><p>Which section is strict, which is lenient, and what a typo costs.</p></a>
+        <a class="doc-card" data-search="commands permissions admin transactions reconcile" href="wiki.html#/commands"><span>OPS / 03</span><h3>Commands and permissions</h3><p>Every command, its permission, and which spelling to use.</p></a>
+        <a class="doc-card" data-search="vault playerpoints luckperms mythiclib modelengine integrations rendering" href="wiki.html#/integrations"><span>OPS / 04</span><h3>Integrations</h3><p>Which plugins add what, and what happens when one is missing.</p></a>
+        <a class="doc-card" data-search="passivepet migration backup rollback journal schema" href="wiki.html#/migration"><span>OPS / 05</span><h3>Migration</h3><p>Move older data across without losing or duplicating a pet.</p></a>
+        <a class="doc-card" data-search="troubleshooting errors yaml providers journal symptoms" href="wiki.html#/troubleshooting"><span>OPS / 06</span><h3>Troubleshooting</h3><p>Arranged by symptom: what causes it, and what to run.</p></a>
+        <a class="doc-card" data-search="player guide hatching vault levelling release idle pets" href="wiki.html#/player-guide"><span>PLAY / 01</span><h3>Playing with pets</h3><p>Hatch an egg, activate a pet, level it, and release it.</p></a>
+        <a class="doc-card" data-search="studio authoring pets tier icon egg give" href="wiki.html#/pet-studio"><span>OPS / 07</span><h3>Creating pets</h3><p>Author a pet in the Studio and get it into a player's hands.</p></a>
+        <a class="doc-card" data-search="java api gradle developer module architecture ports" href="wiki.html#/developer-guide"><span>DEV / 01</span><h3>Developer guide</h3><p>The build, the two-module boundary, and why core has no Bukkit.</p></a>
+        <a class="doc-card" data-search="compatibility paper java probe matrix sound certification" href="wiki.html#/compatibility"><span>REF / 01</span><h3>Compatibility</h3><p>Exactly which builds were tested, and what that does not prove.</p></a>
+        <a class="doc-card" data-search="roadmap hatching renderer progression future deferred" href="wiki.html#/roadmap"><span>PLAN / 01</span><h3>Roadmap</h3><p>An honest ledger of what ships, what does not, and the certification gap.</p></a>
       </div>
       <p id="empty-state" class="empty-state" hidden>No manual matches that filter.</p>
     </section>
 
     <section class="section callout" aria-labelledby="boundary-title">
-      <div><p class="section-index">Architecture boundary</p><h2 id="boundary-title">Persisted intent is not a live pet.</h2></div>
-      <p>The current runtime stores definitions, owned pets, desired-active UUIDs, slot entitlements, and recovery evidence. Hatching, entities, movement, runtime buffs, skills, and item gameplay need later implementations and live certification.</p>
+      <div><p class="section-index">Architecture boundary</p><h2 id="boundary-title">Shipped is not the same as certified.</h2></div>
+      <p>Pets render, follow, and behave; incubation, progression, skills, and release all run. What has not happened is live certification — no crash-injection, process-kill, real inventory-event, live performance, or vendor smoke matrix. Compile probes and unit tests are necessary and insufficient, and this site says which is which on every page.</p>
     </section>
   </main>
 

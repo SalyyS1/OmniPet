@@ -40,15 +40,17 @@
   align-items: center;
   gap: 0.45rem;
   padding: 0.4rem 0.7rem;
-  border: 1px solid var(--line);
+  /* A control the reader has to find, so the stronger of the two line weights. */
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink-soft);
+  position: relative;
 }
 
 .wiki-search-wrap:focus-within {
   border-color: var(--signal);
-  box-shadow: 0 0 0 3px rgba(230, 117, 50, 0.16);
+  box-shadow: 0 0 0 3px rgba(156, 67, 16, 0.2);
 }
 
 #wiki-search {
@@ -62,7 +64,7 @@
 
 .language-switch {
   display: inline-flex;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -78,7 +80,7 @@
   color: var(--ink-soft);
 }
 
-.language-switch button + button { border-left: 1px solid var(--line); }
+.language-switch button + button { border-left: 1px solid var(--line-strong); }
 .language-switch button:hover { background: var(--paper-deep); }
 
 .language-switch button.active {
@@ -88,7 +90,7 @@
 
 .wiki-source {
   padding: 0.45rem 0.75rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   text-decoration: none;
   font-weight: 600;
@@ -120,12 +122,12 @@
 /* --- page rail ------------------------------------------------------------------------------- */
 
 /*
- * A compact vertical rail on the left.
+ * A vertical rail on the left, grouped by section.
  *
- * Narrower than the original sidebar and stripped of its section headings and per-page summaries: with
- * six pages the grouping reads from the order alone, and the summary is already the first line of the
- * page itself. That keeps navigation where it is easy to scan down while giving the article back the
- * width the old rail spent on secondary text.
+ * The labels were once dropped on the argument that declaration order groups the pages well enough. It
+ * does not: an unbroken list of names reads as one flat set, and the group a page belongs to only became
+ * visible after opening it. The headings cost one line each and answer "what kind of page is this"
+ * before the click rather than after.
  */
 .wiki-nav {
   position: sticky;
@@ -135,6 +137,30 @@
   padding-right: 0.2rem;
   scrollbar-width: thin;
 }
+
+.wiki-nav h2 {
+  margin: 1rem 0 0.35rem;
+  font-family: inherit;
+  /*
+   * 0.78rem with light tracking, not the 0.66rem/0.14em the other small caps here use. Half of this site
+   * is Vietnamese, and a stacked tone mark — the ˆ plus ˊ in "BẮT ĐẦU" — is only a few pixels tall: at
+   * 10.5px it survives as a smudge and the word reads as "BAT ĐAU", a different word. Wide tracking made
+   * it worse by pushing the marks away from their letters.
+   */
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  /*
+   * And the line box has to be taller than the glyphs. Inheriting the body's 1.02 left it a fraction of
+   * a pixel taller than the font size, so the rail's own `overflow-y: auto` sheared the top off every
+   * accent — invisible in English, and the difference between "ĐẦU" and "ĐÂU" in Vietnamese.
+   */
+  line-height: 1.7;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.wiki-nav h2:first-child { margin-top: 0; }
 
 .wiki-nav ul {
   list-style: none;
@@ -158,13 +184,28 @@
   color: var(--ink-soft);
 }
 
+/*
+ * The summary as a second line rather than a `title` tooltip. A tooltip never appears on touch, is slow
+ * on a desktop, and is skipped by several screen readers — so the one sentence telling a reader whether
+ * this is the page they want was very nearly unreachable.
+ */
+.wiki-nav a small {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.74rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
 .wiki-nav a:hover {
   background: var(--paper-deep);
-  border-left-color: var(--line);
+  border-left-color: var(--line-strong);
   color: var(--ink);
 }
 
-.wiki-nav a.active {
+.wiki-nav a.active,
+.wiki-nav a[aria-current="page"] {
   background: var(--mint-light);
   border-left-color: var(--signal);
   color: var(--ink);
@@ -183,13 +224,27 @@
   width: min(1400px, 100%);
   margin: 0 auto;
   display: grid;
-  /* 13rem instead of the original 15-18rem: enough for the longest page name at this size, and no
-     more, since every rem here comes out of the prose. */
-  grid-template-columns: minmax(11rem, 13rem) minmax(0, 1fr) minmax(11rem, 14rem);
+  /* Wide enough for a page name plus its one-line summary. The rail was 13rem when it carried names
+     alone; the summary is the thing that tells a reader whether this is the page they want. */
+  grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr) minmax(11rem, 14rem);
   gap: clamp(0.9rem, 2vw, 2rem);
   padding: clamp(1rem, 3vw, 2.5rem) clamp(0.8rem, 3vw, 2rem);
   align-items: start;
 }
+
+/*
+ * Results occupy the reading column, above the article, at every width. Placed explicitly because the
+ * element sits between the rail and the article in the markup — where a screen reader and the tab order
+ * both want it — and auto-placement would otherwise give it the article's cell.
+ */
+.wiki-results {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.wiki-shell > .wiki-article { grid-column: 2; grid-row: 2; }
+.wiki-shell > .wiki-nav { grid-column: 1; grid-row: 1 / span 2; }
+.wiki-shell > .wiki-aside { grid-column: 3; grid-row: 1 / span 2; }
 
 /* --- article --------------------------------------------------------------------------------- */
 
@@ -200,22 +255,51 @@
   border-radius: var(--radius);
   background: rgba(243, 240, 231, 0.72);
   box-shadow: var(--shadow);
+  /*
+   * Prose gets a proportional face. The body was monospace throughout, which reads slower for running
+   * text and, at 16px, fitted roughly 80 characters per line — above the 45-75 range. Code keeps the
+   * monospace face below, where the alignment is the point.
+   */
+  font-family: var(--font-prose);
+  font-size: 1.05rem;
+  line-height: 1.7;
 }
+
+/*
+ * The measure. Applied to the text elements rather than the container so that tables, code blocks, and
+ * figures may still use the full column: those are scanned, not read line by line, and a 68ch cap would
+ * force a wide command table into a horizontal scroll it does not need.
+ */
+.wiki-article p,
+.wiki-article ul,
+.wiki-article ol,
+.wiki-article h2,
+.wiki-article .lede,
+.wiki-article .article-foot p { max-width: 68ch; }
 
 .wiki-article .article-head { margin-bottom: 1.6rem; }
 
+/*
+ * Small caps on this site are set at 0.78rem with 0.06em tracking rather than the ~0.68rem/0.13em that
+ * looks right in English. Half of these pages are Vietnamese, and a stacked tone mark — the circumflex
+ * plus grave in "ĐẦU" — is only a few pixels tall: below about 0.75rem it survives as a smudge and the
+ * word reads as a different one. Wide tracking made it worse by separating each mark from its letter.
+ *
+ * The labels whose text never translates (the build panel's "Tests", "Suites") keep the smaller size.
+ */
 .wiki-article .eyebrow {
   margin: 0 0 0.4rem;
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--signal);
 }
 
 .wiki-article h1 {
   margin: 0 0 0.5rem;
-  font-family: Fraunces, Georgia, serif;
+  font-family: Fraunces, Cambria, Constantia, serif;
   font-size: clamp(1.7rem, 4vw, 2.5rem);
   line-height: 1.12;
 }
@@ -230,7 +314,7 @@
   margin: 2.2rem 0 0.7rem;
   padding-top: 1.1rem;
   border-top: 1px solid var(--line);
-  font-family: Fraunces, Georgia, serif;
+  font-family: Fraunces, Cambria, Constantia, serif;
   font-size: 1.3rem;
   scroll-margin-top: 6rem;
 }
@@ -245,8 +329,46 @@
   padding: 0.1rem 0.32rem;
   border-radius: 3px;
   background: var(--paper-deep);
-  font-size: 0.88em;
+  font-family: var(--font-mono);
+  font-size: 0.84em;
 }
+
+/*
+ * Code blocks carry a copy button. Every block on this site is a command or a YAML fragment the reader
+ * would otherwise retype by hand, and for a plugin this command-heavy that is the most useful thing the
+ * page can offer.
+ */
+.wiki-code {
+  position: relative;
+  margin: 0 0 1.1rem;
+}
+
+.wiki-code pre { margin: 0; }
+
+.wiki-code button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid rgba(243, 240, 231, 0.4);
+  border-radius: 4px;
+  background: rgba(16, 42, 43, 0.85);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  /* Hidden until the block is hovered or the button itself is focused, so it never covers the first
+     line for a reader who is only reading. Keyboard users still reach it by tabbing. */
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.wiki-code:hover button,
+.wiki-code button:focus-visible { opacity: 1; }
+.wiki-code button:hover { background: var(--signal); border-color: var(--signal); }
 
 .wiki-article pre {
   margin: 0 0 1.1rem;
@@ -276,17 +398,28 @@
   background: var(--paper);
 }
 
+/*
+ * Tables scroll horizontally, and the wrapper is focusable so that a keyboard user can actually do it.
+ * With `th { white-space: nowrap }` these overflow on any phone, so without a tab stop the content in
+ * the right-hand columns was unreachable without a mouse.
+ */
 .table-scroll {
   margin: 0 0 1.2rem;
   overflow-x: auto;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius);
+}
+
+.table-scroll:focus-visible {
+  outline: 3px solid var(--signal);
+  outline-offset: 2px;
 }
 
 .wiki-article table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
 }
 
 .wiki-article th,
@@ -313,6 +446,44 @@
   color: var(--ink-soft);
 }
 
+/*
+ * Previous and next, in the same order as the rail.
+ *
+ * Reaching the end of a page used to leave the reader with a static provenance line and no idea what
+ * follows — they had to go back to the rail and guess. Documentation is read in sequence more often than
+ * it is searched.
+ */
+.wiki-pager {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 2.4rem;
+}
+
+.wiki-pager a {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  text-decoration: none;
+  background: rgba(243, 240, 231, 0.6);
+}
+
+.wiki-pager a:hover { background: var(--mint-light); }
+.wiki-pager a.next { grid-column: 2; text-align: right; }
+
+.wiki-pager small {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.wiki-pager strong { font-size: 0.95rem; font-weight: 600; }
+
 /* --- aside ----------------------------------------------------------------------------------- */
 
 .wiki-aside {
@@ -326,9 +497,13 @@
 
 .wiki-toc h3 {
   margin: 0 0 0.5rem;
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
+  /* Same reason as the rail heading: the global 1.02 for headings shears Vietnamese tone marks off
+     inside a scrolling container. */
+  line-height: 1.7;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
@@ -345,6 +520,9 @@
 .wiki-toc a {
   display: block;
   padding: 0.15rem 0 0.15rem 0.7rem;
+  /* The marker sits on the list's own left border, so the active item shifts nothing. */
+  margin-left: -2px;
+  border-left: 2px solid transparent;
   font-size: 0.85rem;
   text-decoration: none;
   color: var(--ink-soft);
@@ -352,11 +530,69 @@
 
 .wiki-toc a:hover { color: var(--ink); }
 
+/*
+ * Scroll position. Without this the contents list said what is on the page but never where the reader
+ * currently is, which on a long page is most of what a contents list is for.
+ */
+.wiki-toc a[aria-current="location"] {
+  border-left-color: var(--signal);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/*
+ * The collapsed contents shown above the article on narrow screens.
+ *
+ * The aside used to be `display: none` below 1180px, which removed the skim tool from every phone and
+ * tablet — the widths where a wall of text is hardest to navigate. Collapsed rather than always open so
+ * it costs one line until it is wanted.
+ */
+.wiki-toc-inline {
+  margin: 0 0 1.4rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: rgba(243, 240, 231, 0.6);
+  font-family: var(--font-mono);
+}
+
+.wiki-toc-inline > summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.wiki-toc-inline ul {
+  list-style: none;
+  margin: 0.6rem 0 0.2rem;
+  padding: 0 0 0 0.2rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.wiki-toc-inline a {
+  display: block;
+  /* 44px is the comfortable minimum touch target, and this list exists for touch. */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+/* Only ever visible where the aside is not. */
+.wiki-toc-inline { display: none; }
+
 .wiki-stats-panel {
   padding: 0.9rem 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   background: var(--mint-light);
+  font-family: var(--font-mono);
 }
 
 .wiki-stats-panel .panel-label {
@@ -372,14 +608,85 @@
 .wiki-stats-panel dt { font-size: 0.78rem; color: var(--ink-soft); }
 .wiki-stats-panel dd { margin: 0; font-size: 0.78rem; font-weight: 600; }
 
+/* --- search results -------------------------------------------------------------------------- */
+
+/*
+ * Results carry the matching heading and a snippet.
+ *
+ * The search already scanned page bodies, but only page names were shown — so a hit inside a 3,000
+ * character page told the reader nothing about where the word was, and the article pane still showed
+ * whatever unrelated page was open.
+ */
+.wiki-results { margin: 0 0 1rem; }
+
+.wiki-results .result-count {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.wiki-results ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+
+.wiki-results a {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+
+.wiki-results a:hover,
+.wiki-results a.selected {
+  background: var(--mint-light);
+  border-left-color: var(--signal);
+  color: var(--ink);
+}
+
+.wiki-results .result-page {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.wiki-results .result-heading { font-size: 0.86rem; font-weight: 600; }
+
+.wiki-results .result-snippet {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+/* Marking the term rather than relying on colour alone, which a colour-blind reader cannot use. */
+.wiki-results mark {
+  padding: 0 0.1rem;
+  background: rgba(156, 67, 16, 0.18);
+  color: var(--ink);
+  font-weight: 600;
+}
+
 /* --- responsive ------------------------------------------------------------------------------ */
 
 @media (max-width: 1180px) {
-  /* The contents rail goes first: the page rail is the one that orients you between pages. */
-  .wiki-shell { grid-template-columns: minmax(11rem, 13rem) minmax(0, 1fr); }
+  /*
+   * The contents column folds away here, but the contents themselves do not: they reappear as the
+   * collapsed `<details>` above the article. Losing them entirely was the old behaviour and it took the
+   * skim tool away from exactly the widths that need it most.
+   */
+  .wiki-shell { grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr); }
   .wiki-aside { display: none; }
+  .wiki-toc-inline { display: block; }
+  /* The article stops widening when the aside goes, or the measure grows past the target. */
+  .wiki-article { max-width: 78ch; }
 }
-
 @media (max-width: 820px) {
   /*
    * Below this the rail would leave the article too narrow to read, so it becomes a scrolling row
@@ -390,6 +697,11 @@
     padding-top: 1rem;
   }
 
+  /* One column now, so the rail is a row on top and everything else stacks under it. */
+  .wiki-shell > .wiki-nav { grid-column: 1; grid-row: 1; }
+  .wiki-results { grid-column: 1; grid-row: 2; }
+  .wiki-shell > .wiki-article { grid-column: 1; grid-row: 3; }
+
   .wiki-nav {
     position: static;
     max-height: none;
@@ -397,6 +709,11 @@
     padding-bottom: 0.6rem;
     border-bottom: 1px solid var(--line);
   }
+
+  /* Section labels and summaries are for the vertical rail; in a scrolling row they would make every
+     tab several lines tall. The names alone are enough when they are all on one line. */
+  .wiki-nav h2 { display: none; }
+  .wiki-nav a small { display: none; }
 
   .wiki-nav ul {
     display: flex;
@@ -411,19 +728,42 @@
     border: 1px solid transparent;
   }
 
-  .wiki-nav a:hover { border-color: var(--line); }
+  .wiki-nav a:hover { border-color: var(--line-strong); }
 
-  .wiki-nav a.active {
+  .wiki-nav a.active,
+  .wiki-nav a[aria-current="page"] {
     background: var(--ink);
     border-color: var(--ink);
     color: var(--paper);
   }
 
-  .wiki-header { gap: 0.6rem; }
+  .wiki-nav a[aria-current="page"] small { color: var(--mint-light); }
+
+  /*
+   * The header stops being sticky here. With the search field wrapping onto its own row it stood two
+   * rows tall, and a permanently pinned double-height bar on a phone is a large share of the viewport
+   * spent on chrome rather than on the page.
+   */
+  .wiki-header { position: static; gap: 0.6rem; }
   #wiki-search { width: 100%; }
   .wiki-search-wrap { flex: 1; }
+
+  .wiki-article { max-width: none; }
+  /* Nothing above to scroll under any more, so the offset only has to clear the heading's own margin. */
+  .wiki-article h2 { scroll-margin-top: 1rem; }
+  .wiki-pager { grid-template-columns: minmax(0, 1fr); }
+  .wiki-pager a.next { grid-column: 1; text-align: left; }
+}
+
+@media (max-width: 700px) {
+  /*
+   * The masthead is decoration and it was taking about a fifth of a phone viewport above the navigation
+   * and the page title. Shorter here rather than removed, since it still sets the tone.
+   */
+  .wiki-banner { height: clamp(84px, 12vh, 120px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .wiki-code button { transition: none; }
 }
