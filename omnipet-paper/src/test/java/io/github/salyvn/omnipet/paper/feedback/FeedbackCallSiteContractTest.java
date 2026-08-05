@@ -36,6 +36,27 @@ class FeedbackCallSiteContractTest {
     }
 
     @Test
+    void particlesFunnelThroughTheSameOutputAndNeverToAWorld() throws IOException {
+        // World.spawnParticle shows the burst to everyone nearby, so it carries exactly the griefing
+        // risk the sound rule exists to prevent. Player.spawnParticle shows it to the acting player.
+        List<Path> withParticles = sources()
+                .filter(path -> Pattern.compile("^(?!\\s*\\*).*\\.spawnParticle\\(", Pattern.MULTILINE)
+                        .matcher(read(path)).find())
+                .toList();
+
+        assertEquals(1, withParticles.size(),
+                "particles must funnel through BukkitFeedbackOutput so the rate limit cannot be bypassed: "
+                        + withParticles);
+        assertTrue(withParticles.getFirst().endsWith("BukkitFeedbackOutput.java"), withParticles.toString());
+
+        List<String> broadcast = sources()
+                .filter(path -> read(path).contains("getWorld().spawnParticle"))
+                .map(Path::toString)
+                .toList();
+        assertTrue(broadcast.isEmpty(), "a burst must be visible to the acting player only: " + broadcast);
+    }
+
+    @Test
     void noCallSitePlaysToAWorldOrALocationInsteadOfAPlayer() throws IOException {
         // Player.playSound(Location, ...) and World.playSound reach everyone nearby. On a click a
         // player can repeat at will, that is a griefing vector rather than a feature.

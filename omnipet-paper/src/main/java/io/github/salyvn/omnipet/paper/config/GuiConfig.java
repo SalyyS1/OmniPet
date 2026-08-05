@@ -19,6 +19,8 @@ public record GuiConfig(
         int helpLinesPerPage,
         Duration studioPromptTimeout,
         boolean studioAutoCreateEgg,
+        boolean firstJoinGreeting,
+        String locale,
         java.util.Map<String, MenuStyle> menus) {
     /** A vault page cannot exceed this: the 54-slot layout reserves the bottom row for controls. */
     public static final int MAX_VAULT_PETS_PER_PAGE = 45;
@@ -26,6 +28,8 @@ public record GuiConfig(
 
     public GuiConfig {
         feedback = Objects.requireNonNull(feedback, "feedback settings");
+        // Blank means the built-in English text, which is what an unset key should give.
+        locale = locale == null || locale.isBlank() ? "en" : locale.trim();
         menus = menus == null ? java.util.Map.of() : java.util.Map.copyOf(menus);
         vaultPetsPerPage = clamp(vaultPetsPerPage, 1, MAX_VAULT_PETS_PER_PAGE);
         helpLinesPerPage = clamp(helpLinesPerPage, 1, MAX_HELP_LINES_PER_PAGE);
@@ -41,7 +45,7 @@ public record GuiConfig(
      */
     public static GuiConfig defaults() {
         return new GuiConfig(Feedback.defaults(), MAX_VAULT_PETS_PER_PAGE, 8, Duration.ofMinutes(2), true,
-                java.util.Map.of());
+                true, "en", java.util.Map.of());
     }
 
     /** The operator's layout for one menu, or an all-defaults style when they configured none. */
@@ -73,12 +77,19 @@ public record GuiConfig(
     public record Feedback(
             boolean enabled,
             boolean actionBar,
+            boolean particles,
+            String particleName,
+            int particleCount,
             Duration minimumInterval,
             Cue success,
             Cue failure,
             Cue blocked,
             Cue progress) {
         public Feedback {
+            // Clamped rather than rejected, like every other display value: a silly particle count must
+            // not stop players using their pets.
+            particleName = particleName == null || particleName.isBlank() ? "HAPPY_VILLAGER" : particleName.trim();
+            particleCount = Math.max(1, Math.min(particleCount, MAX_PARTICLE_COUNT));
             Objects.requireNonNull(minimumInterval, "feedback minimum interval");
             if (minimumInterval.isNegative()) throw new IllegalArgumentException("feedback interval cannot be negative");
             success = Objects.requireNonNull(success, "success cue");
@@ -87,10 +98,16 @@ public record GuiConfig(
             progress = Objects.requireNonNull(progress, "progress cue");
         }
 
+        /** Bounded so a mistyped count cannot ask the server to send thousands of particles. */
+        public static final int MAX_PARTICLE_COUNT = 64;
+
         public static Feedback defaults() {
             return new Feedback(
                     true,
                     true,
+                    true,
+                    "HAPPY_VILLAGER",
+                    12,
                     Duration.ofMillis(150),
                     new Cue("ENTITY_EXPERIENCE_ORB_PICKUP", 0.6f, 1.2f),
                     new Cue("BLOCK_NOTE_BLOCK_BASS", 0.6f, 0.8f),

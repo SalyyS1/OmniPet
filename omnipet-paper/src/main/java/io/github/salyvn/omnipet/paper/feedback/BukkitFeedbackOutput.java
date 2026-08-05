@@ -22,4 +22,17 @@ public final class BukkitFeedbackOutput implements FeedbackOutput {
     public void actionBar(Player player, Component text) {
         player.sendActionBar(text);
     }
+
+    @Override
+    public void particle(Player player, ResolvedParticle particle) {
+        // The Player-scoped overload, deliberately: World.spawnParticle would show this to everyone
+        // nearby, turning a repeatable click into a way to spray effects at other players.
+        player.spawnParticle(
+                particle.particle(),
+                player.getLocation().add(0, 1, 0),
+                particle.count(),
+                particle.spread(),
+                particle.spread(),
+                particle.spread());
+    }
 }

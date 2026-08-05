@@ -14,18 +14,20 @@ import io.github.salyvn.omnipet.paper.text.MessageKey;
  * no key still gets its sound.
  */
 public enum FeedbackEvent {
-    PET_ACTIVATED(FeedbackCategory.SUCCESS),
-    PET_RECALLED(FeedbackCategory.SUCCESS),
+    PET_ACTIVATED(FeedbackCategory.SUCCESS, MessageKey.ACTION_BAR_PET_ACTIVATED, true),
+    PET_RECALLED(FeedbackCategory.SUCCESS, MessageKey.ACTION_BAR_PET_RECALLED),
     PET_TOGGLE_REJECTED(FeedbackCategory.FAILURE),
     PET_REQUEST_IN_FLIGHT(FeedbackCategory.BLOCKED),
     PET_MANAGEMENT_OPENED(FeedbackCategory.PROGRESS),
+    // Deliberately sound-only: cycling the vault sort is repeatable, and narrating every click would
+    // make the action bar noise rather than confirmation.
     VAULT_VIEW_CHANGED(FeedbackCategory.PROGRESS),
 
-    HATCH_QUEUED(FeedbackCategory.PROGRESS),
-    HATCH_CLAIMED(FeedbackCategory.SUCCESS),
+    HATCH_QUEUED(FeedbackCategory.PROGRESS, MessageKey.ACTION_BAR_HATCH_QUEUED),
+    HATCH_CLAIMED(FeedbackCategory.SUCCESS, MessageKey.ACTION_BAR_HATCH_CLAIMED, true),
     HATCH_REJECTED(FeedbackCategory.FAILURE),
 
-    SLOT_UNLOCKED(FeedbackCategory.SUCCESS),
+    SLOT_UNLOCKED(FeedbackCategory.SUCCESS, MessageKey.ACTION_BAR_SLOT_UNLOCKED, true),
     SLOT_PURCHASE_REJECTED(FeedbackCategory.FAILURE),
     SLOT_PURCHASE_IN_FLIGHT(FeedbackCategory.BLOCKED),
 
@@ -36,14 +38,20 @@ public enum FeedbackEvent {
 
     private final FeedbackCategory category;
     private final MessageKey actionBar;
+    private final boolean celebrated;
 
     FeedbackEvent(FeedbackCategory category) {
-        this(category, null);
+        this(category, null, false);
     }
 
     FeedbackEvent(FeedbackCategory category, MessageKey actionBar) {
+        this(category, actionBar, false);
+    }
+
+    FeedbackEvent(FeedbackCategory category, MessageKey actionBar, boolean celebrated) {
         this.category = Objects.requireNonNull(category, "feedback category");
         this.actionBar = actionBar;
+        this.celebrated = celebrated;
     }
 
     public FeedbackCategory category() {
@@ -53,5 +61,16 @@ public enum FeedbackEvent {
     /** The action-bar line for this event, or {@code null} when the event is sound-only. */
     public MessageKey actionBar() {
         return actionBar;
+    }
+
+    /**
+     * Whether this moment earns a particle burst.
+     *
+     * <p>Reserved for the handful of things a player waited for — a hatch completing, a slot opening, a
+     * pet appearing. A repeatable click that burst particles would stop reading as a reward and start
+     * reading as clutter.
+     */
+    public boolean celebrated() {
+        return celebrated;
     }
 }

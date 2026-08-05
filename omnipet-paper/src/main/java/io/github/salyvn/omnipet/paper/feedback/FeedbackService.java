@@ -90,6 +90,11 @@ public final class FeedbackService {
         if (player == null || event == null || category == null || !current.enabled()) return;
         if (!allow(player.getUniqueId(), current.minimumInterval())) return;
         current.sound(category).ifPresent(sound -> output.sound(player, sound));
+        // Reserved for moments a player waited for. Shares the rate limiter with the sound, so a
+        // spammable click cannot turn into a particle fountain.
+        if (event.celebrated()) {
+            current.celebration().ifPresent(particle -> output.particle(player, particle));
+        }
         if (!current.actionBar()) return;
         MessageKey key = event.actionBar();
         if (key != null) output.actionBar(player, Messages.line(key));

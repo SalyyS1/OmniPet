@@ -13,11 +13,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import net.kyori.adventure.text.Component;
 
 import io.github.salyvn.omnipet.paper.config.GuiConfig;
+import io.github.salyvn.omnipet.paper.text.MessageCatalog;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 /**
  * Feedback behavior asserted through a recording output rather than through the source text.
@@ -29,6 +33,17 @@ import io.github.salyvn.omnipet.paper.config.GuiConfig;
 class FeedbackServiceTest {
     private final Recording output = new Recording();
     private final AtomicLong now = new AtomicLong(1_000L);
+
+    @BeforeAll
+    static void bindMessageCatalog() {
+        // Action-bar lines resolve through the catalog, which onEnable normally binds.
+        Messages.bind(MessageCatalog.defaults());
+    }
+
+    @AfterAll
+    static void unbindMessageCatalog() {
+        Messages.unbind();
+    }
 
     @Test
     void disabledFeedbackProducesNoOutputAtAll() {
@@ -126,7 +141,7 @@ class FeedbackServiceTest {
         List<String> warnings = new ArrayList<>();
         GuiConfig.Feedback defaults = GuiConfig.Feedback.defaults();
         GuiConfig.Feedback broken = new GuiConfig.Feedback(
-                true, true, Duration.ZERO,
+                true, true, true, "HAPPY_VILLAGER", 12, Duration.ZERO,
                 new GuiConfig.Cue("NO_SUCH_SOUND_ON_THIS_VERSION", 0.6f, 1.0f),
                 defaults.failure(), defaults.blocked(), defaults.progress());
 
@@ -157,14 +172,83 @@ class FeedbackServiceTest {
 
     @Test
     void anActionBarOnlyFiresForEventsThatCarryAKeyAndOnlyWhenEnabled() {
-        // Every current event is sound-only, so no event may emit an action bar. This test pins that:
-        // when a key is added later, the author must decide deliberately rather than by accident.
         FeedbackService service = service(enabled(Duration.ZERO));
         for (FeedbackEvent event : FeedbackEvent.values()) service.emit(player(), event);
 
+        long withKey = java.util.Arrays.stream(FeedbackEvent.values())
+                .filter(event -> event.actionBar() != null)
+                .count();
+        // Sound is unconditional; the action bar is the subset that has something worth saying.
+        assertEquals(FeedbackEvent.values().length, output.sounds.size());
+        assertEquals(withKey, output.actionBars.size());
+        assertTrue(withKey > 0, "the action-bar channel is configurable, so something must use it");
+        assertTrue(withKey < FeedbackEvent.values().length,
+                "a repeatable event like a vault sort must stay sound-only rather than narrating");
+
+        // The switch has to silence the channel without silencing the sounds.
+        output.actionBars.clear();
+        output.sounds.clear();
+        FeedbackService soundOnly = service(withoutActionBar());
+        for (FeedbackEvent event : FeedbackEvent.values()) soundOnly.emit(player(), event);
+
         assertEquals(FeedbackEvent.values().length, output.sounds.size());
         assertEquals(0, output.actionBars.size());
-        assertTrue(java.util.Arrays.stream(FeedbackEvent.values()).allMatch(e -> e.actionBar() == null));
+    }
+
+    @Test
+    void onlyMomentsWorthCelebratingBurstParticles() {
+        FeedbackService service = service(enabled(Duration.ZERO));
+        for (FeedbackEvent event : FeedbackEvent.values()) service.emit(player(), event);
+
+        long celebrated = java.util.Arrays.stream(FeedbackEvent.values())
+                .filter(FeedbackEvent::celebrated)
+                .count();
+        assertEquals(celebrated, output.particles.size());
+        assertTrue(celebrated > 0, "something has to earn a celebration or the channel is pointless");
+        assertTrue(celebrated < FeedbackEvent.values().length,
+                "a repeatable click bursting particles would read as clutter, not reward");
+        assertFalse(FeedbackEvent.VAULT_VIEW_CHANGED.celebrated(), "cycling a sort is not an achievement");
+        assertTrue(FeedbackEvent.HATCH_CLAIMED.celebrated(), "a hatch is what a player waited for");
+    }
+
+    @Test
+    void theMasterSwitchAndTheParticleSwitchBothSilenceTheBurst() {
+        FeedbackService disabled = service(disabled());
+        disabled.success(player(), FeedbackEvent.HATCH_CLAIMED);
+        assertEquals(0, output.particles.size(), "the master switch must stop every channel");
+
+        FeedbackService noParticles = service(withoutParticles());
+        noParticles.success(player(), FeedbackEvent.HATCH_CLAIMED);
+        assertEquals(0, output.particles.size());
+        assertEquals(1, output.sounds.size(), "turning particles off must not take the sound with it");
+    }
+
+    @Test
+    void anUnknownParticleNameCostsTheBurstRatherThanThrowingAtAPlayer() {
+        List<String> warnings = new ArrayList<>();
+        GuiConfig.Feedback defaults = GuiConfig.Feedback.defaults();
+        GuiConfig.Feedback broken = new GuiConfig.Feedback(
+                true, true, true, "NO_SUCH_PARTICLE_ON_THIS_VERSION", 12, Duration.ZERO,
+                defaults.success(), defaults.failure(), defaults.blocked(), defaults.progress());
+
+        FeedbackService service = service(FeedbackSettings.resolve(broken, warnings::add, NAMES));
+        service.success(player(), FeedbackEvent.HATCH_CLAIMED);
+
+        assertEquals(0, output.particles.size());
+        assertEquals(1, output.sounds.size(), "only the burst is lost");
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("NO_SUCH_PARTICLE_ON_THIS_VERSION")),
+                warnings.toString());
+    }
+
+    @Test
+    void aParticleBurstIsRateLimitedWithTheSound() {
+        // The burst rides the same limiter, so a player holding a click cannot make a fountain.
+        FeedbackService service = service(enabled(Duration.ofMillis(150)));
+        Player player = player();
+
+        for (int click = 0; click < 20; click++) service.success(player, FeedbackEvent.HATCH_CLAIMED);
+
+        assertEquals(1, output.particles.size());
     }
 
     @Test
@@ -193,7 +277,25 @@ class FeedbackServiceTest {
     private static FeedbackSettings enabled(Duration interval) {
         GuiConfig.Feedback defaults = GuiConfig.Feedback.defaults();
         return FeedbackSettings.resolve(new GuiConfig.Feedback(
-                true, true, interval,
+                true, true, true, "HAPPY_VILLAGER", 12, interval,
+                defaults.success(), defaults.failure(), defaults.blocked(), defaults.progress()),
+                warning -> {}, NAMES);
+    }
+
+    /** Sounds on, action bar off: the operator switch that must not silence the sounds with it. */
+    private static FeedbackSettings withoutActionBar() {
+        GuiConfig.Feedback defaults = GuiConfig.Feedback.defaults();
+        return FeedbackSettings.resolve(new GuiConfig.Feedback(
+                true, false, true, "HAPPY_VILLAGER", 12, Duration.ZERO,
+                defaults.success(), defaults.failure(), defaults.blocked(), defaults.progress()),
+                warning -> {}, NAMES);
+    }
+
+    /** Sounds on, particles off — for a server that wants confirmation without the visual noise. */
+    private static FeedbackSettings withoutParticles() {
+        GuiConfig.Feedback defaults = GuiConfig.Feedback.defaults();
+        return FeedbackSettings.resolve(new GuiConfig.Feedback(
+                true, true, false, "HAPPY_VILLAGER", 12, Duration.ZERO,
                 defaults.success(), defaults.failure(), defaults.blocked(), defaults.progress()),
                 warning -> {}, NAMES);
     }
@@ -201,7 +303,7 @@ class FeedbackServiceTest {
     private static FeedbackSettings disabled() {
         GuiConfig.Feedback defaults = GuiConfig.Feedback.defaults();
         return FeedbackSettings.resolve(new GuiConfig.Feedback(
-                false, true, Duration.ZERO,
+                false, true, true, "HAPPY_VILLAGER", 12, Duration.ZERO,
                 defaults.success(), defaults.failure(), defaults.blocked(), defaults.progress()),
                 warning -> {}, NAMES);
     }
@@ -246,6 +348,7 @@ class FeedbackServiceTest {
     private static final class Recording implements FeedbackOutput {
         private final List<ResolvedSound> sounds = new ArrayList<>();
         private final List<Component> actionBars = new ArrayList<>();
+        private final List<ResolvedParticle> particles = new ArrayList<>();
 
         @Override
         public void sound(Player player, ResolvedSound sound) {
@@ -255,6 +358,11 @@ class FeedbackServiceTest {
         @Override
         public void actionBar(Player player, Component text) {
             actionBars.add(text);
+        }
+
+        @Override
+        public void particle(Player player, ResolvedParticle particle) {
+            particles.add(particle);
         }
     }
 }

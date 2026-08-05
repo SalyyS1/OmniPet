@@ -18,4 +18,12 @@ public interface FeedbackOutput {
     void sound(Player player, ResolvedSound sound);
 
     void actionBar(Player player, Component text);
+
+    /**
+     * Shows a burst to the acting player alone.
+     *
+     * <p>Player-scoped for the same reason the sound is: a world-spawned particle is visible to everyone
+     * nearby, which on a spammable click is a griefing vector rather than a celebration.
+     */
+    void particle(Player player, ResolvedParticle particle);
 }

@@ -24,16 +24,19 @@ import io.github.salyvn.omnipet.paper.config.GuiConfig;
 public final class FeedbackSettings {
     private final boolean enabled;
     private final boolean actionBar;
+    private final ResolvedParticle celebration;
     private final Duration minimumInterval;
     private final Map<FeedbackCategory, ResolvedSound> sounds;
 
     private FeedbackSettings(
             boolean enabled,
             boolean actionBar,
+            ResolvedParticle celebration,
             Duration minimumInterval,
             Map<FeedbackCategory, ResolvedSound> sounds) {
         this.enabled = enabled;
         this.actionBar = actionBar;
+        this.celebration = celebration;
         this.minimumInterval = Objects.requireNonNull(minimumInterval, "minimum interval");
         this.sounds = new EnumMap<>(sounds);
     }
@@ -57,12 +60,34 @@ public final class FeedbackSettings {
         put(resolved, FeedbackCategory.FAILURE, config.failure(), warn, resolver);
         put(resolved, FeedbackCategory.BLOCKED, config.blocked(), warn, resolver);
         put(resolved, FeedbackCategory.PROGRESS, config.progress(), warn, resolver);
-        return new FeedbackSettings(config.enabled(), config.actionBar(), config.minimumInterval(), resolved);
+        return new FeedbackSettings(config.enabled(), config.actionBar(), celebration(config, warn),
+                config.minimumInterval(), resolved);
     }
 
     /** Everything off. Used when feedback is disabled and as the safe state before binding. */
     public static FeedbackSettings silent() {
-        return new FeedbackSettings(false, false, Duration.ZERO, Map.of());
+        return new FeedbackSettings(false, false, null, Duration.ZERO, Map.of());
+    }
+
+    /**
+     * The configured celebration burst, or null when it is off or unresolvable.
+     *
+     * <p>Fail-soft like a sound name: a particle this server version does not have costs the burst and
+     * warns, rather than throwing where a player clicked.
+     */
+    private static ResolvedParticle celebration(GuiConfig.Feedback config, Consumer<String> warn) {
+        if (!config.particles()) return null;
+        try {
+            return new ResolvedParticle(
+                    org.bukkit.Particle.valueOf(
+                            config.particleName().trim().toUpperCase(java.util.Locale.ROOT)),
+                    config.particleCount(),
+                    0.35);
+        } catch (IllegalArgumentException unknown) {
+            warn.accept("unknown particle '" + config.particleName()
+                    + "' for gui.feedback.particleName; celebrations will be silent");
+            return null;
+        }
     }
 
     private static void put(
@@ -87,6 +112,11 @@ public final class FeedbackSettings {
 
     public boolean actionBar() {
         return actionBar;
+    }
+
+    /** The burst for a celebrated moment, or empty when particles are off or the name was unusable. */
+    public Optional<ResolvedParticle> celebration() {
+        return Optional.ofNullable(celebration);
     }
 
     public Duration minimumInterval() {

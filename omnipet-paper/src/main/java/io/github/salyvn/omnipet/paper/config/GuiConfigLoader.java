@@ -17,10 +17,12 @@ import java.util.function.Consumer;
  * the default value for that key alone.
  */
 public final class GuiConfigLoader {
-    private static final Set<String> ROOT = Set.of("feedback", "vault", "help", "studio", "menus");
+    private static final Set<String> ROOT = Set.of("feedback", "vault", "help", "studio", "onboarding", "locale", "menus");
     private static final Set<String> STUDIO = Set.of("promptTimeoutSeconds", "autoCreateEgg");
+    private static final Set<String> ONBOARDING = Set.of("firstJoinGreeting");
     private static final Set<String> FEEDBACK =
-            Set.of("enabled", "actionBar", "minIntervalMillis", "success", "failure", "blocked", "progress");
+            Set.of("enabled", "actionBar", "particles", "particleName", "particleCount",
+                    "minIntervalMillis", "success", "failure", "blocked", "progress");
     private static final Set<String> CUE = Set.of("sound", "volume", "pitch");
 
     private static final MenuStyleCodec MENUS = new MenuStyleCodec();
@@ -54,12 +56,19 @@ public final class GuiConfigLoader {
             promptSeconds = defaults.studioPromptTimeout().toSeconds();
         }
 
+        Map<String, Object> onboarding = map(values.get("onboarding"), "gui.onboarding", warn);
+        warnUnknown(onboarding, ONBOARDING, "gui.onboarding", warn);
+        boolean firstJoinGreeting = bool(onboarding.get("firstJoinGreeting"),
+                defaults.firstJoinGreeting(), "gui.onboarding.firstJoinGreeting", warn);
+
+        String locale = text(values.get("locale"), defaults.locale(), "gui.locale", warn);
+
         warnClamp(petsPerPage, 1, GuiConfig.MAX_VAULT_PETS_PER_PAGE, "gui.vault.petsPerPage", warn);
         warnClamp(linesPerPage, 1, GuiConfig.MAX_HELP_LINES_PER_PAGE, "gui.help.linesPerPage", warn);
         // The record clamps; warning here keeps the operator informed of what was actually applied.
         return new GuiConfig(
                 feedback, petsPerPage, linesPerPage, Duration.ofSeconds(promptSeconds), autoCreateEgg,
-                MENUS.parse(values.get("menus"), "gui.menus", warn));
+                firstJoinGreeting, locale, MENUS.parse(values.get("menus"), "gui.menus", warn));
     }
 
     /** Serialises the section so a legacy migration round-trip cannot silently drop it. */
@@ -68,6 +77,9 @@ public final class GuiConfigLoader {
         feedback.put("enabled", config.feedback().enabled());
         feedback.put("minIntervalMillis", config.feedback().minimumInterval().toMillis());
         feedback.put("actionBar", config.feedback().actionBar());
+        feedback.put("particles", config.feedback().particles());
+        feedback.put("particleName", config.feedback().particleName());
+        feedback.put("particleCount", config.feedback().particleCount());
         feedback.put("success", cue(config.feedback().success()));
         feedback.put("failure", cue(config.feedback().failure()));
         feedback.put("blocked", cue(config.feedback().blocked()));
@@ -80,6 +92,8 @@ public final class GuiConfigLoader {
         studio.put("promptTimeoutSeconds", config.studioPromptTimeout().toSeconds());
         studio.put("autoCreateEgg", config.studioAutoCreateEgg());
         root.put("studio", studio);
+        root.put("onboarding", Map.of("firstJoinGreeting", config.firstJoinGreeting()));
+        root.put("locale", config.locale());
         // Only written when the operator restyled something, so a migration neither drops their layout
         // nor litters the file with empty menu blocks.
         Map<String, Object> menus = MENUS.encode(config.menus());
@@ -109,6 +123,10 @@ public final class GuiConfigLoader {
         return new GuiConfig.Feedback(
                 bool(values.get("enabled"), defaults.enabled(), "gui.feedback.enabled", warn),
                 bool(values.get("actionBar"), defaults.actionBar(), "gui.feedback.actionBar", warn),
+                bool(values.get("particles"), defaults.particles(), "gui.feedback.particles", warn),
+                text(values.get("particleName"), defaults.particleName(), "gui.feedback.particleName", warn),
+                integer(values.get("particleCount"), defaults.particleCount(),
+                        "gui.feedback.particleCount", warn),
                 Duration.ofMillis(interval),
                 cue(values.get("success"), defaults.success(), "gui.feedback.success", warn),
                 cue(values.get("failure"), defaults.failure(), "gui.feedback.failure", warn),
@@ -155,8 +173,15 @@ public final class GuiConfigLoader {
         if (value > maximum) warn.accept(path + " was capped at " + maximum + " from " + value);
     }
 
-    private static boolean bool(Object value, boolean fallback, String path, Consumer<String> warn) {
+    /** A configured string, or the built-in one after warning when the value is not text. */
+    private static String text(Object value, String fallback, String path, Consumer<String> warn) {
         if (value == null) return fallback;
+        if (value instanceof String result && !result.isBlank()) return result;
+        warn.accept(path + " must be a non-empty name; using " + fallback);
+        return fallback;
+    }
+
+    private static boolean bool(Object value, boolean fallback, String path, Consumer<String> warn) {        if (value == null) return fallback;
         if (value instanceof Boolean result) return result;
         if (value instanceof String text) {
             String normalised = text.trim().toLowerCase(Locale.ROOT);
