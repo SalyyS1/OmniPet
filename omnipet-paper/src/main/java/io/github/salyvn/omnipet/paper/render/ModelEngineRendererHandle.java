@@ -17,9 +17,11 @@ final class ModelEngineRendererHandle implements RendererHandle {
     private final ArmorStand carrier;
     private final Interaction interaction;
     private final Object modeledEntity;
+    private final boolean animation;
     private Object activeModel;
     private String assetId;
     private RuntimeTransform transform;
+    private String playingAnimation;
     private boolean removed;
 
     ModelEngineRendererHandle(
@@ -31,7 +33,8 @@ final class ModelEngineRendererHandle implements RendererHandle {
             Object modeledEntity,
             Object activeModel,
             String assetId,
-            RuntimeTransform transform) {
+            RuntimeTransform transform,
+            boolean animation) {
         this.ownerId = ownerId;
         this.petInstanceId = petInstanceId;
         this.generation = generation;
@@ -41,13 +44,16 @@ final class ModelEngineRendererHandle implements RendererHandle {
         this.activeModel = activeModel;
         this.assetId = assetId;
         this.transform = transform;
+        this.animation = animation;
     }
 
     @Override public UUID ownerId() { return ownerId; }
     @Override public UUID petInstanceId() { return petInstanceId; }
     @Override public long rendererGeneration() { return generation; }
     @Override public RendererCapabilities capabilities() {
-        return new RendererCapabilities(true, false, true, true);
+        // Animation is per instance, not per implementation: a build that does not expose the animation
+        // API still renders, and callers must be able to tell the difference.
+        return new RendererCapabilities(true, false, true, true, animation);
     }
     @Override public Set<UUID> interactionEntityIds() { return Set.of(interaction.getUniqueId()); }
     @Override public boolean removed() { return removed; }
@@ -58,8 +64,17 @@ final class ModelEngineRendererHandle implements RendererHandle {
     Object activeModel() { return activeModel; }
     String assetId() { return assetId; }
     RuntimeTransform transform() { return transform; }
+
+    /** The clip currently driven, so a gait change stops the old one before starting the new. */
+    String playingAnimation() { return playingAnimation; }
+    void playingAnimation(String next) { playingAnimation = next; }
+
     void assetId(String next) { assetId = next; }
-    void activeModel(Object next) { activeModel = next; }
+    void activeModel(Object next) {
+        activeModel = next;
+        // A replaced model is a fresh handler, so nothing is playing on it yet.
+        playingAnimation = null;
+    }
     void transform(RuntimeTransform next) { transform = next; }
     void markRemoved() { removed = true; }
 }

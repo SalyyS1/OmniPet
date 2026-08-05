@@ -13,6 +13,7 @@ import org.bukkit.entity.Interaction;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
+import io.github.salyvn.omnipet.core.runtime.MovementGait;
 import io.github.salyvn.omnipet.core.runtime.PetRendererPort;
 import io.github.salyvn.omnipet.core.runtime.RendererAppearance;
 import io.github.salyvn.omnipet.core.runtime.RendererHandle;
@@ -22,12 +23,39 @@ import io.github.salyvn.omnipet.core.runtime.RuntimeTransform;
 
 /** ModelEngine R4.0.9 renderer with disposable Bukkit carrier and HEAD fallback upstream. */
 public final class PaperModelEngineRenderer implements PetRendererPort {
-    private static final double SAFETY_DISTANCE_SQUARED = 32 * 32;
     private final ReflectiveModelEngineBindings bindings;
+    private final ReflectiveModelEngineAnimationBindings animations;
+    private final ModelEngineAnimations clips;
+    private final PaperHeadRendererSettings settings;
     private final Map<UUID, ModelEngineRendererHandle> handles = new LinkedHashMap<>();
     private String unhealthy;
 
     public PaperModelEngineRenderer(ClassLoader providerLoader) {
+        this(providerLoader, PaperHeadRendererSettings.defaults());
+    }
+
+    /**
+     * Shares the built-in renderer's movement settings.
+     *
+     * <p>This adapter used to hold its own copies of the gain, the velocity ceiling, and the safety
+     * distance, so retuning one renderer silently left the other at the old numbers.
+     */
+    public PaperModelEngineRenderer(ClassLoader providerLoader, PaperHeadRendererSettings settings) {
+        this(providerLoader, settings, ModelEngineAnimations.defaults());
+    }
+
+    /**
+     * Shares the built-in renderer's movement settings and takes the clip names to drive.
+     *
+     * <p>This adapter used to hold its own copies of the gain, the velocity ceiling, and the safety
+     * distance, so retuning one renderer silently left the other at the old numbers.
+     */
+    public PaperModelEngineRenderer(
+            ClassLoader providerLoader,
+            PaperHeadRendererSettings settings,
+            ModelEngineAnimations clips) {
+        this.settings = java.util.Objects.requireNonNull(settings, "renderer settings");
+        this.clips = java.util.Objects.requireNonNull(clips, "animation clip names");
         ReflectiveModelEngineBindings resolved = null;
         try {
             resolved = new ReflectiveModelEngineBindings(providerLoader);
@@ -35,6 +63,13 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             unhealthy = detail(failure);
         }
         bindings = resolved;
+        // Bound separately and allowed to fail: losing the animation API must cost clips, not the model.
+        animations = new ReflectiveModelEngineAnimationBindings(providerLoader);
+    }
+
+    /** Why animation is off on this server, or null when clips are being driven. */
+    public String animationUnavailableDetail() {
+        return animations.unavailableDetail();
     }
 
     @Override
@@ -86,8 +121,10 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             bindings.attach(modeled, active);
             ModelEngineRendererHandle handle = new ModelEngineRendererHandle(
                     request.ownerId(), request.petInstanceId(), request.rendererGeneration(),
-                    carrier, interaction, modeled, active, request.appearance().assetId(), request.transform());
+                    carrier, interaction, modeled, active, request.appearance().assetId(),
+                    request.transform(), animations.available());
             handles.put(request.petInstanceId(), handle);
+            driveAnimation(handle, request.transform());
             return handle;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
             cleanup(modeled, active, interaction, carrier, failure);
@@ -109,7 +146,8 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             throw new IllegalStateException("ModelEngine renderer entities became invalid");
         }
         if (!carrier.getWorld().equals(owner.getWorld())
-                || carrier.getLocation().distanceSquared(target) > SAFETY_DISTANCE_SQUARED) {
+                || carrier.getLocation().distanceSquared(target)
+                        > settings.safetyDistance() * settings.safetyDistance()) {
             carrier.eject();
             if (!carrier.teleport(target) || !handle.interaction().teleport(target)) {
                 throw new IllegalStateException("ModelEngine renderer safety teleport failed");
@@ -118,8 +156,10 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
                 throw new IllegalStateException("could not reattach model interaction");
             }
         } else {
-            Vector velocity = target.toVector().subtract(carrier.getLocation().toVector()).multiply(0.35);
-            if (velocity.lengthSquared() > 1.44) velocity.normalize().multiply(1.2);
+            Vector velocity = target.toVector().subtract(carrier.getLocation().toVector())
+                    .multiply(settings.movementGain());
+            double ceiling = settings.maximumVelocity();
+            if (velocity.lengthSquared() > ceiling * ceiling) velocity.normalize().multiply(ceiling);
             carrier.setVelocity(velocity);
             carrier.setRotation(transform.yaw(), transform.pitch());
         }
@@ -130,7 +170,26 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             throw wrap(failure);
         }
         setInteractionScale(handle.interaction(), transform.scale());
+        driveAnimation(handle, transform);
         handle.transform(transform);
+    }
+
+    /**
+     * Switches the clip when the pet's gait changes.
+     *
+     * <p>Only on a change: re-issuing the playing clip every tick would restart it, so a walking pet would
+     * never get past the first frame. Best-effort by design — a definition naming a clip the model does not
+     * have loses its animation and keeps its model, reported once rather than every tick.
+     */
+    private void driveAnimation(ModelEngineRendererHandle handle, RuntimeTransform transform) {
+        if (!animations.available()) return;
+        MovementGait gait = MovementGait.of(
+                transform.horizontalSpeed(), transform.dashing(), settings.maximumVelocity());
+        String clip = clips.forGait(gait);
+        if (clip == null || clip.equals(handle.playingAnimation())) return;
+        if (animations.play(handle.activeModel(), handle.playingAnimation(), clip)) {
+            handle.playingAnimation(clip);
+        }
     }
 
     @Override
