@@ -164,14 +164,38 @@ public final class PlacedEggView {
     }
 
     /**
-     * Deletes a record whose pet has been admitted.
+     * Deletes a record whose pet has been admitted, and clears the block it occupied.
      *
      * <p>Called only after the grant succeeded, so an egg is never consumed for a pet that did not
      * arrive. Until then the record stays and the egg keeps reading ready.
+     *
+     * <p>The block goes last and only if it is still the egg. It used to be left standing: the record and
+     * the hologram were deleted and the egg block stayed in the world forever, looking like an egg that
+     * had stopped incubating. Worse, breaking that orphan dropped a vanilla turtle egg, because the
+     * listener's no-drop path only covers blocks it still has a record for.
      */
     public void consume(PlacedEggRecord record) {
         coordinator.consume(record);
         holograms.hide(record.key());
+        clearBlock(record);
+    }
+
+    /**
+     * Puts the egg's block back to air.
+     *
+     * <p>Only when the block is still whatever the record says was placed there. A record whose block
+     * someone has since replaced must not have that replacement deleted, and after a chunk reload we are
+     * reading the world rather than trusting memory.
+     *
+     * <p>An unloaded chunk is left alone. The record is gone either way, so the worst case is one stray
+     * decorative block rather than a lost pet.
+     */
+    private void clearBlock(PlacedEggRecord record) {
+        Block block = block(record);
+        if (block == null || !block.getChunk().isLoaded()) return;
+        if (!PlacedEggBlocks.isEggBlock(block)) return;
+        // No physics update: the egg is decorative and its neighbours have nothing to recalculate.
+        block.setType(org.bukkit.Material.AIR, false);
     }
 
     private void pass() {

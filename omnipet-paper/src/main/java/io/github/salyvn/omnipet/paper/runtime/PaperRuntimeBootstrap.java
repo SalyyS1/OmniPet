@@ -31,7 +31,10 @@ public final class PaperRuntimeBootstrap {
         PaperHeadRenderer head = new PaperHeadRenderer(render);
         HeadFallbackRendererResolver renderers = new HeadFallbackRendererResolver(
                 new PaperModelEngineRendererResolver(plugin, render),
-                head);
+                head,
+                // Says why a pet authored for ModelEngine is rendering as a player head. Without this the
+                // fallback was silent and the only way to learn the reason was to read the resolver.
+                reason -> plugin.getLogger().warning("OmniPet renderer fallback — " + reason));
         // Retained rather than discarded: this index is already populated on spawn and purged on
         // remove, so exposing it is all that stood between a rendered pet and a right-click.
         InteractionIndex interactions = new InteractionIndex();

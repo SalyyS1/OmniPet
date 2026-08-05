@@ -9,7 +9,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.block.BlockPhysicsEvent;
+import org.bukkit.event.block.BlockPistonExtendEvent;
+import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.inventory.ItemStack;
 
 import io.github.salyvn.omnipet.paper.feedback.Feedback;
@@ -94,6 +100,64 @@ public final class PlacedEggListener implements Listener {
         event.setCancelled(true);
         player.sendMessage(message);
         Feedback.emit(player, FeedbackEvent.HATCH_REJECTED);
+    }
+
+    /**
+     * Stops anything walking over a placed egg from destroying it.
+     *
+     * <p>The shipped egg block is a turtle egg, and vanilla removes a turtle egg when an entity steps on
+     * it. That fired here as a plain block change with no break event, so nothing gave the egg back and
+     * nothing deleted the record: the countdown kept running against a block that no longer existed, the
+     * hologram floated over air, and the egg could never be reclaimed. Its owner simply lost it.
+     *
+     * <p>Cancelled rather than handled, because trampling is not a way to collect an egg — breaking the
+     * block is, and that path already returns the exact egg that was placed.
+     */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)
+    public void onTrample(EntityChangeBlockEvent event) {
+        Block block = event.getBlock();
+        if (!PlacedEggBlocks.tramplable(block)) return;
+        if (coordinator.at(block).isEmpty()) return;
+        event.setCancelled(true);
+    }
+
+    /**
+     * Keeps a placed egg from being removed by anything other than a player breaking it.
+     *
+     * <p>Vanilla turtle eggs are also destroyed by pistons and by the block-update path, and an explosion
+     * takes any of the egg blocks. Each of those would orphan the record the same way trampling did, so
+     * they are refused too. A placed egg is a durable record with an owner, not scenery.
+     */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)
+    public void onPhysics(BlockPhysicsEvent event) {
+        if (!PlacedEggBlocks.tramplable(event.getBlock())) return;
+        if (coordinator.at(event.getBlock()).isEmpty()) return;
+        event.setCancelled(true);
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)
+    public void onEntityExplode(EntityExplodeEvent event) {
+        event.blockList().removeIf(this::isPlacedEgg);
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)
+    public void onBlockExplode(BlockExplodeEvent event) {
+        event.blockList().removeIf(this::isPlacedEgg);
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)
+    public void onPistonExtend(BlockPistonExtendEvent event) {
+        if (event.getBlocks().stream().anyMatch(this::isPlacedEgg)) event.setCancelled(true);
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)
+    public void onPistonRetract(BlockPistonRetractEvent event) {
+        if (event.getBlocks().stream().anyMatch(this::isPlacedEgg)) event.setCancelled(true);
+    }
+
+    /** Whether this block is an egg somebody is currently incubating. */
+    private boolean isPlacedEgg(Block block) {
+        return PlacedEggBlocks.isEggBlock(block) && coordinator.at(block).isPresent();
     }
 
     /** Hands the egg back, dropping it at the block when the inventory is full so it is never destroyed. */

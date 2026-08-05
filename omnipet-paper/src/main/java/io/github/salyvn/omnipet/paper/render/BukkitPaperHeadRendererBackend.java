@@ -12,7 +12,6 @@ import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Transformation;
-import org.bukkit.util.Vector;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
@@ -98,40 +97,36 @@ final class BukkitPaperHeadRendererBackend implements PaperHeadRendererBackend {
         return x * x + y * y + z * z;
     }
 
+    /**
+     * Puts the carrier where the steering controller says it should be.
+     *
+     * <p>Moved by teleport rather than by {@code setVelocity}. The carrier is a marker armor stand with
+     * gravity disabled, which is to say an entity with no movement physics: velocity handed to it is never
+     * integrated into a position, so the pet stood still and the only motion a player ever saw was the
+     * safety teleport firing once the gap passed {@code safetyDistance}. That is the whole of the "pet
+     * does not follow, it just jumps to me when I get far away" report.
+     *
+     * <p>The smoothness velocity was reaching for comes from the display entity instead: its
+     * {@code teleportDuration} makes the client glide between server positions rather than snap, which is
+     * a client-side interpolation the carrier's own physics was never needed for.
+     */
     @Override
     public void smoothMove(EntityRef carrier, RuntimeTransform transform, PaperHeadRendererSettings settings) {
         Entity nativeCarrier = entity(carrier);
         Location current = nativeCarrier.getLocation();
-        Vector velocity = new Vector(
-                transform.position().x() - current.getX(),
-                transform.position().y() - current.getY(),
-                transform.position().z() - current.getZ()).multiply(settings.movementGain());
-        if (velocity.lengthSquared() > settings.maximumVelocity() * settings.maximumVelocity()) {
-            velocity.normalize().multiply(settings.maximumVelocity());
+        if (!CarrierMotion.needsMove(current.getX(), current.getY(), current.getZ(),
+                current.getYaw(), current.getPitch(), transform)) {
+            return;
         }
-        // A pet already standing where it should be, facing where it should face, needs neither write.
-        // Standing still is the common case, and both calls reach the network: setVelocity sends a
-        // velocity packet and setRotation moves a tracked entity.
-        boolean settled = velocity.lengthSquared() <= AT_REST_VELOCITY_SQUARED
-                && nativeCarrier.getVelocity().lengthSquared() <= AT_REST_VELOCITY_SQUARED;
-        if (settled && sameFacing(nativeCarrier, transform)) return;
-        nativeCarrier.setVelocity(velocity);
-        nativeCarrier.setRotation(transform.yaw(), transform.pitch());
-    }
-
-    /**
-     * Below this squared speed a carrier counts as at rest.
-     *
-     * <p>Roughly a thousandth of a block per tick. Small enough that a pet genuinely following still
-     * moves, large enough that the spring's residual jitter around a target does not keep resending.
-     */
-    private static final double AT_REST_VELOCITY_SQUARED = 1.0e-6;
-
-    /** Whether the carrier already faces where the transform wants it, within rounding. */
-    private static boolean sameFacing(Entity carrier, RuntimeTransform transform) {
-        Location current = carrier.getLocation();
-        return Math.abs(current.getYaw() - transform.yaw()) < 0.1f
-                && Math.abs(current.getPitch() - transform.pitch()) < 0.1f;
+        Location target = current.clone();
+        target.setX(transform.position().x());
+        target.setY(transform.position().y());
+        target.setZ(transform.position().z());
+        target.setYaw(transform.yaw());
+        target.setPitch(transform.pitch());
+        // Best-effort: a refused teleport leaves the carrier where it was and the safety policy picks it
+        // up on a later tick. Throwing here would tear down a renderer over one dropped frame.
+        nativeCarrier.teleport(target);
     }
 
     @Override

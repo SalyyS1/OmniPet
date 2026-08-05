@@ -41,7 +41,19 @@ public final class VaultPetSummary {
                 PetManagementMetadata.read(pet).favorite());
     }
 
-    /** The pet's level, or empty when absent or not an exact integer. */
+    /**
+     * The pet's level.
+     *
+     * <p>A pet with no progression component reads as level 1 rather than as unknown, which is the same
+     * answer {@code ProgressionState.initial} gives and therefore the same level the pet actually has.
+     * The two used to disagree: the projection defaulted a missing component to level 1 while this reader
+     * returned nothing, and since a freshly hatched pet has no progression component written for it, every
+     * new pet showed no level at all in the vault until its first cultivation action created the node.
+     *
+     * <p>Still empty for a component that exists but is corrupt. A level that is present and unreadable is
+     * a different situation from a level that was never written, and inventing a number for the first
+     * would hide the corruption.
+     */
     public Optional<Integer> level() {
         return Optional.ofNullable(level);
     }
@@ -61,8 +73,15 @@ public final class VaultPetSummary {
         return raw instanceof Map<?, ?> map ? map : null;
     }
 
+    /**
+     * The level from a progression component.
+     *
+     * <p>A missing component means the pet has never been cultivated, which is level 1 — the same value
+     * {@code ProgressionState.initial} would produce. A component that is present but unreadable stays
+     * empty, because that is corruption rather than absence.
+     */
     private static Integer readLevel(Map<?, ?> progression) {
-        if (progression == null) return null;
+        if (progression == null) return INITIAL_LEVEL;
         if (!(progression.get("level") instanceof Number number)) return null;
         double decimal = number.doubleValue();
         long exact = number.longValue();
@@ -71,6 +90,9 @@ public final class VaultPetSummary {
         if (exact < Integer.MIN_VALUE || exact > Integer.MAX_VALUE) return null;
         return (int) exact;
     }
+
+    /** The level a pet has before anything has cultivated it. Mirrors {@code ProgressionState.initial}. */
+    private static final Integer INITIAL_LEVEL = 1;
 
     private static String readRarity(Map<?, ?> hatching) {
         if (hatching == null) return null;

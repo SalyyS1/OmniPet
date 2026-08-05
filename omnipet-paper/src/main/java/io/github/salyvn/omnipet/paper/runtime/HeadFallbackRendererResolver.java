@@ -10,14 +10,35 @@ import io.github.salyvn.omnipet.core.runtime.RendererHealth;
 import io.github.salyvn.omnipet.core.runtime.RendererSpawnRequest;
 import io.github.salyvn.omnipet.core.runtime.RuntimeTransform;
 
-/** Routes optional renderers through a linkage-safe built-in HEAD fallback. */
+/**
+ * Routes optional renderers through a linkage-safe built-in HEAD fallback.
+ *
+ * <p>The fallback used to be silent. A pet authored for ModelEngine that rendered as a player head looked
+ * to an operator exactly like a pet whose provider had been ignored, because the reason the preferred
+ * renderer was passed over — plugin absent, reflection quarantined, model not loaded — was captured into a
+ * local and then dropped the moment HEAD succeeded. Nothing logged it and nothing surfaced it, so the only
+ * way to find out was to read this class. It is now reported once per reason.
+ */
 public final class HeadFallbackRendererResolver implements ActivationRendererResolver {
     private final RoutingRenderer routing;
 
     public HeadFallbackRendererResolver(ActivationRendererResolver preferred, PetRendererPort headRenderer) {
+        this(preferred, headRenderer, reason -> {});
+    }
+
+    /**
+     * @param fallbackReporter told once for each distinct reason the preferred renderer was passed over.
+     *     Deduplicated rather than rate-limited: the reason is a property of the server's configuration,
+     *     so it is the same on every pet and every tick, and one line names it without flooding the log.
+     */
+    public HeadFallbackRendererResolver(
+            ActivationRendererResolver preferred,
+            PetRendererPort headRenderer,
+            java.util.function.Consumer<String> fallbackReporter) {
         routing = new RoutingRenderer(
                 Objects.requireNonNull(preferred, "preferred renderer resolver"),
-                Objects.requireNonNull(headRenderer, "HEAD fallback renderer"));
+                Objects.requireNonNull(headRenderer, "HEAD fallback renderer"),
+                Objects.requireNonNull(fallbackReporter, "fallback reporter"));
     }
 
     @Override
@@ -29,10 +50,18 @@ public final class HeadFallbackRendererResolver implements ActivationRendererRes
     private static final class RoutingRenderer implements PetRendererPort {
         private final ActivationRendererResolver preferred;
         private final PetRendererPort head;
+        private final java.util.function.Consumer<String> fallbackReporter;
+        /** Reasons already reported, so a per-tick fallback does not become a per-tick log line. */
+        private final java.util.Set<String> reported =
+                java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<>());
 
-        private RoutingRenderer(ActivationRendererResolver preferred, PetRendererPort head) {
+        private RoutingRenderer(
+                ActivationRendererResolver preferred,
+                PetRendererPort head,
+                java.util.function.Consumer<String> fallbackReporter) {
             this.preferred = preferred;
             this.head = head;
+            this.fallbackReporter = fallbackReporter;
         }
 
         @Override
@@ -52,7 +81,8 @@ public final class HeadFallbackRendererResolver implements ActivationRendererRes
         @Override
         public RendererHandle spawn(RendererSpawnRequest request) {
             Throwable preferredFailure = null;
-            if (!"HEAD".equals(request.appearance().provider())) {
+            String provider = request.appearance().provider();
+            if (!"HEAD".equals(provider)) {
                 try {
                     PetRendererPort candidate = Objects.requireNonNull(
                             preferred.resolve(request), "preferred renderer resolver returned null");
@@ -64,10 +94,28 @@ public final class HeadFallbackRendererResolver implements ActivationRendererRes
                 }
             }
             try {
-                return new RoutedHandle(head, head.spawn(request));
+                RoutedHandle routed = new RoutedHandle(head, head.spawn(request));
+                // Reported here rather than swallowed. A pet authored for one provider that renders as a
+                // head is a visible surprise, and the reason it happened is the only thing that makes it
+                // diagnosable.
+                if (preferredFailure != null) reportFallback(provider, preferredFailure);
+                return routed;
             } catch (RuntimeException | LinkageError fallbackFailure) {
                 if (preferredFailure != null) fallbackFailure.addSuppressed(preferredFailure);
                 throw fallbackFailure;
+            }
+        }
+
+        /** Says once why a provider was passed over, keyed on the reason so it cannot repeat per pet. */
+        private void reportFallback(String provider, Throwable failure) {
+            String reason = provider + ": " + detail(failure);
+            if (!reported.add(reason)) return;
+            try {
+                fallbackReporter.accept(
+                        "rendering as a player head instead of " + reason
+                        + " — pets authored for this provider will not show their model until it is resolved");
+            } catch (RuntimeException | LinkageError ignored) {
+                // An observer must never be able to stop a pet spawning.
             }
         }
 

@@ -1,9 +1,11 @@
 package io.github.salyvn.omnipet.paper.buff;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -19,6 +21,8 @@ import io.github.salyvn.omnipet.core.storage.PetStorageSnapshot;
 public final class PaperOwnerBuffCoordinator implements Consumer<PetStorageSnapshot>, AutoCloseable {
     private final JavaPlugin plugin;
     private final Map<UUID, Desired> desiredByOwner = new LinkedHashMap<>();
+    /** Reasons already warned about, per owner, so a per-snapshot condition logs once. Cleared on quit. */
+    private final Map<UUID, Set<String>> reportedByOwner = new LinkedHashMap<>();
     private ReflectiveMythicLibBuffPort port;
     private boolean closed;
 
@@ -57,6 +61,9 @@ public final class PaperOwnerBuffCoordinator implements Consumer<PetStorageSnaps
         Objects.requireNonNull(ownerId, "buff owner ID");
         synchronized (this) {
             desiredByOwner.remove(ownerId);
+            // Forgotten with the owner, so a condition they fix and re-log in on is reported again rather
+            // than staying silent for the lifetime of the server.
+            reportedByOwner.remove(ownerId);
         }
         runMain(() -> clearCurrent(ownerId));
     }
@@ -102,10 +109,43 @@ public final class PaperOwnerBuffCoordinator implements Consumer<PetStorageSnaps
         if (port != null) report(ownerId, port.reconcile(ownerId, buffs));
     }
 
+    /**
+     * Says what happened to an owner's buffs, when it is worth saying.
+     *
+     * <p>This used to log {@code QUARANTINED} and nothing else, which made "MythicLib stats do nothing"
+     * undiagnosable: a server with no MythicLib, an owner who had just logged out, and a pet whose stat IDs
+     * MythicLib has never heard of all looked identical from outside — silent, with the plugin reporting
+     * success. The skipped count in particular was already being computed and then thrown away.
+     *
+     * <p>Deduplicated per owner and reason, because both the unavailable state and an unregistered stat ID
+     * are properties of the configuration rather than of one tick, and this runs on every snapshot.
+     */
     private void report(UUID ownerId, MythicLibBuffResult result) {
-        if (result.status() == MythicLibBuffResult.Status.QUARANTINED) {
-            plugin.getLogger().warning("MythicLib pet buffs quarantined for " + ownerId + ": " + result.detail());
+        switch (result.status()) {
+            case QUARANTINED -> warnOnce(ownerId, "quarantined",
+                    "MythicLib pet buffs quarantined for " + ownerId + ": " + result.detail());
+            case UNAVAILABLE -> warnOnce(ownerId, "unavailable:" + result.detail(),
+                    "MythicLib pet buffs were not applied for " + ownerId + ": " + result.detail());
+            case OFF_THREAD -> warnOnce(ownerId, "off-thread",
+                    "MythicLib pet buffs were skipped for " + ownerId + ": " + result.detail());
+            case APPLIED -> {
+                // Applied with nothing applied. Every stat was dropped because MythicLib does not know the
+                // ID, which is an authoring mistake in the pet definition and the likeliest cause of
+                // "the stats do nothing" on a server where MythicLib is installed and working.
+                if (result.skipped() > 0) {
+                    warnOnce(ownerId, "skipped:" + result.skipped(),
+                            "MythicLib did not recognise " + result.skipped() + " stat ID(s) on "
+                            + ownerId + "'s active pets, so those stats had no effect — check the stat IDs"
+                            + " in the pet definition against MythicLib's registered stats");
+                }
+            }
         }
+    }
+
+    /** Warns once per owner and reason, so a per-snapshot condition does not become a per-snapshot line. */
+    private void warnOnce(UUID ownerId, String reason, String message) {
+        if (!reportedByOwner.computeIfAbsent(ownerId, ignored -> new LinkedHashSet<>()).add(reason)) return;
+        plugin.getLogger().warning(message);
     }
 
     private synchronized List<UUID> owners() {

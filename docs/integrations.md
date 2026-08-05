@@ -13,7 +13,7 @@ The deterministic incubation, egg catalog, item escrow, and structured core hatc
 | Capability | Plugin | Current status | Missing-plugin behavior |
 | --- | --- | --- | --- |
 | Studio stat catalog | MythicLib | Reflection-safe picker with manual fallback | Picker unavailable; manual IDs remain supported. |
-| Owner stat application | MythicLib | Deferred | No runtime buff is applied. |
+| Owner stat application | MythicLib | Reflection-safe adapter implemented, uncertified | No runtime buff is applied. |
 | Item stats/expressions | MMOItems | Deferred | No hard MMOItems integration, item distribution, reducer, or instant-hatch redemption is active. |
 | Direct skill execution | MythicMobs | Deferred | No direct adapter is loaded. |
 | Live rendering | ModelEngine | Reflection-safe renderer implemented, with gait and idle animation | Pets render through the built-in player-head renderer instead. Nothing is lost but the model. |
@@ -23,9 +23,21 @@ The deterministic incubation, egg catalog, item escrow, and structured core hatc
 
 The Paper descriptor declares MythicLib, MMOItems, Vault, PlayerPoints, and LuckPerms as optional server dependencies with isolated classpaths. Economy and LuckPerms use dedicated dynamic registries; no vendor classes appear in core contracts.
 
+## MythicLib owner stats
+
+A pet's realized stats are registered on its owner as MythicLib stat modifiers. The adapter is reflection-safe: an ABI it cannot bind quarantines itself and no stat is applied.
+
+**A stat ID MythicLib does not recognise is skipped, not applied.** That is the usual reason "the stats do nothing" on a server where MythicLib is installed and working — the ID in the pet definition does not match a stat MythicLib has registered. This used to be silent, and the plugin still reported success; it now warns once per owner naming how many IDs were dropped. Check the log first and compare those IDs against MythicLib's registered stats.
+
+The same path now reports the other ways nothing gets applied — MythicLib absent, the owner offline, the adapter quarantined — each saying which. Previously only the quarantine case was logged, so the other three were indistinguishable from working.
+
 ## ModelEngine rendering
 
 A pet whose definition sets `display.provider: MODELENGINE` renders through the vendor's API; anything else, and any pet whose model fails to resolve, renders as a player head. The fallback is per pet rather than per server, so one bad `display.model` costs that pet its model and nothing else.
+
+**A pet authored for ModelEngine that renders as a player head now says why, once, in the server log.** The reason is one of: ModelEngine is not installed or not enabled, the reflective binding failed against this build, or the model named in `display.model` is not loaded. The fallback used to be entirely silent, which made the three indistinguishable from each other and from the provider simply being ignored.
+
+A head icon is required on every pet definition regardless of provider. That is deliberate rather than an oversight: the icon is the item the Studio and every GUI list shows, and it is the texture the head fallback uses when ModelEngine is unavailable. A MODELENGINE pet with no icon would have nothing to fall back to and no way to appear in a menu.
 
 Animation is bound **separately** from the methods the renderer cannot work without. That split is deliberate: losing `createModeledEntity` means there is nothing to show, but losing the animation API should cost clips, not models. A ModelEngine build that renamed an animation method therefore leaves every pet rendered and still, reported once in the log, with `RendererCapabilities.animation()` reading false.
 

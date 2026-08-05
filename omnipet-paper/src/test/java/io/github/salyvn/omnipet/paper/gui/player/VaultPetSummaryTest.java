@@ -28,10 +28,15 @@ class VaultPetSummaryTest {
     }
 
     @Test
-    void aPetWithNoComponentsAtAllYieldsNothingAndDoesNotThrow() {
+    void aPetWithNoComponentsAtAllReadsAsLevelOne() {
+        // The freshly-hatched case, and the bug this test was changed to catch. Hatching writes hatching,
+        // stats, appearance, and release components but no progression node, so every new pet showed no
+        // level in the vault until its first cultivation action created one. Absent progression means
+        // never-cultivated, which is level 1 -- the same answer ProgressionState.initial gives.
         VaultPetSummary summary = assertDoesNotThrow(() -> VaultPetSummary.of(pet(Map.of())));
 
-        assertTrue(summary.level().isEmpty());
+        assertEquals(1, summary.level().orElseThrow(),
+                "a pet nothing has cultivated is level 1, not a pet with no level");
         assertTrue(summary.rarity().isEmpty());
     }
 
@@ -65,11 +70,12 @@ class VaultPetSummaryTest {
 
     @Test
     void aComponentThatIsNotAMapIsIgnored() {
+        // Not a map is not a progression component at all, so it reads the same as absent: level 1.
         VaultPetSummary summary = assertDoesNotThrow(() -> VaultPetSummary.of(pet(Map.of(
                 "progression", "not-a-map",
                 "hatching", 42))));
 
-        assertTrue(summary.level().isEmpty());
+        assertEquals(1, summary.level().orElseThrow());
         assertTrue(summary.rarity().isEmpty());
     }
 
@@ -82,12 +88,13 @@ class VaultPetSummaryTest {
     }
 
     @Test
-    void aMissingLevelStillAllowsRarityToRender() {
+    void aProgressionNodeWithoutALevelStillAllowsRarityToRender() {
+        // The node exists and carries experience but no level. Absent within a present node still means
+        // never-levelled, so it reads as 1; the point of the test is that rarity is unaffected either way.
         VaultPetSummary summary = VaultPetSummary.of(pet(Map.of(
                 "progression", Map.of("experience", 10.0),
                 "hatching", Map.of("rarityId", "RARE"))));
 
-        assertTrue(summary.level().isEmpty());
         assertEquals("RARE", summary.rarity().orElseThrow());
     }
 

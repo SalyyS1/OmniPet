@@ -11,7 +11,6 @@ import org.bukkit.World;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.Player;
-import org.bukkit.util.Vector;
 
 import io.github.salyvn.omnipet.core.runtime.MovementGait;
 import io.github.salyvn.omnipet.core.runtime.PetRendererPort;
@@ -156,12 +155,20 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
                 throw new IllegalStateException("could not reattach model interaction");
             }
         } else {
-            Vector velocity = target.toVector().subtract(carrier.getLocation().toVector())
-                    .multiply(settings.movementGain());
-            double ceiling = settings.maximumVelocity();
-            if (velocity.lengthSquared() > ceiling * ceiling) velocity.normalize().multiply(ceiling);
-            carrier.setVelocity(velocity);
-            carrier.setRotation(transform.yaw(), transform.pitch());
+            // Teleport, not setVelocity. The carrier is a marker armor stand with gravity off, so it has
+            // no movement physics to integrate a velocity into: the model stood still and only moved when
+            // the safety distance tripped. ModelEngine interpolates the model between server positions
+            // itself, which is where the smoothness velocity was reaching for actually comes from.
+            Location current = carrier.getLocation();
+            if (CarrierMotion.needsMove(current.getX(), current.getY(), current.getZ(),
+                    current.getYaw(), current.getPitch(), transform)) {
+                Location destination = target.clone();
+                destination.setYaw(transform.yaw());
+                destination.setPitch(transform.pitch());
+                // Best-effort: a refused teleport leaves the carrier alone and the safety branch above
+                // picks it up on a later tick rather than tearing the renderer down over one frame.
+                carrier.teleport(destination);
+            }
         }
         // Only when the size actually changed. setScale is a reflective call and the interaction's width
         // and height are data-watcher fields, so re-applying an unchanged scale cost a metadata packet per
