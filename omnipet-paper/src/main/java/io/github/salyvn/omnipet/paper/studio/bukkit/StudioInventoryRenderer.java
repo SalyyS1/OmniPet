@@ -1,5 +1,8 @@
 package io.github.salyvn.omnipet.paper.studio.bukkit;
 
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
+import io.github.salyvn.omnipet.paper.gui.MenuPage;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -31,7 +34,7 @@ final class StudioInventoryRenderer {
     Inventory tiers(Player player, StudioState state, RegistrySnapshot snapshot) {
         Map<Integer, StudioAction> actions = new HashMap<>();
         StudioInventoryHolder holder = holder(state, StudioInventoryHolder.Screen.TIERS, actions);
-        Inventory inventory = create(holder, 27, "OmniPet Studio | Tiers");
+        Inventory inventory = create(holder, 27, Messages.line(MessageKey.GUI_TITLE_STUDIO_TIERS));
         fill(inventory);
         int[] slots = {10, 11, 12, 14, 15};
         for (int index = 0; index < PetTier.values().length; index++) {
@@ -50,7 +53,8 @@ final class StudioInventoryRenderer {
     Inventory list(Player player, StudioState state, RegistrySnapshot snapshot) {
         Map<Integer, StudioAction> actions = new HashMap<>();
         StudioInventoryHolder holder = holder(state, StudioInventoryHolder.Screen.LIST, actions);
-        Inventory inventory = create(holder, 54, "OmniPet Studio | " + state.tier.name());
+        Inventory inventory = create(holder, 54, Messages.line(MessageKey.GUI_TITLE_STUDIO_LIST,
+                Messages.of("detail", state.tier.name())));
         fill(inventory);
 
         List<PetDefinition> definitions = snapshot.definitions().values().stream()
@@ -58,12 +62,11 @@ final class StudioInventoryRenderer {
                 .filter(definition -> state.filter.isBlank() || definition.id().toLowerCase().contains(state.filter.toLowerCase()))
                 .sorted(Comparator.comparing(PetDefinition::id))
                 .toList();
-        int pages = Math.max(1, (definitions.size() + 44) / 45);
-        state.page = Math.max(0, Math.min(state.page, pages - 1));
-        int start = state.page * 45;
-        for (int index = start; index < Math.min(start + 45, definitions.size()); index++) {
+        MenuPage page = MenuPage.of(definitions.size(), 45, state.page);
+        state.page = page.index();
+        for (int index = page.firstItem(); index < page.lastItemExclusive(); index++) {
             PetDefinition definition = definitions.get(index);
-            int slot = index - start;
+            int slot = index - page.firstItem();
             actions.put(slot, new StudioAction(StudioActionType.PET, definition.id()));
             inventory.setItem(slot, StudioHeadItems.apply(item(Material.PLAYER_HEAD, definition.id(), NamedTextColor.AQUA,
                     "Tier: " + definition.tier(), "Revision: " + definition.revision(),
@@ -75,7 +78,7 @@ final class StudioInventoryRenderer {
         actions.put(49, new StudioAction(StudioActionType.BACK, ""));
         actions.put(50, new StudioAction(StudioActionType.SEARCH, ""));
         actions.put(53, new StudioAction(StudioActionType.NEXT, ""));
-        inventory.setItem(45, item(Material.ARROW, "Previous", NamedTextColor.YELLOW, "Page " + (state.page + 1) + "/" + pages));
+        inventory.setItem(45, item(Material.ARROW, "Previous", NamedTextColor.YELLOW, "Page " + page.label()));
         inventory.setItem(46, item(state.archiveMode ? Material.LIME_DYE : Material.REDSTONE,
                 state.archiveMode ? "Archive mode: ON" : "Archive mode: OFF", NamedTextColor.YELLOW,
                 "Archive is reversible and reference-aware"));
@@ -83,14 +86,15 @@ final class StudioInventoryRenderer {
         inventory.setItem(49, item(Material.BARRIER, "Back to tiers", NamedTextColor.RED));
         inventory.setItem(50, item(Material.COMPASS, "Search", NamedTextColor.AQUA,
                 state.filter.isBlank() ? "No filter" : "Filter: " + state.filter));
-        inventory.setItem(53, item(Material.ARROW, "Next", NamedTextColor.YELLOW, "Page " + (state.page + 1) + "/" + pages));
+        inventory.setItem(53, item(Material.ARROW, "Next", NamedTextColor.YELLOW, "Page " + page.label()));
         return inventory;
     }
 
     Inventory editor(Player player, StudioState state) {
         Map<Integer, StudioAction> actions = new HashMap<>();
         StudioInventoryHolder holder = holder(state, StudioInventoryHolder.Screen.EDITOR, actions);
-        Inventory inventory = create(holder, 54, "OmniPet Studio | Edit " + state.draft.id());
+        Inventory inventory = create(holder, 54, Messages.line(MessageKey.GUI_TITLE_STUDIO_EDIT,
+                Messages.of("detail", state.draft.id())));
         fill(inventory);
         StudioPetDraft draft = state.draft;
         actions.put(10, new StudioAction(StudioActionType.EDIT_TIER, ""));
@@ -146,11 +150,11 @@ final class StudioInventoryRenderer {
     @FunctionalInterface
     interface ScreenFactory {
         Inventory create(StudioState state, StudioInventoryHolder.Screen screen,
-                         Map<Integer, StudioAction> actions, int size, String title);
+                         Map<Integer, StudioAction> actions, int size, Component title);
     }
 
     private static Inventory screen(StudioState state, StudioInventoryHolder.Screen screen,
-                                    Map<Integer, StudioAction> actions, int size, String title) {
+                                    Map<Integer, StudioAction> actions, int size, Component title) {
         Inventory inventory = create(holder(state, screen, actions), size, title);
         fill(inventory);
         return inventory;
@@ -159,7 +163,7 @@ final class StudioInventoryRenderer {
     Inventory archiveConfirm(Player player, StudioState state) {
         Map<Integer, StudioAction> actions = new HashMap<>();
         StudioInventoryHolder holder = holder(state, StudioInventoryHolder.Screen.ARCHIVE_CONFIRM, actions);
-        Inventory inventory = create(holder, 27, "OmniPet Studio | Archive");
+        Inventory inventory = create(holder, 27, Messages.line(MessageKey.GUI_TITLE_STUDIO_ARCHIVE));
         fill(inventory);
         actions.put(11, new StudioAction(StudioActionType.CONFIRM_ARCHIVE, state.archiveTarget));
         actions.put(13, new StudioAction(StudioActionType.HARD_DELETE, state.archiveTarget));
@@ -177,9 +181,9 @@ final class StudioInventoryRenderer {
         return new StudioInventoryHolder(state.viewerId, state.token, screen, actions);
     }
 
-    private static Inventory create(StudioInventoryHolder holder, int size, String title) {
-        Inventory inventory = Bukkit.createInventory(holder, size,
-                GuiItems.label(title, GuiColors.TITLE));
+    /** Titles resolve through the message catalog, so the Studio reads like the rest of the plugin. */
+    private static Inventory create(StudioInventoryHolder holder, int size, Component title) {
+        Inventory inventory = Bukkit.createInventory(holder, size, title);
         holder.bind(inventory);
         return inventory;
     }

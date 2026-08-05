@@ -153,31 +153,24 @@ public final class MenuLayout<A> {
      */
     public Material material(String button, Material fallback) {
         Objects.requireNonNull(fallback, "fallback material");
-        return style.button(button).material()
-                .flatMap(name -> material(name, menuPath + ".buttons." + button + ".material"))
-                .orElse(fallback);
+        return MenuButtonStyle.material(style, menuPath, button, fallback, warnings);
     }
 
     private int resolveSlot(String button, int defaultSlot) {
-        int configured = style.button(button).slot().orElse(defaultSlot);
-        if (configured == defaultSlot) return defaultSlot;
-        String existing = claimedBy.get(configured);
-        if (existing != null && !existing.equals(button)) {
-            warnings.accept(menuPath + ".buttons." + button + ".slot " + configured
-                    + " is already used by " + existing + "; keeping its built-in slot " + defaultSlot);
-            return defaultSlot;
-        }
-        return configured;
+        // Bounds are checked in draw() against the real inventory rather than here, because the menu's
+        // size is only known once the caller has created it.
+        return MenuButtonStyle.slot(
+                style, menuPath, button, defaultSlot, 0,
+                configured -> {
+                    String existing = claimedBy.get(configured);
+                    return existing == null || existing.equals(button) ? null : existing;
+                },
+                warnings);
     }
 
     /** The named material, or empty after warning when it is unusable. */
     private Optional<Material> material(String raw, String path) {
-        Material resolved = Material.matchMaterial(raw.trim().toUpperCase(Locale.ROOT));
-        if (resolved == null || resolved == Material.AIR || !resolved.isItem()) {
-            warnings.accept(path + " is not a usable item material: " + raw + "; using the built-in one");
-            return Optional.empty();
-        }
-        return Optional.of(resolved);
+        return MenuButtonStyle.item(raw, path, warnings);
     }
 
     /** A deferred item, so recording a button needs no live server; only {@link #draw} does. */

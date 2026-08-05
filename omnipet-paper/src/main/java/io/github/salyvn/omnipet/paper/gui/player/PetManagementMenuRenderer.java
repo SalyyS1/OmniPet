@@ -91,7 +91,9 @@ public final class PetManagementMenuRenderer {
         put(style, actions, entries, "release", 16,
                 PetManagementInventoryHolder.Action.simple(PetManagementInventoryHolder.Type.PREVIEW_RELEASE),
                 locked ? Material.BARRIER : Material.LAVA_BUCKET,
-                label(MessageKey.GUI_MANAGE_RELEASE, locked ? GuiColors.SECTION : GuiColors.BLOCKED),
+                // Red because releasing cannot be undone, not because the click is refused. A locked pet
+                // greys out instead: the control is present but there is nothing to read.
+                label(MessageKey.GUI_MANAGE_RELEASE, locked ? GuiColors.DISABLED : GuiColors.DESTRUCTIVE),
                 Messages.line(locked
                         ? MessageKey.GUI_MANAGE_RELEASE_LOCKED
                         : MessageKey.GUI_MANAGE_RELEASE_HINT));
@@ -193,42 +195,27 @@ public final class PetManagementMenuRenderer {
         entries.put(slot, new Entry(material(style, button, material), name, List.of(lore)));
     }
 
-    /** The operator's slot for a button, or its built-in one when unset or already taken. */
+    /** The operator's slot for a button, or its built-in one when unset, taken, or out of range. */
     private static int slot(
             MenuStyle style,
             Map<Integer, PetManagementInventoryHolder.Action> actions,
             Map<Integer, Entry> entries,
             String button,
             int defaultSlot) {
-        int configured = style.button(button).slot().orElse(defaultSlot);
-        if (configured == defaultSlot) return defaultSlot;
-        if (actions.containsKey(configured) || entries.containsKey(configured)) {
-            GuiSettings.warn("gui.menus.management.buttons." + button + ".slot " + configured
-                    + " is already used; keeping its built-in slot " + defaultSlot);
-            return defaultSlot;
-        }
-        if (configured >= MANAGEMENT_SIZE) {
-            GuiSettings.warn("gui.menus.management.buttons." + button + ".slot " + configured
-                    + " is outside this menu; keeping its built-in slot " + defaultSlot);
-            return defaultSlot;
-        }
-        return configured;
+        return io.github.salyvn.omnipet.paper.gui.MenuButtonStyle.slot(
+                style, "gui.menus.management", button, defaultSlot, MANAGEMENT_SIZE,
+                // This menu keys its bookkeeping by slot rather than by button name, so it can say the
+                // slot is taken but not by which control.
+                configured -> actions.containsKey(configured) || entries.containsKey(configured)
+                        ? "another control"
+                        : null,
+                GuiSettings::warn);
     }
 
     /** The operator's material for a button, or the state-dependent one the renderer chose. */
     private static Material material(MenuStyle style, String button, Material fallback) {
-        return style.button(button).material()
-                .map(name -> {
-                    Material resolved = Material.matchMaterial(
-                            name.trim().toUpperCase(java.util.Locale.ROOT));
-                    if (resolved == null || resolved == Material.AIR || !resolved.isItem()) {
-                        GuiSettings.warn("gui.menus.management.buttons." + button
-                                + ".material is not a usable item material: " + name);
-                        return fallback;
-                    }
-                    return resolved;
-                })
-                .orElse(fallback);
+        return io.github.salyvn.omnipet.paper.gui.MenuButtonStyle.material(
+                style, "gui.menus.management", button, fallback, GuiSettings::warn);
     }
 
     /** The configured size, when it is still large enough to hold every placed control. */

@@ -1,5 +1,8 @@
 package io.github.salyvn.omnipet.paper.studio.bukkit;
 
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
+import io.github.salyvn.omnipet.paper.gui.MenuPage;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -32,20 +35,19 @@ final class StudioStatScreens {
     static Inventory picker(StudioState state, StudioInventoryRenderer.ScreenFactory factory) {
         Map<Integer, StudioAction> actions = new HashMap<>();
         Inventory inventory = factory.create(
-                state, StudioInventoryHolder.Screen.STAT_PICKER, actions, 54, "OmniPet Studio | Stats");
+                state, StudioInventoryHolder.Screen.STAT_PICKER, actions, 54, Messages.line(MessageKey.GUI_TITLE_STUDIO_STATS));
 
         boolean degraded = state.statSnapshot == null || state.statSnapshot.health() != CatalogHealth.AVAILABLE;
         List<StatCatalogEntry> entries = visibleEntries(state);
-        int pages = Math.max(1, (entries.size() + 44) / 45);
-        state.statPage = Math.max(0, Math.min(state.statPage, pages - 1));
-        int start = state.statPage * 45;
-        for (int index = start; index < Math.min(start + 45, entries.size()); index++) {
+        MenuPage page = MenuPage.of(entries.size(), 45, state.statPage);
+        state.statPage = page.index();
+        for (int index = page.firstItem(); index < page.lastItemExclusive(); index++) {
             StatCatalogEntry entry = entries.get(index);
             String logicalKey = StatLogicalIdentity.key(entry.id(), entry.extensions());
             StudioStat selected = state.draft.stats().stream()
                     .filter(stat -> StatLogicalIdentity.key(stat).equals(logicalKey))
                     .findFirst().orElse(null);
-            int slot = index - start;
+            int slot = index - page.firstItem();
             actions.put(slot, new StudioAction(StudioActionType.STAT, entry.id()));
             inventory.setItem(slot, StudioInventoryRenderer.item(
                     StatMaterialPalette.rowIcon(logicalKey, selected != null, degraded),
@@ -66,7 +68,7 @@ final class StudioStatScreens {
                             ? "MythicLib returned no registered stats" : "Change or clear search"}));
         }
 
-        String pageLabel = "Page " + (state.statPage + 1) + "/" + pages;
+        String pageLabel = "Page " + page.label();
         actions.put(45, new StudioAction(StudioActionType.PREVIOUS, ""));
         actions.put(46, new StudioAction(StudioActionType.STAT_MANUAL, ""));
         actions.put(47, new StudioAction(StudioActionType.STAT_REFRESH, ""));
@@ -100,7 +102,8 @@ final class StudioStatScreens {
         Map<Integer, StudioAction> actions = new HashMap<>();
         Inventory inventory = factory.create(
                 state, StudioInventoryHolder.Screen.STAT_MODIFIER, actions, 27,
-                "OmniPet Studio | " + abbreviate(entry.displayName()));
+                Messages.line(MessageKey.GUI_TITLE_STUDIO_STAT,
+                        Messages.of("detail", abbreviate(entry.displayName()))));
 
         int[] slots = {11, 13, 15};
         int index = 0;

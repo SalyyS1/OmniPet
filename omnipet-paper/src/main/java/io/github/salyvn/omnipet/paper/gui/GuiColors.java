@@ -25,6 +25,19 @@ public final class GuiColors {
     /** Blocked, locked, unaffordable. */
     public static final NamedTextColor BLOCKED = NamedTextColor.RED;
 
+    /**
+     * An irreversible action the player can take, such as releasing a pet.
+     *
+     * <p>Shares red with {@link #BLOCKED} deliberately — red means stop and read either way — but is a
+     * separate role because the two are opposites: blocked means the click will not work, destructive
+     * means it will and cannot be undone. A renderer naming the wrong one still looks right today, so the
+     * distinction has to live in the name.
+     */
+    public static final NamedTextColor DESTRUCTIVE = NamedTextColor.RED;
+
+    /** Unavailable and not worth reading — a control greyed out rather than refused. */
+    public static final NamedTextColor DISABLED = NamedTextColor.DARK_GRAY;
+
     /** Static descriptive lore. */
     public static final NamedTextColor DESCRIPTION = NamedTextColor.GRAY;
 
