@@ -115,10 +115,17 @@ class ItemAppearanceCodecTest {
                 "an unconfigured appearance must not be written back");
     }
 
+    /**
+     * The shipped config, with line endings normalised to LF.
+     *
+     * <p>Normalised because the tests anchor their injections on {@code "\n"}: on a CRLF checkout the
+     * anchor would silently fail to match, {@code replace} would be a no-op, and the assertion would
+     * compare against a value that was never injected.
+     */
     private static String shipped() {
         try (var input = ItemAppearanceCodecTest.class.getClassLoader()
                 .getResourceAsStream("config.yml")) {
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
         } catch (Exception error) {
             throw new AssertionError(error);
         }

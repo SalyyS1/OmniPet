@@ -440,6 +440,37 @@ class FilePurchaseJournalTest {
         assertTrue(Files.exists(AtomicFileStore.backupPath(file)));
     }
 
+    @Test
+    void aRowOnALaterPageIsOnlyFoundWhenTheRescanCarriesThatPagesCursor() throws Exception {
+        // The reconcile menu re-reads a row before acting on it. Re-reading from the start of the journal
+        // instead of from the page the row was shown on cannot reach anything past one page, which reads
+        // as "already reconciled" for a transaction that is still pending.
+        Path root = temporary.resolve("later-page-purchases");
+        FilePurchaseJournal journal = new FilePurchaseJournal(root);
+        Set<SlotPurchaseSagaState> pending = Set.of(SlotPurchaseSagaState.UNKNOWN_REQUIRES_RECONCILIATION);
+        SlotPurchaseTransaction first = transaction(
+                UUID.fromString("10000000-0000-0000-0000-000000000001"),
+                SlotPurchaseSagaState.UNKNOWN_REQUIRES_RECONCILIATION);
+        SlotPurchaseTransaction second = transaction(
+                UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                SlotPurchaseSagaState.UNKNOWN_REQUIRES_RECONCILIATION);
+        journal.create(first);
+        journal.create(second);
+
+        PurchaseJournalScanResult page = journal.scan(pending, 1);
+        assertEquals(java.util.List.of(first), page.transactions());
+
+        UUID onNextPage = second.transactionId();
+        assertFalse(
+                journal.scan(pending, 1).transactions().stream()
+                        .anyMatch(row -> row.transactionId().equals(onNextPage)),
+                "a cursorless rescan cannot see the next page, so it must not be what a re-read uses");
+        assertTrue(
+                journal.scan(pending, 1, page.nextCursor()).transactions().stream()
+                        .anyMatch(row -> row.transactionId().equals(onNextPage)),
+                "carrying the page cursor is what finds the row the operator actually clicked");
+    }
+
     private static SlotPurchaseTransaction transaction(UUID transactionId, SlotPurchaseSagaState state) {
         SlotPurchaseQuote quote = new SlotPurchaseQuote(
                 UUID.randomUUID(),

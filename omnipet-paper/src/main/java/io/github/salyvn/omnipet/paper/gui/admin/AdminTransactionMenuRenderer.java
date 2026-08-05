@@ -35,6 +35,8 @@ import io.github.salyvn.omnipet.paper.text.Messages;
 public final class AdminTransactionMenuRenderer {
     private static final int LIST_SIZE = 54;
     private static final int ROWS = 45;
+    /** Slots the bottom row reserves for controls, whatever size the operator chose. */
+    private static final int CONTROL_ROW = 9;
     private static final int REFRESH_SLOT = 49;
     private static final int NEXT_SLOT = 53;
     private static final int CONFIRM_SIZE = 27;
@@ -55,21 +57,32 @@ public final class AdminTransactionMenuRenderer {
                 GuiSettings.gui().menu("adminTransactions"), "gui.menus.adminTransactions",
                 GuiSettings::warn);
 
-        // Rows are data, not buttons: they fill 0..44 in journal order and there is no meaningful
-        // "move the third row" for an operator, so they bind directly rather than through a button name
-        // that all 45 of them would have to share.
+        // Rows are data, not buttons: they fill the space above the control row in journal order and
+        // there is no meaningful "move the third row" for an operator, so they bind directly rather than
+        // through a button name they would all have to share.
+        //
+        // Bounded by the menu's actual size, not the default: a smaller configured size has fewer rows
+        // to give, and drawing past it would warn once per dropped row and show nothing for any of them.
+        int size = layout.size(LIST_SIZE);
+        int capacity = Math.min(ROWS, Math.max(0, size - CONTROL_ROW));
         List<SlotPurchaseTransaction> rows = scan.transactions();
-        for (int index = 0; index < rows.size() && index < ROWS; index++) {
+        int shown = Math.min(rows.size(), capacity);
+        for (int index = 0; index < shown; index++) {
             SlotPurchaseTransaction row = rows.get(index);
             layout.putStack("row" + index, index,
                     AdminTransactionInventoryHolder.Action.open(row.transactionId()),
                     io.github.salyvn.omnipet.paper.gui.GuiItems.of(
                             layout.material("row", Material.PAPER), rowName(row), rowLore(row)));
         }
+        if (shown < rows.size()) {
+            GuiSettings.warn("gui.menus.adminTransactions.size " + size + " fits only " + shown
+                    + " of " + rows.size() + " pending transaction(s); the rest are on the next page"
+                    + " or reachable with /pet admin transactions.");
+        }
         layout.put("refresh", REFRESH_SLOT, AdminTransactionInventoryHolder.Action.refresh(),
                 Material.CLOCK, Messages.line(MessageKey.GUI_ADMIN_REFRESH),
                 List.of(Messages.line(MessageKey.GUI_ADMIN_TX_COUNT,
-                        Messages.of("amount", rows.size()))));
+                        Messages.of("amount", shown))));
         if (scan.nextCursor() != null) {
             layout.put("next", NEXT_SLOT, AdminTransactionInventoryHolder.Action.page(scan.nextCursor()),
                     Material.ARROW, Messages.line(MessageKey.GUI_ADMIN_NEXT_PAGE), List.of());
@@ -79,7 +92,7 @@ public final class AdminTransactionMenuRenderer {
                 viewer.getUniqueId(), AdminTransactionInventoryHolder.View.LIST, cursor, null,
                 layout.actions());
         Inventory inventory = Bukkit.createInventory(
-                holder, layout.size(LIST_SIZE), Messages.line(MessageKey.GUI_TITLE_ADMIN_TRANSACTIONS));
+                holder, size, Messages.line(MessageKey.GUI_TITLE_ADMIN_TRANSACTIONS));
         holder.bind(inventory);
         layout.draw(inventory);
         return inventory;

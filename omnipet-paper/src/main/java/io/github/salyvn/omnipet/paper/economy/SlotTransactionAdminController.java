@@ -35,8 +35,9 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
     /**
      * How far the confirm screen scans to re-find its row.
      *
-     * <p>Bounded like every other journal read: a transaction beyond this is reachable by the command
-     * form with an explicit cursor, which is what that form is for.
+     * <p>Bounded like every other journal read, and read from the page the row was shown on: scanning
+     * from the start of the journal instead would never reach a row on the second page, and would
+     * report a still-pending transaction as already reconciled.
      */
     private static final int MENU_SCAN_LIMIT = 50;
     private final io.github.salyvn.omnipet.paper.gui.admin.AdminTransactionMenuRenderer menus =
@@ -116,19 +117,40 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
             CommandSender sender,
             UUID transactionId,
             SlotReconciliationDecision decision) {
+        reconcile(sender, transactionId, decision, null);
+    }
+
+    /**
+     * Applies one decision, running {@code afterApplied} on the main thread once the journal write has
+     * finished.
+     *
+     * <p>The callback exists so a caller that wants to show the result — the menu reopening its list —
+     * observes the decision instead of racing it.
+     */
+    public void reconcile(
+            CommandSender sender,
+            UUID transactionId,
+            SlotReconciliationDecision decision,
+            Runnable afterApplied) {
         Objects.requireNonNull(sender, "sender");
         Objects.requireNonNull(transactionId, "transaction id");
         Objects.requireNonNull(decision, "reconciliation decision");
         String actor = sender.getName();
         submit(sender, () -> {
             SlotPurchaseResult result;
-            if (decision == SlotReconciliationDecision.ENTITLEMENT_SYNC_RETRY) {
-                result = synchronizeExternalEntitlement(transactionId, actor);
-            } else {
-                result = reconciliation.reconcile(transactionId, decision, actor);
-                if (result.status() == SlotPurchaseResult.Status.ENTITLEMENT_SYNC_PENDING) {
+            try {
+                if (decision == SlotReconciliationDecision.ENTITLEMENT_SYNC_RETRY) {
                     result = synchronizeExternalEntitlement(transactionId, actor);
+                } else {
+                    result = reconciliation.reconcile(transactionId, decision, actor);
+                    if (result.status() == SlotPurchaseResult.Status.ENTITLEMENT_SYNC_PENDING) {
+                        result = synchronizeExternalEntitlement(transactionId, actor);
+                    }
                 }
+            } finally {
+                // Runs even when the decision failed: the caller's view is stale either way, and the
+                // failure itself is already reported by submit().
+                if (afterApplied != null) runMain(afterApplied);
             }
             sendMain(sender, "OmniPet: reconciliation " + result.status().name().toLowerCase()
                     + " - " + result.detail());
@@ -184,9 +206,27 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
      * cursor is an opaque token an operator pastes into a ticket, which no menu replaces.
      */
     public void openMenu(org.bukkit.entity.Player viewer, String cursor) {
+        openMenu(viewer, cursor, null);
+    }
+
+    /**
+     * Opens the pending-transaction menu, reporting a failed journal read through {@code onLoadFailed}.
+     *
+     * <p>A read that throws leaves no menu open, so without this the operator gets only the generic
+     * operation-failed line and no indication that the list they asked for is the thing that is missing.
+     * The text belongs to the caller for the same reason the missing-row text does: this class is the
+     * audit trail.
+     */
+    public void openMenu(org.bukkit.entity.Player viewer, String cursor, Runnable onLoadFailed) {
         Objects.requireNonNull(viewer, "viewer");
         submit(viewer, () -> {
-            PurchaseJournalScanResult scan = reconciliation.pending(MENU_PAGE_SIZE, cursor);
+            PurchaseJournalScanResult scan;
+            try {
+                scan = reconciliation.pending(MENU_PAGE_SIZE, cursor);
+            } catch (IOException | RuntimeException failure) {
+                if (onLoadFailed != null) runMain(onLoadFailed);
+                throw failure;
+            }
             runMain(() -> {
                 if (!viewer.isOnline()) return;
                 viewer.openInventory(menus.renderList(viewer, scan, cursor));
@@ -198,8 +238,9 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
      * Opens the confirm screen for one transaction, re-reading it first.
      *
      * <p>The row is read again rather than carried from the list, so a transaction another operator
-     * already reconciled cannot be acted on from a menu that is minutes old. When it has gone, the list
-     * is reopened instead of silently doing nothing.
+     * already reconciled cannot be acted on from a menu that is minutes old. The re-read starts from the
+     * cursor the list page was loaded with, so a row on a later page is still found. When it has gone,
+     * the list is reopened at the same page instead of silently doing nothing.
      */
     public void openConfirm(
             org.bukkit.entity.Player viewer, UUID transactionId, String cursor, Runnable onMissing) {
@@ -207,7 +248,7 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
         Objects.requireNonNull(transactionId, "transaction id");
         Objects.requireNonNull(onMissing, "missing-row handler");
         submit(viewer, () -> {
-            PurchaseJournalScanResult scan = reconciliation.pending(MENU_SCAN_LIMIT, null);
+            PurchaseJournalScanResult scan = reconciliation.pending(MENU_SCAN_LIMIT, cursor);
             var row = scan.transactions().stream()
                     .filter(candidate -> candidate.transactionId().equals(transactionId))
                     .findFirst()
@@ -218,7 +259,7 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
                     // Reported by the caller, which owns menu-facing text: this class is the audit
                     // trail, and its output deliberately stays in Java where a YAML edit cannot reach.
                     onMissing.run();
-                    openMenu(viewer, null);
+                    openMenu(viewer, cursor);
                     return;
                 }
                 viewer.openInventory(menus.renderConfirm(viewer, row, cursor));
@@ -226,14 +267,20 @@ public final class SlotTransactionAdminController implements SlotTransactionAdmi
         });
     }
 
-    /** Applies a decision from the confirm screen, then reopens the list so the operator sees the effect. */
+    /**
+     * Applies a decision from the confirm screen, then reopens the list so the operator sees the effect.
+     *
+     * <p>The reopen is chained onto the decision rather than scheduled alongside it. Scheduling both at
+     * once lets the reopen win the race and redraw the row the operator just decided, which reads as the
+     * decision having been lost.
+     */
     public void reconcileFromMenu(
             org.bukkit.entity.Player viewer,
             UUID transactionId,
             SlotReconciliationDecision decision,
             String cursor) {
-        reconcile(viewer, transactionId, decision);
-        runMain(() -> {
+        Objects.requireNonNull(viewer, "viewer");
+        reconcile(viewer, transactionId, decision, () -> {
             if (viewer.isOnline()) openMenu(viewer, cursor);
         });
     }

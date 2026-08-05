@@ -10,6 +10,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 
 import io.github.salyvn.omnipet.paper.economy.SlotTransactionAdminController;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 /**
  * Admin transaction click guards, copied guard-for-guard from {@code HubMenuListener}.
@@ -57,13 +59,11 @@ public final class AdminTransactionMenuListener implements Listener {
             AdminTransactionInventoryHolder holder,
             AdminTransactionInventoryHolder.Action action) {
         switch (action.type()) {
-            case REFRESH -> controller.openMenu(player, holder.cursor());
-            case PAGE -> controller.openMenu(player, action.cursor());
+            case REFRESH -> openList(player, holder.cursor());
+            case PAGE -> openList(player, action.cursor());
             case OPEN -> controller.openConfirm(player, action.transactionId(), holder.cursor(),
-                    () -> player.sendMessage(
-                            io.github.salyvn.omnipet.paper.text.Messages.line(
-                                    io.github.salyvn.omnipet.paper.text.MessageKey.GUI_ADMIN_TX_GONE)));
-            case BACK -> controller.openMenu(player, holder.cursor());
+                    () -> player.sendMessage(Messages.line(MessageKey.GUI_ADMIN_TX_GONE)));
+            case BACK -> openList(player, holder.cursor());
             case DECIDE -> {
                 // Only from the confirm screen, and only for the transaction that screen is about.
                 if (holder.view() != AdminTransactionInventoryHolder.View.CONFIRM) return;
@@ -72,6 +72,12 @@ public final class AdminTransactionMenuListener implements Listener {
                         player, action.transactionId(), action.decision(), holder.cursor());
             }
         }
+    }
+
+    /** Reopens the list, telling the operator when the journal itself could not be read. */
+    private void openList(Player player, String cursor) {
+        controller.openMenu(player, cursor,
+                () -> player.sendMessage(Messages.line(MessageKey.GUI_ADMIN_TX_LOAD_FAILED)));
     }
 
     @EventHandler
