@@ -99,6 +99,17 @@ final class PetManagementMenuSupport {
         player.sendMessage(Messages.line(key, Messages.of("detail", text)));
     }
 
+    /**
+     * A readable line for a status the outcome gave no detail for.
+     *
+     * <p>Resolved from the catalog rather than from the constant's name, so it is translatable and does
+     * not put internal vocabulary like {@code PERSISTED_CONSUMPTION_PENDING} in front of a player.
+     */
+    static String statusText(PetManagementOutcome.Status status) {
+        MessageKey key = PetManagementStatusText.of(status);
+        return Messages.plain(Messages.line(key == null ? MessageKey.STATUS_ERROR : key));
+    }
+
     static String detail(Throwable failure) {
         Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null
                 ? failure.getCause() : failure;
@@ -164,7 +175,7 @@ final class PetManagementMenuSupport {
                     || outcome.status() == PetManagementOutcome.Status.STALE_SESSION
                     ? NamedTextColor.YELLOW : NamedTextColor.RED;
             String text = outcome.detail().isBlank()
-                    ? Displays.words(outcome.status())
+                    ? statusText(outcome.status())
                     : outcome.detail();
             message(player, text, color);
             // The colour already encodes the distinction: yellow means "try again", red means refused.

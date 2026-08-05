@@ -84,6 +84,27 @@ without a restart. What *is* fixed at startup is the egg count reported in the e
 pet-to-egg index the Studio uses to refuse deleting a definition an egg still references — restart to
 refresh those.
 
+## Hatching an egg by placing it
+
+An egg does not have to be held. Placing it as a block next to a heat source incubates it where it
+stands, with a countdown floating above it:
+
+```
+/pet hatch main       # incubate the egg you are holding
+                      # ...or just place the egg block beside a torch
+```
+
+Any one adjacent heat source is enough for an ordinary egg — torch, soul torch, campfire, lantern,
+fire, lava, magma block, furnace, blast furnace, or smoker. An egg definition can ask for something
+harder: a fire-affinity egg can require a full ring of eight lava blocks, and an egg can refuse
+placement entirely so it must be hatched in hand.
+
+The requirement is re-checked every second. Removing the heat pauses the countdown rather than
+cancelling it, and an unloaded chunk pauses rather than accruing time. Breaking the block returns the
+egg exactly as it was placed — the record is consumed before the item is returned, so a break-and-place
+cycle cannot duplicate it. When the countdown finishes with a full vault, the egg stays on the ground
+reading ready and waits for space rather than being lost.
+
 ## Compatibility scope
 
 The build defines probes for Paper APIs `1.21-R0.1-SNAPSHOT`, `1.21.11-R0.1-SNAPSHOT`, `26.1.1.build.29-alpha`, `26.1.2.build.74-stable`, and `26.2.build.87-stable`. The 26.x jobs use a Java 25 compiler while still producing Java 21 bytecode. These are compile checks only; the shared-queue checkpoint did not rerun them or perform live Paper smoke testing.

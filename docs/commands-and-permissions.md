@@ -104,10 +104,9 @@ Every Studio action checks both the viewer permission and the current session/vi
 ## Not implemented
 
 - Riding. `RendererCapabilities.riding` exists and the built-in head renderer reports `false`; no mount service or control is registered.
-- Entity click interaction. Activation populates a stable entity-to-owner index, but no interact listener routes through it, so passive event triggers and click-to-target actions are unavailable.
-- A combined player hub. Vault, hatch, slot purchase, and management are separate entry points.
 - MMOItems cultivation identities. Candy and breakthrough items are standalone materials from `config.yml`.
 - Admin target mode for another player's management menu.
+- A skill picker. `/pet skill` takes a pet UUID typed by hand; no menu selects one.
 
 ## Migration note
 

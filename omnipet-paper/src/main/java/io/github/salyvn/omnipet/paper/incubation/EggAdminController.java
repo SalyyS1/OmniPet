@@ -401,6 +401,7 @@ public final class EggAdminController {
                 Messages.of("detail", IncubationDurationParser.formatMillis(definition.baseActiveMillis()))));
         lore.add(Component.empty());
         lore.add(Messages.line(MessageKey.GUI_EGG_ITEM_HINT));
+        lore.add(Messages.line(MessageKey.GUI_EGG_ITEM_PLACE_HINT));
         ItemStack egg = codec.create(
                 definition.id(),
                 ItemAppearanceApplier.material(
