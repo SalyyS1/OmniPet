@@ -34,9 +34,11 @@ enum StudioFieldPrompt {
     SKILLS("skills", "Skills",
             "<provider:id>|<trigger>|<cooldown>|<chance>|<stamina>|<target>; repeat with ; or type none",
             "mythicmobs:Fireball|ACTIVE|30s|1.0|10|SELF"),
-    BEHAVIOR("behavior", "Behavior and effects",
+    // The example names keys the runtime actually reads. It used to suggest `glow=true;particle=flame`,
+    // neither of which exists, so an operator following the prompt got a pet that moved exactly as before.
+    BEHAVIOR("behavior", "Movement",
             "key=value; repeat with ; or type none",
-            "glow=true;particle=flame"),
+            "pattern=ORBIT;orbitRadius=2.0;heightOffset=1.5"),
     RELEASE("release", "Release policy",
             "one mode token, or none",
             "INTERNAL_ONLY"),

@@ -19,7 +19,10 @@ class PaperRuntimeProductionWiringTest {
         String source = Files.readString(source(
                 "src/main/java/io/github/salyvn/omnipet/paper/OmniPetPlugin.java"));
 
-        assertTrue(source.contains("petRuntime = PaperRuntimeBootstrap.create(this, activeConfig.runtime())"));
+        // The renderer settings travel with the runtime settings, so both renderers are tuned from the
+        // same config rather than one of them silently keeping its built-in numbers.
+        assertTrue(source.contains(
+                "petRuntime = PaperRuntimeBootstrap.create(this, activeConfig.runtime(), activeConfig.render())"));
         assertTrue(source.contains("new PaperRuntimeSnapshotPublisher(petRuntime, registry)"));
         assertTrue(source.contains("new PlayerStorageLifecycleListener("));
         assertTrue(source.contains("managementServices::onJoin"));

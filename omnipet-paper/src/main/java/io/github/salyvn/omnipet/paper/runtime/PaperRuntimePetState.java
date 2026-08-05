@@ -3,6 +3,7 @@ package io.github.salyvn.omnipet.paper.runtime;
 import java.util.UUID;
 
 import io.github.salyvn.omnipet.core.runtime.MovementController;
+import io.github.salyvn.omnipet.core.runtime.MovementFacing;
 import io.github.salyvn.omnipet.core.runtime.MovementInput;
 import io.github.salyvn.omnipet.core.runtime.MovementStep;
 import io.github.salyvn.omnipet.core.runtime.RendererSpawnRequest;
@@ -17,6 +18,8 @@ final class PaperRuntimePetState {
     private final double phaseOffsetRadians;
     private RuntimeVector position;
     private RuntimeVector velocity;
+    private float yaw;
+    private boolean dashing;
     private long lastUpdateNanos;
 
     private PaperRuntimePetState(
@@ -25,13 +28,15 @@ final class PaperRuntimePetState {
             long phaseStartedNanos,
             double phaseOffsetRadians,
             RuntimeVector position,
-            RuntimeVector velocity) {
+            RuntimeVector velocity,
+            float yaw) {
         this.rendererGeneration = rendererGeneration;
         this.rendererProvider = rendererProvider;
         this.phaseStartedNanos = phaseStartedNanos;
         this.phaseOffsetRadians = phaseOffsetRadians;
         this.position = position;
         this.velocity = velocity;
+        this.yaw = yaw;
         this.lastUpdateNanos = phaseStartedNanos;
     }
 
@@ -52,7 +57,9 @@ final class PaperRuntimePetState {
                 nowNanos,
                 phaseOffset(pet.instance().id()),
                 initial.position(),
-                initial.velocity());
+                initial.velocity(),
+                // Spawns facing the same way as its owner; motion takes over from the first tick.
+                MovementFacing.normalize(owner.yaw()));
     }
 
     void advance(DesiredPet pet, PaperRuntimeOwnerPose owner, long nowNanos, MovementController movement) {
@@ -63,6 +70,11 @@ final class PaperRuntimePetState {
                 deltaSeconds, phaseSeconds, phaseOffsetRadians));
         position = step.position();
         velocity = step.velocity();
+        dashing = step.dashing();
+        // A snap relocates the pet without it having travelled, so the old heading means nothing there.
+        yaw = step.safetySnap()
+                ? MovementFacing.normalize(owner.yaw())
+                : MovementFacing.yaw(yaw, velocity, deltaSeconds);
         lastUpdateNanos = nowNanos;
     }
 
@@ -73,7 +85,9 @@ final class PaperRuntimePetState {
                 rendererGeneration,
                 pet.definitionId(),
                 pet.appearance(),
-                new RuntimeTransform(position, owner.yaw(), owner.pitch(), pet.scale()));
+                // Pitch stays level: a pet that pitched with its owner's look would tip over when the
+                // player glanced at the sky, and nothing about following needs it.
+                new RuntimeTransform(position, yaw, 0, pet.scale(), velocity, dashing));
     }
 
     boolean rendererProviderMatches(DesiredPet pet) {

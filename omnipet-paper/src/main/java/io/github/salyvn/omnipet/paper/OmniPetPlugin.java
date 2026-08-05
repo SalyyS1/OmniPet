@@ -52,12 +52,8 @@ import io.github.salyvn.omnipet.paper.entitlement.PaperLuckPermsEntitlementRegis
 import io.github.salyvn.omnipet.paper.entitlement.SlotEntitlementSynchronizer;
 import io.github.salyvn.omnipet.paper.gui.pet.PetInteractListener;
 import io.github.salyvn.omnipet.paper.incubation.EggAdminController;
-import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggCoordinator;
-import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggHolograms;
-import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggListener;
 import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggRecord;
-import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggStore;
-import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggView;
+import io.github.salyvn.omnipet.paper.incubation.placed.PlacedEggServices;
 import io.github.salyvn.omnipet.paper.incubation.PaperEggItemCodec;
 import io.github.salyvn.omnipet.paper.gui.player.PlayerPetMenuListener;
 import io.github.salyvn.omnipet.paper.gui.hatch.HatchMenuListener;
@@ -121,7 +117,8 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PlayerHubController hubController;
     private EggAdminController eggAdmin;
     private Path messagesFile;
-    private PlacedEggView placedEggs;
+    private Path dataRoot;
+    private PlacedEggServices placedEggs;
 
     @Override
     public void onEnable() {
@@ -146,6 +143,10 @@ public final class OmniPetPlugin extends JavaPlugin {
             Feedback.bind(feedback);
             messagesFile = dataRoot.resolve("messages.yml");
             MessageCatalogFile.writeDefaultsIfAbsent(messagesFile);
+            // Bundled translations are copied out so an operator can edit them; never overwritten.
+            io.github.salyvn.omnipet.paper.text.MessageLocales.writeBundledPacks(
+                    dataRoot, note -> getLogger().info("OmniPet: " + note));
+            this.dataRoot = dataRoot;
             Messages.bind(loadMessages());
             Phase4PaperConfig phase4Config = activeConfig.storage();
             migrateLegacyEggDefinitions(dataRoot);
@@ -156,7 +157,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             PurchaseTransactionCoordinator purchaseTransactions = new PurchaseTransactionCoordinator();
             registry = new InMemoryRegistrySnapshotRepository();
             var snapshot = new FoundationRegistryLoader().load(definitions, registry);
-            petRuntime = PaperRuntimeBootstrap.create(this, activeConfig.runtime());
+            petRuntime = PaperRuntimeBootstrap.create(this, activeConfig.runtime(), activeConfig.render());
             ownerBuffs = new PaperOwnerBuffCoordinator(this);
             ownerBuffs.refreshProvider();
             skillProviders = new PaperMythicMobsSkillContext(this);
@@ -268,20 +269,20 @@ public final class OmniPetPlugin extends JavaPlugin {
             // Placing an egg incubates it in the world, keeping its identity in a durable block record.
             // Deliberately its own record rather than an escrow row: escrow proves a held item was paid
             // for, while a placed egg is one the player still owns.
-            // One coordinator, shared: two would each hold their own store and could disagree about
-            // whether a block still has an egg on it.
-            PlacedEggCoordinator placedEggCoordinator = new PlacedEggCoordinator(
-                    new PlacedEggStore(dataRoot.resolve("data/placed-eggs")),
+            placedEggs = PlacedEggServices.open(
+                    this,
+                    dataRoot,
                     incubation.eggDefinitions(),
-                    warning -> getLogger().warning("OmniPet placed egg: " + warning));
-            placedEggs = new PlacedEggView(
-                    this, placedEggCoordinator, new PlacedEggHolograms(), this::hatchPlacedEgg);
-            getServer().getPluginManager().registerEvents(
-                    new PlacedEggListener(
-                            new PaperEggItemCodec(this), placedEggCoordinator, placedEggs),
-                    this);
+                    warning -> getLogger().warning("OmniPet placed egg: " + warning),
+                    this::hatchPlacedEgg);
+            getServer().getPluginManager().registerEvents(placedEggs.listener(), this);
             placedEggs.start();
             getServer().getPluginManager().registerEvents(new HubMenuListener(hubController), this);
+            // The only thing that tells a brand-new player OmniPet is here.
+            getServer().getPluginManager().registerEvents(
+                    new io.github.salyvn.omnipet.paper.player.PlayerOnboardingListener(
+                            () -> GuiSettings.gui().firstJoinGreeting()),
+                    this);
             // Reconciling a transaction from a menu, so the operator never copies a UUID out of chat.
             getServer().getPluginManager().registerEvents(
                     new io.github.salyvn.omnipet.paper.gui.admin.AdminTransactionMenuListener(
@@ -376,7 +377,9 @@ public final class OmniPetPlugin extends JavaPlugin {
                     this::reloadRuntime);
             command.bindHub(hubController::open);
             command.bindEggAdmin(eggAdmin);
-            command.bindTransactionMenu(viewer -> transactionAdmin.openMenu(viewer, null));
+            command.bindTransactionMenu(viewer -> transactionAdmin.openMenu(viewer, null,
+                    () -> viewer.sendMessage(io.github.salyvn.omnipet.paper.text.Messages.line(
+                            io.github.salyvn.omnipet.paper.text.MessageKey.GUI_ADMIN_TX_LOAD_FAILED))));
             event.registrar().register(
                     FoundationCommandContract.NAME, FoundationCommandContract.ALIASES, command);
             // The same administration without the second word. Routes into the router /pet already
@@ -438,7 +441,11 @@ public final class OmniPetPlugin extends JavaPlugin {
     private void hatchPlacedEgg(java.util.UUID ownerId, PlacedEggRecord record) {
         var owner = getServer().getPlayer(ownerId);
         if (owner == null || !owner.isOnline()) return;
-        var definition = registry.current().definitions().get(placedEggDefinitionId(record));
+        String definitionId = PlacedEggServices.definitionId(
+                incubation.eggDefinitions(),
+                record,
+                warning -> getLogger().warning("OmniPet placed egg: " + warning));
+        var definition = registry.current().definitions().get(definitionId);
         if (definition == null) return;
         var limits = new PaperStorageLimitsResolver(activeConfig.storage())
                 .resolve(owner::hasPermission).limits();
@@ -447,25 +454,10 @@ public final class OmniPetPlugin extends JavaPlugin {
                 owner.sendMessage(Messages.line(MessageKey.EGG_PLACED_VAULT_FULL));
                 return;
             }
-            placedEggs.remove(record.key());
             placedEggs.consume(record);
             owner.sendMessage(Messages.line(MessageKey.EGG_PLACED_HATCHED,
                     Messages.of("pet", definition.id())));
         });
-    }
-
-    /** The pet a placed egg hatches: its catalog entry's single candidate. */
-    private String placedEggDefinitionId(PlacedEggRecord record) {
-        try {
-            return incubation.eggDefinitions().read(record.eggId())
-                    .map(envelope -> envelope.definition().candidates().isEmpty()
-                            ? null
-                            : envelope.definition().candidates().getFirst().definitionId())
-                    .orElse(null);
-        } catch (IOException | RuntimeException failure) {
-            getLogger().warning("OmniPet could not read the placed egg's definition: " + failure.getMessage());
-            return null;
-        }
     }
 
     private FeedbackSettings resolveFeedback(GuiConfig.Feedback config) {
@@ -490,8 +482,17 @@ public final class OmniPetPlugin extends JavaPlugin {
      * Reads {@code messages.yml}. Unknown keys and unusable values are logged and skipped, so an
      * operator typo degrades one line instead of blocking startup or a reload.
      */
+    /**
+     * The text catalog for the configured locale.
+     *
+     * <p>{@code messages.yml} layers over the language pack, which layers over the built-in English, so
+     * an operator's own edits always win and a partial translation still loads.
+     */
     private MessageCatalog loadMessages() throws IOException {
-        return MessageCatalog.load(messagesFile, warning -> getLogger().warning("OmniPet messages.yml: " + warning));
+        return io.github.salyvn.omnipet.paper.text.MessageLocales.load(
+                dataRoot,
+                activeConfig.gui().locale(),
+                warning -> getLogger().warning("OmniPet messages: " + warning));
     }
 
     PlayerStateRepository playerStates() {

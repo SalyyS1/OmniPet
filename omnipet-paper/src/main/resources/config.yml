@@ -96,6 +96,33 @@ runtime:
 
 
 # ----------------------------------------------------------------------------------------------
+#  RENDER - how a pet looks while it moves
+# ----------------------------------------------------------------------------------------------
+#  RESTART ONLY. Shared by the built-in renderer and the ModelEngine adapter, so retuning here
+#  applies to both. Strict like the runtime section and unlike the GUI one: these values steer
+#  entities, so a misspelled key is refused rather than ignored. Delete the whole section for the
+#  built-in tuning.
+#
+#  A pet's own movement shape - follow distance, orbit, hovering, bobbing - is per-pet and lives in
+#  the pet definition's `behavior:` block, not here. This section is about the rendering.
+# ----------------------------------------------------------------------------------------------
+render:
+  # How far a pet may drift from where it should be before it is teleported instead of steered.
+  # Raise it and a lagging pet catches up visibly; lower it and it snaps more eagerly.
+  safetyDistance: 8.0
+  # Fraction of the remaining distance converted to velocity each tick. Higher is snappier and
+  # twitchier; lower is smoother and lazier. Must stay in (0, 1].
+  movementGain: 0.35
+  # Hard ceiling on that velocity, in blocks per tick.
+  maximumVelocity: 1.2
+  # Client-side smoothing window. 0 disables it and the pet moves in visible steps.
+  interpolationTicks: 3
+  # How far a pet tips back at full speed, in degrees, like something leaning into a run.
+  # 0 keeps it perfectly upright. Purely visual: the clickable hitbox stays where the pet is.
+  maximumLeanDegrees: 12.0
+
+
+# ----------------------------------------------------------------------------------------------
 #  PROGRESSION - levelling, stamina, and the default EXP curve
 # ----------------------------------------------------------------------------------------------
 #  Server-wide fallback. Any pet definition may override the formula for itself.
@@ -185,8 +212,20 @@ gui:
     # Minimum gap between two sounds from the same player, in milliseconds. This is what stops a
     # fast-clicking player becoming an audible nuisance to everyone nearby.
     minIntervalMillis: 150
-    # Action-bar text alongside the sound.
+    # Action-bar text alongside the sound. Only events worth narrating carry a line: summoning,
+    # recalling, starting an incubation, claiming a hatch, and unlocking a slot. Repeatable actions
+    # such as cycling the vault sort stay sound-only. Wording is in messages.yml under action-bar.*
     actionBar: true
+
+    # A small burst shown to the acting player when something they waited for finally lands - a hatch
+    # claimed, a slot unlocked, a pet summoned. Never for a repeatable click, and never visible to
+    # anyone else: a burst other players could see would make a spammable menu a griefing tool.
+    # Shares the interval below with the sound, so holding a click cannot make a fountain.
+    particles: true
+    # Any vanilla particle name. An unknown name costs the burst alone and warns; the sound stays.
+    particleName: HAPPY_VILLAGER
+    # Particles per burst, capped at 64.
+    particleCount: 12
 
     # One cue per OUTCOME, not per event - so a new feature never needs new keys here.
     #   success  - it worked          failure  - it did not
@@ -216,6 +255,26 @@ gui:
     # writing egg files at all. Reloads live.
     autoCreateEgg: true
 
+  onboarding:
+    # Two chat lines sent the FIRST time a player ever joins, telling them /pet exists. Without this
+    # nothing announces the plugin: /pet tab-completes, but only for someone already looking for it.
+    # Never repeats for a returning player. Set false if your server does its own introduction.
+    # Wording lives in messages.yml under onboarding.*   Reloads live.
+    firstJoinGreeting: true
+
+  # Which language pack to read, as a file name in lang/. Ships with:
+  #   en   built-in English (no file; this is the plugin's own text)
+  #   vi   Tiếng Việt
+  #
+  # Bundled packs are copied into lang/ on first start and NEVER overwritten afterwards, so your
+  # edits survive an upgrade. Add your own by dropping lang/<name>.yml beside them.
+  #
+  # Priority, highest first:  messages.yml  ->  lang/<locale>.yml  ->  built-in English.
+  # So your messages.yml always wins, and a key missing from a pack falls back instead of breaking.
+  # Naming a locale nobody has translated warns and uses English rather than refusing to start.
+  # Reloads live.
+  locale: en
+
   # ----------------------------------------------------------------------------------------------
   #  MENU RESTYLING (optional)
   # ----------------------------------------------------------------------------------------------
@@ -231,12 +290,18 @@ gui:
   #  is a different item when ready, incubating, and idle - pins it to that one look on purpose.
   #
   #  Menus and their buttons:
-  #    hub         vault, hatch, slots, help, studio
-  #    vault       previous, next, hub, sort, filter, status, unlockSlot   (materials only)
-  #    hatch       startMain, startOff, incubation, hub, refresh
-  #    management  favorite, lock, moveUp, moveDown, candy, breakthrough, release,
-  #                refresh, back, hub
-  #    slot        payVault, payPoints, confirm, cancel, hub
+  #    hub                vault, hatch, slots, help, studio
+  #    vault              previous, next, hub, sort, filter, status, unlockSlot   (materials only)
+  #    hatch              startMain, startOff, incubation, hub, refresh,
+  #                       redeemMain, redeemOff
+  #    management         favorite, lock, moveUp, moveDown, candy, breakthrough, release,
+  #                       refresh, back, hub
+  #    slot               payVault, payPoints, confirm, cancel, hub
+  #    adminTransactions  row, refresh, next
+  #    adminReconcile     charge, noCharge, refund, sync, subject, back
+  #
+  #  redeemMain and redeemOff only appear while an egg is incubating - they sit in the slots the
+  #  start buttons are not using. `row` styles every row of the admin transaction list at once.
   #
   #  The vault takes materials but not slots or size: pet rows fill slots 0-44 and the paging maths
   #  is built on that shape. Moving a button onto an occupied slot, or outside the menu, is refused

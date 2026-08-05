@@ -11,11 +11,17 @@ import io.github.salyvn.omnipet.core.runtime.RendererSpawnRequest;
 
 public final class PaperModelEngineRendererResolver implements ActivationRendererResolver {
     private final JavaPlugin plugin;
+    private final PaperHeadRendererSettings settings;
     private Plugin provider;
     private PaperModelEngineRenderer renderer;
 
     public PaperModelEngineRendererResolver(JavaPlugin plugin) {
+        this(plugin, PaperHeadRendererSettings.defaults());
+    }
+
+    public PaperModelEngineRendererResolver(JavaPlugin plugin, PaperHeadRendererSettings settings) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.settings = Objects.requireNonNull(settings, "renderer settings");
     }
 
     @Override
@@ -27,7 +33,14 @@ public final class PaperModelEngineRendererResolver implements ActivationRendere
         if (current == null || !current.isEnabled()) throw new IllegalStateException("ModelEngine is not enabled");
         if (current != provider || renderer == null || !renderer.health().available()) {
             provider = current;
-            renderer = new PaperModelEngineRenderer(current.getClass().getClassLoader());
+            renderer = new PaperModelEngineRenderer(current.getClass().getClassLoader(), settings);
+            // Said once per provider instance, not per pet: an operator who expected animated pets needs
+            // to know clips are off, but a per-spawn line would flood the log.
+            String animationFailure = renderer.animationUnavailableDetail();
+            if (animationFailure != null) {
+                plugin.getLogger().warning("OmniPet: ModelEngine pets will render without animation - "
+                        + animationFailure);
+            }
         }
         return renderer;
     }

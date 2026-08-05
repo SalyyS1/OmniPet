@@ -14,6 +14,7 @@ import io.github.salyvn.omnipet.core.persistence.YamlDocuments;
 import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
 import io.github.salyvn.omnipet.core.studio.input.CompiledFormula;
 import io.github.salyvn.omnipet.core.studio.input.StudioFormulaValidator;
+import io.github.salyvn.omnipet.paper.render.PaperHeadRendererSettings;
 import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeSettings;
 
 /** Aggregate loader that preserves the strict Phase 4 storage contract. */
@@ -27,7 +28,7 @@ public final class OmniPetConfigLoader {
      * {@code docs/integrations.md}.
      */
     private static final Set<String> ROOT_KEYS =
-            Set.of("storage", "runtime", "progression", "items", "integrations", "gui");
+            Set.of("storage", "runtime", "render", "progression", "items", "integrations", "gui");
     private static final ItemAppearanceCodec APPEARANCES = new ItemAppearanceCodec();
 
     public LoadResult load(Path file) throws IOException {
@@ -57,12 +58,13 @@ public final class OmniPetConfigLoader {
                 : new Phase4PaperConfigLoader().parseWithReport(YamlDocuments.writeMap(Map.of(
                         "storage", requiredMap(root.get("storage"), "storage"))));
         PaperRuntimeSettings runtime = runtime(optionalMap(root.get("runtime"), "runtime"));
+        PaperHeadRendererSettings render = render(optionalMap(root.get("render"), "render"));
         Map<String, Object> progressionValues = optionalMap(root.get("progression"), "progression");
         ProgressionConfig progression = progression(progressionValues);
         Map<String, Object> itemValues = optionalMap(root.get("items"), "items");
         OmniPetConfig.CultivationItems items = items(itemValues);
         GuiConfig gui = new GuiConfigLoader().parse(root.get("gui"), warnings);
-        return new LoadResult(new OmniPetConfig(storage.config(), runtime, progression,
+        return new LoadResult(new OmniPetConfig(storage.config(), runtime, render, progression,
                 experienceFormulaSource(progressionValues), items,
                 appearances(itemValues, warnings), gui),
                 legacy || storage.migratedLegacy());
@@ -75,6 +77,14 @@ public final class OmniPetConfigLoader {
         runtime.put("periodTicks", config.runtime().periodTicks());
         runtime.put("maximumOwnersPerTick", config.runtime().maximumOwnersPerTick());
         runtime.put("maximumPetsPerOwner", config.runtime().maximumPetsPerOwner());
+        // Written back for the same reason the EXP formula is: encode() is what a legacy migration
+        // produces, and omitting a tuned section would reset it on upgrade.
+        LinkedHashMap<String, Object> render = new LinkedHashMap<>();
+        render.put("safetyDistance", config.render().safetyDistance());
+        render.put("movementGain", config.render().movementGain());
+        render.put("maximumVelocity", config.render().maximumVelocity());
+        render.put("interpolationTicks", config.render().interpolationTicks());
+        render.put("maximumLeanDegrees", config.render().maximumLeanDegrees());
         LinkedHashMap<String, Object> progression = new LinkedHashMap<>();
         progression.put("maxLevel", config.progression().maxLevel());
         progression.put("maxStamina", config.progression().maxStamina());
@@ -94,6 +104,7 @@ public final class OmniPetConfigLoader {
         LinkedHashMap<String, Object> root = new LinkedHashMap<>();
         root.put("storage", storageRoot.get("storage"));
         root.put("runtime", runtime);
+        root.put("render", render);
         root.put("progression", progression);
         root.put("items", items);
         // Serialised, not omitted: encode() is what a legacy migration writes back, so leaving gui out
@@ -134,6 +145,31 @@ public final class OmniPetConfigLoader {
         }
         merged.put("appearance", APPEARANCES.encode(appearance));
         items.put(key, merged);
+    }
+
+    /**
+     * Movement and lean tuning shared by both renderers.
+     *
+     * <p>Strict like {@code runtime:} rather than lenient like {@code gui:}: these values steer entities,
+     * and a silently ignored typo would leave an operator convinced they had retuned something they had
+     * not. An absent section is the built-in tuning.
+     */
+    private static PaperHeadRendererSettings render(Map<String, Object> values) {
+        rejectUnknown(values, Set.of(
+                "safetyDistance", "movementGain", "maximumVelocity", "interpolationTicks",
+                "maximumLeanDegrees"), "render");
+        PaperHeadRendererSettings defaults = PaperHeadRendererSettings.defaults();
+        return new PaperHeadRendererSettings(
+                number(values.getOrDefault("safetyDistance", defaults.safetyDistance()),
+                        "render.safetyDistance"),
+                number(values.getOrDefault("movementGain", defaults.movementGain()),
+                        "render.movementGain"),
+                number(values.getOrDefault("maximumVelocity", defaults.maximumVelocity()),
+                        "render.maximumVelocity"),
+                integer(values.getOrDefault("interpolationTicks", defaults.interpolationTicks()),
+                        "render.interpolationTicks"),
+                number(values.getOrDefault("maximumLeanDegrees", defaults.maximumLeanDegrees()),
+                        "render.maximumLeanDegrees"));
     }
 
     private static PaperRuntimeSettings runtime(Map<String, Object> values) {

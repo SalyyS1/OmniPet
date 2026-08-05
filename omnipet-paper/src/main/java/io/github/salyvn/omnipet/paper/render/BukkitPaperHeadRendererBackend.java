@@ -148,11 +148,28 @@ final class BukkitPaperHeadRendererBackend implements PaperHeadRendererBackend {
         display.setInterpolationDuration(settings.interpolationTicks());
         display.setTeleportDuration(settings.interpolationTicks());
         display.setTransformation(new Transformation(
-                new Vector3f(), new AxisAngle4f(), new Vector3f(scale, scale, scale), new AxisAngle4f()));
+                new Vector3f(), leanBack(transform, settings), new Vector3f(scale, scale, scale),
+                new AxisAngle4f()));
         Interaction target = interaction(interaction);
         float width = Math.max(0.25f, Math.min(8.0f, scale));
         target.setInteractionWidth(width);
         target.setInteractionHeight(Math.max(0.25f, Math.min(8.0f, scale * 1.25f)));
+    }
+
+    /**
+     * Tips the pet back as it picks up speed, like something leaning into a run.
+     *
+     * <p>Applied to the display rather than the carrier so it is purely visual: the interaction hitbox and
+     * the movement policy's distance checks keep working against an upright position. The lean is around
+     * the pet's local left axis, so it reads the same whichever way the pet has turned.
+     */
+    private static AxisAngle4f leanBack(RuntimeTransform transform, PaperHeadRendererSettings settings) {
+        double speed = transform.horizontalSpeed();
+        if (speed <= 0.05 || settings.maximumLeanDegrees() <= 0) return new AxisAngle4f();
+        double reference = Math.max(0.1, settings.maximumVelocity());
+        double fraction = Math.min(1.0, speed / reference);
+        float radians = (float) Math.toRadians(settings.maximumLeanDegrees() * fraction);
+        return new AxisAngle4f(radians, 1, 0, 0);
     }
 
     @Override

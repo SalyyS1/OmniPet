@@ -52,5 +52,26 @@ final class PaperHeadRendererHandle implements RendererHandle {
     void appearance(RendererAppearance value) { appearance = value; }
     RuntimeTransform transform() { return transform; }
     void transform(RuntimeTransform value) { transform = value; }
+
+    /**
+     * Whether the display's transformation would actually differ from the one already sent.
+     *
+     * <p>Re-sending an identical transformation restarts interpolation and dirties the display's data
+     * watcher, so an unconditional per-tick write costs a packet per pet for no visible change. Only the
+     * channels the transformation carries are compared; position and yaw move the carrier, not the
+     * display, and are handled separately.
+     */
+    boolean displayTransformChanged(RuntimeTransform next) {
+        return transform == null
+                || transform.scale() != next.scale()
+                || transform.dashing() != next.dashing()
+                || tiltDiffers(next);
+    }
+
+    /** Tilt follows horizontal speed, so a speed change is what makes the lean visibly different. */
+    private boolean tiltDiffers(RuntimeTransform next) {
+        return Math.abs(transform.horizontalSpeed() - next.horizontalSpeed()) > 0.02;
+    }
+
     void markRemoved() { removed = true; }
 }

@@ -8,6 +8,7 @@ import io.github.salyvn.omnipet.core.runtime.InteractionIndex;
 import io.github.salyvn.omnipet.core.runtime.MovementController;
 import io.github.salyvn.omnipet.core.runtime.PetActivationService;
 import io.github.salyvn.omnipet.paper.render.PaperHeadRenderer;
+import io.github.salyvn.omnipet.paper.render.PaperHeadRendererSettings;
 import io.github.salyvn.omnipet.paper.render.PaperModelEngineRendererResolver;
 
 public final class PaperRuntimeBootstrap {
@@ -18,11 +19,18 @@ public final class PaperRuntimeBootstrap {
     }
 
     public static PaperPetRuntimeCoordinator create(JavaPlugin plugin, PaperRuntimeSettings settings) {
+        return create(plugin, settings, PaperHeadRendererSettings.defaults());
+    }
+
+    /** Both renderers share {@code render}, so retuning movement cannot apply to only one of them. */
+    public static PaperPetRuntimeCoordinator create(
+            JavaPlugin plugin, PaperRuntimeSettings settings, PaperHeadRendererSettings render) {
         Objects.requireNonNull(plugin, "runtime plugin");
         Objects.requireNonNull(settings, "runtime settings");
-        PaperHeadRenderer head = new PaperHeadRenderer();
+        Objects.requireNonNull(render, "renderer settings");
+        PaperHeadRenderer head = new PaperHeadRenderer(render);
         HeadFallbackRendererResolver renderers = new HeadFallbackRendererResolver(
-                new PaperModelEngineRendererResolver(plugin),
+                new PaperModelEngineRendererResolver(plugin, render),
                 head);
         // Retained rather than discarded: this index is already populated on spawn and purged on
         // remove, so exposing it is all that stood between a rendered pet and a right-click.

@@ -69,6 +69,33 @@ are inserted literally and never re-parsed, so player-supplied text cannot injec
 viewer's screen. Operator and console output — transaction pages, cursors, reconcile reasons, item
 delivery receipts — stays in the plugin: it is an audit trail, not UI.
 
+## Languages (`lang/`)
+
+`gui.locale` in `config.yml` picks a language pack from `plugins/OmniPet/lang/`. The build ships:
+
+| Locale | Text |
+| --- | --- |
+| `en` | The built-in English. No file — it is the plugin's own defaults, so there is no second copy to drift. |
+| `vi` | Tiếng Việt, covering every key. |
+
+Bundled packs are written into `lang/` on first start and **never overwritten afterwards**, so a
+correction you make survives an upgrade — the same rule `messages.yml` and the egg catalog follow. Add
+a language by dropping `lang/<name>.yml` beside them and pointing `gui.locale` at it.
+
+Resolution, highest priority first:
+
+1. `messages.yml` — whatever the operator wrote
+2. `lang/<locale>.yml` — the pack for the configured locale
+3. the built-in English defaults
+
+So `messages.yml` always wins, which matters because it is generated on first start and many servers
+already have one edited in place. A key missing from a pack falls through to the next layer rather than
+failing, so a half-finished translation shows translated lines where it has them and English elsewhere.
+Naming a locale nobody has translated warns and uses English instead of refusing to start.
+
+One caveat: a few values inside translated lines come from enum names rather than the catalog — a sort
+order, a reconcile decision — and those still read in English. Player-facing failure text is covered.
+
 ## `config.yml`
 
 ```yaml
@@ -258,7 +285,55 @@ Current required fields are `classification.tier`, `icon.head.source`, `icon.hea
 
 `display.provider` accepts `HEAD` or `MODELENGINE`; `MODELENGINE` requires a non-blank `display.model`. These are authoring/persistence values only. No HEAD, Paper display-entity, or ModelEngine live renderer ships in this checkpoint.
 
-Admin Pet Studio can also persist bounded `stats`, `rarity.bands`, `progression`, `skills`, `behavior`, and `release` metadata. The editor validates these fields and preserves unknown raw nodes, but no hatching, progression, skill execution, release gameplay, or owner-stat application consumes them yet.
+Admin Pet Studio can also persist bounded `stats`, `rarity.bands`, `progression`, `skills`, `behavior`, and `release` metadata. The editor validates these fields and preserves unknown raw nodes. Of these, `behavior` is read at runtime and steers the pet (see below); hatching, progression, skill execution, release gameplay, and owner-stat application do not yet consume the others.
+
+### Per-pet movement (`behavior`)
+
+Optional. Every key falls back to the built-in value, so a definition with no `behavior` block moves on the defaults. This is the pet's own movement *shape*; the `render:` block in `config.yml` covers how any pet is drawn and is server-wide.
+
+```yaml
+behavior:
+  pattern: FOLLOW        # FOLLOW, ORBIT, HOP, or HOVER
+  followDistance: 1.8    # blocks behind the owner
+  sideOffset: 0.7        # blocks to the owner's side; negative mirrors it
+  heightOffset: 1.25     # blocks above the owner's feet
+  orbitRadius: 1.5       # ORBIT only
+  orbitRadiansPerSecond: 1.5708
+  bobAmplitude: 0.18     # HOP and HOVER only: how far it rises
+  bobRadiansPerSecond: 6.2832
+  springStrength: 18     # how hard it pulls toward its target; higher is tighter
+  damping: 7             # resists overshoot; too low oscillates, too high feels sluggish
+  maxAcceleration: 24
+  maxSpeed: 6
+  dashDistance: 5        # beyond this it dashes to catch up
+  dashSpeedMultiplier: 1.75
+  safetySnapDistance: 24 # beyond this it stops steering and is placed instantly
+  maxDeltaSeconds: 0.25  # caps the step a lagging tick may take
+  scale: 1.0             # 0 < scale <= 64
+```
+
+Steering is a spring-damper: the pet accelerates toward a target derived from the owner's position and facing, then that acceleration is clamped. `dashDistance` must be smaller than `safetySnapDistance`, or the definition is refused. Pets in a group are given a deterministic phase offset from their instance ID, so several of the same pet do not bob in lockstep.
+
+`pattern` picks how the target is built: `FOLLOW` trails the owner, `ORBIT` circles them, `HOP` adds a bouncing rise, and `HOVER` adds a smooth rise and fall.
+
+### ModelEngine animation clips (`behavior.animations`)
+
+Optional, and only used by pets whose `display.provider` is `MODELENGINE`. The built-in HEAD renderer has no clips to play.
+
+```yaml
+behavior:
+  animations:
+    idle: idle
+    walk: walk
+    run: run
+```
+
+The defaults above match the names Blockbench rigs conventionally use, so a typical model animates with no configuration. Set a name to an empty string to stop that gait asking for a clip, which is how a model carrying only an idle loop avoids being asked for a walk.
+
+A clip is switched only when the gait changes, since re-issuing the playing clip every tick would restart it. Gait comes from movement: standing still is `idle`, ordinary following is `walk`, and either reaching `render.maximumVelocity` or the controller's own catch-up dash is `run`.
+
+Naming a clip the model does not contain costs that gait its animation and nothing else — the pet still renders. The same is true if a server's ModelEngine build does not expose the animation API at all: it is bound separately from the methods the renderer cannot work without, reported once in the log, and `RendererCapabilities.animation()` then reads false.
+
 
 `rarity.bands` is optional. A definition with no `rarity` node hatches against a single implicit full-range band (`standard`, quality 0-100, hatch multiplier 1.0), so a pet saved in the Studio without authoring a rarity profile is still obtainable. An explicit `rarity` node that is malformed is still rejected — only genuine absence defaults.
 

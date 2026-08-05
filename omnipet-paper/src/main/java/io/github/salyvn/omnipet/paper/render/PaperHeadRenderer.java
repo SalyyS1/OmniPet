@@ -105,7 +105,12 @@ public final class PaperHeadRenderer implements PetRendererPort {
         } else {
             backend.smoothMove(handle.carrier(), transform, settings);
         }
-        backend.updateScale(handle.visual(), handle.interaction(), transform, settings);
+        // Only when the display would actually look different. An unchanged transformation still restarts
+        // interpolation and dirties the entity's data watcher, so writing it every tick costs a packet per
+        // pet and buys nothing.
+        if (handle.displayTransformChanged(transform)) {
+            backend.updateScale(handle.visual(), handle.interaction(), transform, settings);
+        }
         handle.transform(transform);
     }
 

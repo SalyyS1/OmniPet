@@ -3,11 +3,13 @@ package io.github.salyvn.omnipet.paper.config;
 import java.util.Objects;
 
 import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
+import io.github.salyvn.omnipet.paper.render.PaperHeadRendererSettings;
 import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeSettings;
 
 public record OmniPetConfig(
         Phase4PaperConfig storage,
         PaperRuntimeSettings runtime,
+        PaperHeadRendererSettings render,
         ProgressionConfig progression,
         String experienceFormulaSource,
         CultivationItems cultivationItems,
@@ -19,6 +21,7 @@ public record OmniPetConfig(
     public OmniPetConfig {
         storage = Objects.requireNonNull(storage, "storage config");
         runtime = Objects.requireNonNull(runtime, "runtime config");
+        render = render == null ? PaperHeadRendererSettings.defaults() : render;
         progression = Objects.requireNonNull(progression, "progression config");
         // Retained beside the compiled formula because compilation is one-way: ProgressionConfig holds
         // only a lambda, so without the source text encode() could not write back what the operator

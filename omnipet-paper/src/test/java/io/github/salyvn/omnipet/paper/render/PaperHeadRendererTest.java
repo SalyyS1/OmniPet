@@ -53,6 +53,40 @@ class PaperHeadRendererTest {
     }
 
     @Test
+    void anUnchangedDisplayTransformIsNotResentEveryTick() {
+        // The display's transformation used to be written on every update. Re-sending an identical one
+        // restarts interpolation and dirties the entity's data watcher, so a stationary pet cost a packet
+        // per tick for no visible change - multiplied by every pet on the server.
+        FakeBackend backend = new FakeBackend();
+        PaperHeadRenderer renderer = renderer(backend);
+        RendererHandle handle = renderer.spawn(request());
+        int afterSpawn = backend.scaleUpdates;
+
+        RuntimeTransform still = new RuntimeTransform(new RuntimeVector(1, 0, 0), 0, 0, 1);
+        renderer.update(handle, still);
+        renderer.update(handle, still);
+        renderer.update(handle, still);
+
+        assertEquals(afterSpawn, backend.scaleUpdates, "an unchanged transform must not be resent");
+    }
+
+    @Test
+    void aChangedScaleOrGaitIsStillSentOnce() {
+        FakeBackend backend = new FakeBackend();
+        PaperHeadRenderer renderer = renderer(backend);
+        RendererHandle handle = renderer.spawn(request());
+        int afterSpawn = backend.scaleUpdates;
+
+        renderer.update(handle, new RuntimeTransform(new RuntimeVector(1, 0, 0), 0, 0, 2.0));
+        assertEquals(afterSpawn + 1, backend.scaleUpdates, "a resized pet must be redrawn");
+
+        // Speed drives the lean, so a pet breaking into a run looks different even at the same scale.
+        renderer.update(handle, new RuntimeTransform(
+                new RuntimeVector(1, 0, 0), 0, 0, 2.0, new RuntimeVector(0, 0, 3), true));
+        assertEquals(afterSpawn + 2, backend.scaleUpdates, "a pet that started moving must be redrawn");
+    }
+
+    @Test
     void safetyDistanceUsesHardTeleportAndRemoveIsIdempotent() {
         FakeBackend backend = new FakeBackend();
         PaperHeadRenderer renderer = renderer(backend);
