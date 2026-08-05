@@ -26,6 +26,9 @@ import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
 
 public final class PlayerPetMenuRenderer {
+    /** Pet rows own slots 0-44; the bottom row is controls. */
+    private static final int GRID_SIZE = 45;
+
     private final int petsPerPage;
 
     /** Reads the operator's page size once. Restart-only: the renderer outlives a reload. */
@@ -42,6 +45,25 @@ public final class PlayerPetMenuRenderer {
     }
 
     public Inventory render(Player player, PetStorageSnapshot snapshot, VaultViewState requested) {
+        return render(player, snapshot, requested,
+                ActiveSlotStatus.unknown(snapshot.effectiveActiveSlotCount()));
+    }
+
+    /**
+     * The vault, with the lock state of the next active slot.
+     *
+     * <p>Handed the status rather than reading it here because resolving it needs the player's
+     * permissions and the slot config, neither of which a renderer should reach for; a caller without
+     * them uses the three-argument overload and gets a tile that reports the count and offers nothing.
+     */
+    public Inventory render(
+            Player player,
+            PetStorageSnapshot snapshot,
+            VaultViewState requested,
+            ActiveSlotStatus slots) {
+        ActiveSlotStatus lockState = slots == null
+                ? ActiveSlotStatus.unknown(snapshot.effectiveActiveSlotCount())
+                : slots;
         VaultPetView view = VaultPetView.of(snapshot, requested, petsPerPage);
         VaultViewState state = requested.withPage(view.page());
         Map<Integer, PlayerPetInventoryHolder.Action> actions = new HashMap<>();
@@ -61,6 +83,9 @@ public final class PlayerPetMenuRenderer {
             inventory.setItem(index, petRow(pet, active));
         }
         VaultMenuControls.paintEmptyState(inventory, state, view);
+        // After the pets, so a full page leaves the tile off the grid rather than displacing one.
+        VaultMenuControls.paintLockedSlot(
+                inventory, actions, view.lockedSlotIndex(GRID_SIZE), lockState);
 
         if (!view.firstPage()) {
             actions.put(45, PlayerPetInventoryHolder.Action.previous());
@@ -88,7 +113,11 @@ public final class PlayerPetMenuRenderer {
         inventory.setItem(50, GuiItems.of(
                 MenuMaterials.of("vault", "unlockSlot", Material.EXPERIENCE_BOTTLE),
                 Messages.line(MessageKey.GUI_VAULT_UNLOCK_SLOT),
-                List.of(Messages.line(MessageKey.GUI_VAULT_UNLOCK_HINT))));
+                List.of(
+                        Messages.line(MessageKey.GUI_VAULT_SLOT_UNLOCKED_COUNT,
+                                Messages.of("amount", lockState.unlocked()),
+                                Messages.of("total", lockState.max())),
+                        Messages.line(MessageKey.GUI_VAULT_UNLOCK_HINT))));
         return inventory;
     }
 

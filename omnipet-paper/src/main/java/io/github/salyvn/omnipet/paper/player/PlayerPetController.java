@@ -95,7 +95,8 @@ public final class PlayerPetController {
                     var snapshot = storage.snapshot(playerId, limits);
                     publishSnapshot(snapshot);
                     completeUi(player, playerId, request, expectedTop, false, () ->
-                            player.openInventory(renderer.render(player, snapshot, view)));
+                            player.openInventory(renderer.render(
+                                    player, snapshot, view, slotStatus(player, snapshot))));
                 } catch (IOException | RuntimeException failure) {
                     failAsync(player, playerId, request, "vault could not be loaded", failure);
                 }
@@ -223,6 +224,29 @@ public final class PlayerPetController {
         return limitsResolver.resolve(player::hasPermission).limits();
     }
 
+    /**
+     * The lock state of the next active slot, for the vault's locked tile.
+     *
+     * <p>Called from the main thread only — {@code hasPermission} reaches a permission plugin and is not
+     * safe off it. Best-effort: a resolver or permission provider that throws costs the tile its prices,
+     * not the player their vault, so the failure degrades to the count-only tile and is logged once at
+     * the same level as any other display problem.
+     */
+    private io.github.salyvn.omnipet.paper.gui.player.ActiveSlotStatus slotStatus(
+            Player player, PetStorageSnapshot snapshot) {
+        try {
+            return io.github.salyvn.omnipet.paper.gui.player.ActiveSlotStatus.of(
+                    limitsResolver.activeSlots(),
+                    snapshot.effectiveActiveSlotCount(),
+                    player::hasPermission);
+        } catch (RuntimeException | LinkageError failure) {
+            plugin.getLogger().warning("OmniPet could not resolve active slot prices for "
+                    + snapshot.playerId() + ": " + failure.getMessage());
+            return io.github.salyvn.omnipet.paper.gui.player.ActiveSlotStatus.unknown(
+                    snapshot.effectiveActiveSlotCount());
+        }
+    }
+
     private void reconcileAsync(Player player, UUID playerId, PetStorageLimits limits) {
         try {
             PetStorageResult result = null;
@@ -265,7 +289,8 @@ public final class PlayerPetController {
         }
         // Re-rendered at the player's own sort and filter: activating a pet must not silently
         // reset the view they arranged.
-        player.openInventory(renderer.render(player, result.snapshot(), view));
+        player.openInventory(renderer.render(
+                player, result.snapshot(), view, slotStatus(player, result.snapshot())));
     }
 
     private void completeUi(

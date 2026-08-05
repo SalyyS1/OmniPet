@@ -64,4 +64,24 @@ public record VaultPetView(
     public boolean firstPage() {
         return page <= 1;
     }
+
+    /**
+     * Where a locked active slot belongs in the grid, or {@code -1} for nowhere on this page.
+     *
+     * <p>Computed here rather than configured, because the vault's slot layout is not an operator
+     * setting: pet rows own 0-44 and the paging arithmetic is derived from that shape, so a tile at an
+     * operator-chosen index would either overwrite a pet or drift out of the grid. Placing it directly
+     * after the last pet on the last page is the only position that is always free and always adjacent
+     * to what the player is looking at.
+     *
+     * <p>Nowhere when the grid is showing no pets — the tile's job is to sit beside the collection, and a
+     * player who filtered everything out is being told something else. Nowhere too when the last page is
+     * full, since the next free index is off the grid; the control row keeps the entry point in both
+     * cases.
+     */
+    public int lockedSlotIndex(int gridSize) {
+        if (gridSize <= 0 || !lastPage() || pets.isEmpty()) return -1;
+        int index = pets.size();
+        return index < gridSize ? index : -1;
+    }
 }

@@ -25,6 +25,9 @@ import io.github.salyvn.omnipet.paper.text.Messages;
  * <p>Occupied slots are 45, 48, 49, 50, and 53 — paging, hub, status, and slot purchase. Sort takes
  * 46 and filter takes 47, the only two action-free slots left in the row. "Free" means action-free
  * rather than item-free, since the renderer paints all 54 slots with filler first.
+ *
+ * <p>One tile is also painted inside the pet grid: the locked active slot, positioned by
+ * {@link VaultPetView#lockedSlotIndex(int)} rather than by a configured index.
  */
 final class VaultMenuControls {
     static final int SORT_SLOT = 46;
@@ -114,5 +117,76 @@ final class VaultMenuControls {
                 Messages.line(MessageKey.GUI_VAULT_OVERFLOW),
                 Messages.line(MessageKey.GUI_VAULT_OVERFLOW_RELEASE),
                 Messages.line(MessageKey.GUI_VAULT_OVERFLOW_CAPACITY));
+    }
+
+    /**
+     * The locked active slot sitting in the grid, right after the player's last pet.
+     *
+     * <p>In the grid rather than only in the control row because a player asked to be able to see that
+     * there was something to unlock without first opening a menu about it. The row button stays: it is
+     * the only entry point when the last page is full, when the vault is empty, and when a filter is
+     * hiding everything.
+     *
+     * <p>Clickable only when a purchase is plausible. A tile that is merely informative — cap reached,
+     * nothing priced, permission missing, or multi-pet off — gets no action, so a click on it does not
+     * open a menu that would immediately refuse.
+     */
+    static void paintLockedSlot(
+            Inventory inventory,
+            Map<Integer, PlayerPetInventoryHolder.Action> actions,
+            int slot,
+            ActiveSlotStatus status) {
+        if (slot < 0 || status == null) return;
+        if (!status.multiPetEnabled() && status.locked() == 0) return;
+        boolean purchasable = status.purchasable();
+        if (purchasable) actions.put(slot, PlayerPetInventoryHolder.Action.purchaseSlot());
+        inventory.setItem(slot, GuiItems.of(
+                MenuMaterials.of("vault", purchasable ? "lockedSlot" : "lockedSlotIdle",
+                        purchasable ? Material.IRON_DOOR : Material.BARRIER),
+                lockedTitle(status),
+                lockedSlotLore(status, purchasable)));
+    }
+
+    /**
+     * Names the slot being offered, or says the slots are all open.
+     *
+     * <p>A number in the title rather than a bare "Locked slot", because "slot 3" is the thing the
+     * purchase menu will then talk about and matching the two avoids a player wondering which slot they
+     * just bought.
+     */
+    private static Component lockedTitle(ActiveSlotStatus status) {
+        if (status.exhausted()) {
+            return Messages.line(MessageKey.GUI_VAULT_SLOT_ALL_UNLOCKED).color(GuiColors.POSITIVE);
+        }
+        return Messages.line(MessageKey.GUI_VAULT_SLOT_LOCKED,
+                Messages.of("amount", status.nextSlot()));
+    }
+
+    /**
+     * The count, then every price, then one closing line about what a click does.
+     *
+     * <p>All prices rather than the cheapest: the purchase flow offers each currency as its own choice
+     * and never picks for the player, so showing one would misrepresent the next screen.
+     */
+    private static List<Component> lockedSlotLore(ActiveSlotStatus status, boolean purchasable) {
+        List<Component> lore = new java.util.ArrayList<>();
+        lore.add(Messages.line(MessageKey.GUI_VAULT_SLOT_UNLOCKED_COUNT,
+                Messages.of("amount", status.unlocked()),
+                Messages.of("total", status.max())));
+        if (!status.costs().isEmpty()) {
+            lore.add(Component.empty());
+            status.costs().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> lore.add(Messages.line(MessageKey.GUI_VAULT_SLOT_COST_LINE,
+                            Messages.of("provider", Displays.of(entry.getKey())),
+                            Messages.of("cost", entry.getValue().value().toPlainString()))));
+        }
+        lore.add(Component.empty());
+        if (purchasable) lore.add(Messages.line(MessageKey.GUI_VAULT_SLOT_LOCKED_HINT));
+        else if (!status.multiPetEnabled()) lore.add(Messages.line(MessageKey.GUI_VAULT_SLOT_SINGLE_PET));
+        else if (status.blockedByPermission()) {
+            lore.add(Messages.line(MessageKey.GUI_VAULT_SLOT_LOCKED_PERMISSION));
+        } else lore.add(Messages.line(MessageKey.GUI_VAULT_SLOT_NO_UPGRADE));
+        return lore;
     }
 }

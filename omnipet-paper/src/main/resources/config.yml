@@ -299,7 +299,8 @@ gui:
   #
   #  Menus and their buttons:
   #    hub                vault, hatch, slots, help, studio
-  #    vault              previous, next, hub, sort, filter, status, unlockSlot   (materials only)
+  #    vault              previous, next, hub, sort, filter, status, unlockSlot,
+  #                       lockedSlot, lockedSlotIdle                            (materials only)
   #    hatch              startMain, startOff, incubation, hub, refresh,
   #                       redeemMain, redeemOff
   #    management         favorite, lock, moveUp, moveDown, candy, breakthrough, release,
@@ -310,6 +311,11 @@ gui:
   #
   #  redeemMain and redeemOff only appear while an egg is incubating - they sit in the slots the
   #  start buttons are not using. `row` styles every row of the admin transaction list at once.
+  #
+  #  lockedSlot is the tile shown inside the pet grid, just after your last pet, when another active
+  #  slot could be bought. lockedSlotIdle is the same tile when it is only informative - the cap is
+  #  reached, nothing further is priced, or you lack the permission that gates it - and is not
+  #  clickable. The position is not configurable: pet rows own the grid and the tile follows them.
   #
   #  The vault takes materials but not slots or size: pet rows fill slots 0-44 and the paging maths
   #  is built on that shape. Moving a button onto an occupied slot, or outside the menu, is refused
