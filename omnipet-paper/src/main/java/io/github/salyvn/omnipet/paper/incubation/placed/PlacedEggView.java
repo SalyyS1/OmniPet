@@ -31,8 +31,18 @@ public final class PlacedEggView {
     private final PlacedEggCoordinator coordinator;
     private final PlacedEggHolograms holograms;
     private final BiConsumer<UUID, PlacedEggRecord> onReady;
+    /**
+     * How often a moved countdown is written, in nanoseconds.
+     *
+     * <p>Thirty seconds. A crash loses at most this much incubation progress, which is the deliberate
+     * trade for not fsyncing per egg per second. The record itself — the player's item — is written the
+     * moment the egg is placed and is never at risk, and an egg reaching ready flushes immediately.
+     */
+    private static final long FLUSH_INTERVAL_NANOS = 30_000_000_000L;
+
     private BukkitTask task;
     private long lastPassNanos;
+    private long lastFlushNanos;
 
     public PlacedEggView(
             JavaPlugin plugin,
@@ -49,6 +59,7 @@ public final class PlacedEggView {
     public void start() {
         if (task != null) return;
         lastPassNanos = System.nanoTime();
+        lastFlushNanos = lastPassNanos;
         task = plugin.getServer().getScheduler().runTaskTimer(
                 plugin, this::pass, PERIOD_TICKS, PERIOD_TICKS);
         PlacedEggStore.Scan scan = coordinator.all();
@@ -66,6 +77,9 @@ public final class PlacedEggView {
     public void stop() {
         if (task != null) task.cancel();
         task = null;
+        // Last chance to persist: a countdown that only lived in memory would otherwise roll back to the
+        // previous flush on restart.
+        coordinator.flush();
         holograms.hideAll();
     }
 
@@ -96,6 +110,12 @@ public final class PlacedEggView {
         long elapsedMillis = Math.max(0, (now - lastPassNanos) / 1_000_000L);
         lastPassNanos = now;
         if (elapsedMillis == 0) return;
+        // Countdowns move in memory every pass and reach disk on this cadence. Writing each one every
+        // second meant two fsyncs per egg per second on the tick thread.
+        if (now - lastFlushNanos >= FLUSH_INTERVAL_NANOS) {
+            lastFlushNanos = now;
+            coordinator.flush();
+        }
         for (PlacedEggRecord record : coordinator.all().records()) {
             Block block = block(record);
             // An unloaded world or chunk simply pauses that egg: crediting time for a block nobody can
