@@ -1,6 +1,6 @@
 # OmniPet — Hiệu năng, Gameplay, và Wiki
 
-**Trạng thái:** chưa bắt đầu · 15 phase · nền tảng: 828 test / 0 fail
+**Trạng thái:** Phần A xong (Phase 1-3) · còn 12 phase · 841 test / 0 fail
 
 ## Bối cảnh
 
@@ -33,7 +33,7 @@ Wiki: theme tốt, UX không. Nặng nhất — bấm mục lục **ghi đè URL
 
 | # | Phase | Tài liệu |
 |---|---|---|
-| 1-3 | Nền hiệu năng: cấp phát tick, packet ModelEngine, I/O trứng đặt | [part-a-performance-foundation.md](part-a-performance-foundation.md) |
+| 1-3 ✅ | Nền hiệu năng: cấp phát tick, packet ModelEngine, I/O trứng đặt | [part-a-performance-foundation.md](part-a-performance-foundation.md) |
 | 4-5 | Pet sống động: trứng rung lắc, hành vi nhàn rỗi | [part-b-living-pets.md](part-b-living-pets.md) |
 | 6-7 | Thức ăn và độ thân thiết | [part-c-food-and-bond.md](part-c-food-and-bond.md) |
 | 8-9 | Buff tạm thời: cơ chế hết hạn, hiển thị | [part-d-temporary-buffs.md](part-d-temporary-buffs.md) |
