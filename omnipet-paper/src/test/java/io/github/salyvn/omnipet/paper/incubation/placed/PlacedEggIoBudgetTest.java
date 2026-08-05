@@ -1,6 +1,7 @@
 package io.github.salyvn.omnipet.paper.incubation.placed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -102,6 +103,38 @@ class PlacedEggIoBudgetTest {
         assertTrue(Pattern.compile("public void stop\\(\\).*?coordinator\\.flush\\(\\)", Pattern.DOTALL)
                         .matcher(source).find(),
                 "shutdown must persist what only lived in memory");
+    }
+
+    @Test
+    void theShakePassDoesNoDiskWorkAndSkipsEggsNobodyCanSee() throws Exception {
+        // The shake runs ten times more often than the countdown, so anything expensive in it would undo
+        // the I/O work this phase did.
+        String source = source("PlacedEggView.java");
+
+        String shakePass = source.substring(source.indexOf("private void shakePass()"));
+        shakePass = shakePass.substring(0, shakePass.indexOf("\n    }") + 6);
+
+        for (String forbidden : java.util.List.of("coordinator.tick", "coordinator.flush", "store.")) {
+            assertFalse(shakePass.contains(forbidden),
+                    "the shake pass must not touch disk or advance state: found " + forbidden);
+        }
+        assertTrue(shakePass.contains("EggShake.intensity"),
+                "an egg still in its quiet period must be skipped before anything else is computed");
+        assertTrue(shakePass.contains("watched(block)"),
+                "an effect nobody is near is wasted work");
+        assertTrue(shakePass.contains("record.ready()"),
+                "a ready egg has stopped incubating and has nothing left to anticipate");
+    }
+
+    @Test
+    void neighbouringEggsDoNotRockInLockstep() throws Exception {
+        // Synchronised motion reads as a mechanism rather than as something alive -- the same reason pets
+        // carry a phase offset. Derived from the block key so it survives a restart.
+        String source = source("PlacedEggView.java");
+
+        assertTrue(source.contains("phaseOffsetSeconds"));
+        assertTrue(source.contains("record.key().hashCode()"),
+                "the offset has to come from something stable, not from spawn order or a random");
     }
 
     @Test

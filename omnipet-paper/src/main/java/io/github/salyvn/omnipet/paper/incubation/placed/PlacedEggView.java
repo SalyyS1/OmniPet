@@ -9,6 +9,7 @@ import org.bukkit.block.Block;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import io.github.salyvn.omnipet.core.incubation.EggShake;
 import io.github.salyvn.omnipet.paper.text.Durations;
 import io.github.salyvn.omnipet.paper.text.MessageKey;
 import io.github.salyvn.omnipet.paper.text.Messages;
@@ -27,6 +28,19 @@ public final class PlacedEggView {
     /** One second: fine enough for a visible countdown, coarse enough to stay cheap. */
     private static final long PERIOD_TICKS = 20L;
 
+    /**
+     * How often the rocking is redrawn, in ticks.
+     *
+     * <p>Separate from the countdown pass because the two want opposite things: crediting time is cheap
+     * once a second, but sampling a shake eleven times a second at 1 Hz produces a stutter rather than a
+     * rock. This task does no I/O and touches only eggs already close to hatching.
+     */
+    private static final long SHAKE_PERIOD_TICKS = 2L;
+
+    /** Beyond this many blocks nobody can read the hologram, so nothing is redrawn for it. */
+    private static final double VIEWER_RADIUS = 32.0;
+    private static final double VIEWER_RADIUS_SQUARED = VIEWER_RADIUS * VIEWER_RADIUS;
+
     private final JavaPlugin plugin;
     private final PlacedEggCoordinator coordinator;
     private final PlacedEggHolograms holograms;
@@ -41,8 +55,10 @@ public final class PlacedEggView {
     private static final long FLUSH_INTERVAL_NANOS = 30_000_000_000L;
 
     private BukkitTask task;
+    private BukkitTask shakeTask;
     private long lastPassNanos;
     private long lastFlushNanos;
+    private long startedNanos;
 
     public PlacedEggView(
             JavaPlugin plugin,
@@ -60,8 +76,11 @@ public final class PlacedEggView {
         if (task != null) return;
         lastPassNanos = System.nanoTime();
         lastFlushNanos = lastPassNanos;
+        startedNanos = lastPassNanos;
         task = plugin.getServer().getScheduler().runTaskTimer(
                 plugin, this::pass, PERIOD_TICKS, PERIOD_TICKS);
+        shakeTask = plugin.getServer().getScheduler().runTaskTimer(
+                plugin, this::shakePass, SHAKE_PERIOD_TICKS, SHAKE_PERIOD_TICKS);
         PlacedEggStore.Scan scan = coordinator.all();
         scan.records().forEach(this::refresh);
         if (!scan.unreadable().isEmpty()) {
@@ -76,7 +95,9 @@ public final class PlacedEggView {
 
     public void stop() {
         if (task != null) task.cancel();
+        if (shakeTask != null) shakeTask.cancel();
         task = null;
+        shakeTask = null;
         // Last chance to persist: a countdown that only lived in memory would otherwise roll back to the
         // previous flush on restart.
         coordinator.flush();
@@ -87,7 +108,55 @@ public final class PlacedEggView {
     public void refresh(PlacedEggRecord record) {
         Block block = block(record);
         if (block == null) return;
-        holograms.show(PlacedEggCoordinator.hologramLocation(block), record, text(record));
+        holograms.show(PlacedEggCoordinator.hologramLocation(block), record, text(record),
+                shakeDegrees(record));
+    }
+
+    /**
+     * Rocks the eggs that are close to hatching.
+     *
+     * <p>Does no I/O and skips anything still in its quiet period, so the cost is proportional to the
+     * eggs about to hatch rather than to every egg placed. An egg nobody is near is skipped outright: the
+     * whole point of the effect is that somebody sees it.
+     */
+    private void shakePass() {
+        for (PlacedEggRecord record : coordinator.all().records()) {
+            if (record.ready()) continue;
+            if (EggShake.intensity(record.remainingMillis(), record.totalMillis()) <= 0) continue;
+            Block block = block(record);
+            if (block == null || !block.getChunk().isLoaded()) continue;
+            if (!watched(block)) continue;
+            holograms.show(PlacedEggCoordinator.hologramLocation(block), record, text(record),
+                    shakeDegrees(record));
+        }
+    }
+
+    /** The rocking angle for one egg this instant, desynchronised so neighbours do not rock together. */
+    private double shakeDegrees(PlacedEggRecord record) {
+        double phaseSeconds = (System.nanoTime() - startedNanos) / 1_000_000_000.0
+                + phaseOffsetSeconds(record);
+        return EggShake.degrees(record.remainingMillis(), record.totalMillis(), phaseSeconds);
+    }
+
+    /**
+     * A stable per-egg phase offset.
+     *
+     * <p>Derived from the block key so it survives a restart and so two eggs side by side never rock in
+     * lockstep -- synchronised motion reads as a mechanism rather than as something alive, the same reason
+     * pets carry a phase offset.
+     */
+    private static double phaseOffsetSeconds(PlacedEggRecord record) {
+        int hash = record.key().hashCode();
+        return Math.abs(hash % 1000) / 1000.0;
+    }
+
+    /** Whether any player is close enough to read this hologram. */
+    private boolean watched(Block block) {
+        var location = block.getLocation();
+        for (var player : block.getWorld().getPlayers()) {
+            if (player.getLocation().distanceSquared(location) <= VIEWER_RADIUS_SQUARED) return true;
+        }
+        return false;
     }
 
     public void remove(String recordKey) {
