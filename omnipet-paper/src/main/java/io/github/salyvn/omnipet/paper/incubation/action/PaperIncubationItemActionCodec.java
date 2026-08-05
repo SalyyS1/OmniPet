@@ -98,8 +98,43 @@ public final class PaperIncubationItemActionCodec {
         return new CapturedIncubationItemAction(stack, action.type(), action.effectMillis(), identity);
     }
 
-    public Optional<ObservedEggStack> observe(ItemStack source, int slot) {
-        if (source == null || source.getType() == Material.AIR || source.getAmount() < 1) return Optional.empty();
+    /**
+     * What a support item would do, without touching it.
+     *
+     * <p>Read-only and side-effect free, unlike {@link #capture}, which stamps a fresh nonce into the stack
+     * so escrow can match it. Placed eggs need to describe an item in a menu before the player has decided
+     * to spend it, and re-nonceing an item the player is only looking at would invalidate anything already
+     * referring to it.
+     *
+     * <p>Empty for a stack that is not one of ours, and for one of ours whose identity does not read back —
+     * a menu must not offer to spend an item this codec would later refuse.
+     */
+    public Optional<SupportEffect> effect(ItemStack source) {
+        if (source == null || source.getType() == Material.AIR || source.getAmount() < 1) {
+            return Optional.empty();
+        }
+        ItemMeta meta = source.getItemMeta();
+        if (meta == null) return Optional.empty();
+        return readAction(meta.getPersistentDataContainer())
+                .map(action -> new SupportEffect(action.type(), action.effectMillis()));
+    }
+
+    /** A support item's declared type and magnitude. */
+    public record SupportEffect(IncubationItemActionType type, long effectMillis) {
+        public SupportEffect {
+            Objects.requireNonNull(type, "support effect type");
+        }
+
+        public boolean reducer() {
+            return type == IncubationItemActionType.REDUCE;
+        }
+
+        public boolean instant() {
+            return type == IncubationItemActionType.COMPLETE;
+        }
+    }
+
+    public Optional<ObservedEggStack> observe(ItemStack source, int slot) {        if (source == null || source.getType() == Material.AIR || source.getAmount() < 1) return Optional.empty();
         ItemMeta meta = source.getItemMeta();
         if (meta == null) return Optional.empty();
         PersistentDataContainer data = meta.getPersistentDataContainer();

@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
@@ -16,6 +17,8 @@ import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import io.github.salyvn.omnipet.paper.feedback.Feedback;
@@ -39,12 +42,46 @@ public final class PlacedEggListener implements Listener {
     private final PaperEggItemCodec codec;
     private final PlacedEggCoordinator coordinator;
     private final PlacedEggView view;
+    private final PlacedEggSupportController support;
 
     public PlacedEggListener(
             PaperEggItemCodec codec, PlacedEggCoordinator coordinator, PlacedEggView view) {
+        this(codec, coordinator, view, null);
+    }
+
+    public PlacedEggListener(
+            PaperEggItemCodec codec,
+            PlacedEggCoordinator coordinator,
+            PlacedEggView view,
+            PlacedEggSupportController support) {
         this.codec = Objects.requireNonNull(codec, "egg item codec");
         this.coordinator = Objects.requireNonNull(coordinator, "placed egg coordinator");
         this.view = Objects.requireNonNull(view, "placed egg view");
+        // Optional so the placement and protection handlers can be wired without the menu, which is what
+        // the existing tests construct.
+        this.support = support;
+    }
+
+    /**
+     * Right-clicking an incubating egg opens its menu.
+     *
+     * <p>The only way a player can spend an accelerator on a placed egg. Support items previously reached a
+     * held incubation only, so an egg on the ground could not be hurried at all.
+     *
+     * <p>Cancelled so the click does not also place whatever is in the player's hand — which, for a player
+     * holding the very accelerator they are about to spend, would drop a block on top of the egg.
+     */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)
+    public void onInteract(PlayerInteractEvent event) {
+        if (support == null) return;
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getHand() != EquipmentSlot.HAND) return;
+        Block block = event.getClickedBlock();
+        if (block == null || !PlacedEggBlocks.isEggBlock(block)) return;
+        Optional<PlacedEggRecord> record = coordinator.at(block);
+        if (record.isEmpty()) return;
+        event.setCancelled(true);
+        support.open(event.getPlayer(), record.get());
     }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.NORMAL)

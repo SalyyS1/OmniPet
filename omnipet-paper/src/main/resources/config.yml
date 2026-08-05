@@ -306,6 +306,7 @@ gui:
   #    management         favorite, lock, moveUp, moveDown, candy, breakthrough, release,
   #                       refresh, back, hub
   #    slot               payVault, payPoints, confirm, cancel, hub
+  #    placedEgg          status, reducer, instant, handIdle, refresh, hub   (materials only)
   #    adminTransactions  row, refresh, next
   #    adminReconcile     charge, noCharge, refund, sync, subject, back
   #
@@ -316,6 +317,11 @@ gui:
   #  slot could be bought. lockedSlotIdle is the same tile when it is only informative - the cap is
   #  reached, nothing further is priced, or you lack the permission that gates it - and is not
   #  clickable. The position is not configurable: pet rows own the grid and the tile follows them.
+  #
+  #  placedEgg is the menu opened by right-clicking an egg that is incubating in the world. reducer
+  #  and instant style the per-hand button when that hand holds a usable support item; handIdle is
+  #  the same button when it does not. The menu has no storage slots by design - the item is spent
+  #  from your hand, never deposited - so there is nothing here to configure a slot layout for.
   #
   #  The vault takes materials but not slots or size: pet rows fill slots 0-44 and the paging maths
   #  is built on that shape. Moving a button onto an occupied slot, or outside the menu, is refused

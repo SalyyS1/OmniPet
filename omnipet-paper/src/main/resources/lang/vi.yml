@@ -50,6 +50,15 @@ hatch:
   item-no-incubation: "<yellow>OmniPet: Không có quả trứng nào đang ấp.</yellow>"
   item-failed: "<red>OmniPet: Vật phẩm ấp trứng thất bại: <detail>.</red>"
 
+placed-egg:
+  not-owner: "<yellow>OmniPet: Chỉ người đặt quả trứng này mới rút ngắn được thời gian.</yellow>"
+  gone: "<yellow>OmniPet: Quả trứng đó không còn ở đó nữa.</yellow>"
+  already-ready: "<green>OmniPet: Quả trứng đã sẵn sàng; hãy phá khối để nhận thú cưng.</green>"
+  nothing-to-spend: "<yellow>OmniPet: Bạn không cầm vật phẩm nào có tác dụng với trứng.</yellow>"
+  reduced: "<green>OmniPet: Đã trừ <detail> khỏi quả trứng; còn <remaining>.</green>"
+  finished: "<green>OmniPet: Quả trứng đã sẵn sàng — hãy phá khối để nhận thú cưng.</green>"
+  spend-failed: "<red>OmniPet: Không dùng được vật phẩm đó, nên bạn vẫn còn nó: <detail>.</red>"
+
 slot:
   baseline-pending: "<yellow>OmniPet: Đang đợi đối soát số ô hoạt động; hãy mở lại menu này sau giây lát.</yellow>"
   counts-differ: "<red>OmniPet: Số ô của OmniPet và LuckPerms lệch nhau; hãy đối soát trước khi mua tiếp.</red>"
@@ -161,6 +170,7 @@ gui:
     hub: "OmniPet"
     vault: "OmniPet <dark_gray>▸</dark_gray> Kho <gray>(<page>/<pages>)</gray>"
     hatch: "OmniPet <dark_gray>▸</dark_gray> Ấp trứng"
+    placed-egg: "OmniPet <dark_gray>▸</dark_gray> Quả trứng"
     manage: "OmniPet <dark_gray>▸</dark_gray> Quản lý"
     release: "OmniPet <dark_gray>▸</dark_gray> Xác nhận phóng sinh"
     admin-transactions: "OmniPet <dark_gray>▸</dark_gray> Giao dịch chờ xử lý"
@@ -241,6 +251,20 @@ gui:
     item-duration: "<gray>Thời gian ấp</gray> <white><detail></white>"
     item-hint: "<yellow>Cầm trên tay và chạy <white>/pet hatch main</white></yellow> <gray>để bắt đầu</gray>"
     item-place-hint: "<gray>hoặc đặt xuống cạnh một nguồn nhiệt</gray>"
+  placed-egg:
+    status: "<gold>Đang ấp</gold>"
+    remaining: "<gray>Còn lại</gray> <white><remaining></white>"
+    ready: "<green>Sẵn sàng — phá khối trứng để nhận</green>"
+    owner-note: "<gray>Chỉ người đặt quả trứng mới rút ngắn được thời gian.</gray>"
+    main-hand: "<yellow>Tay chính</yellow>"
+    off-hand: "<yellow>Tay phụ</yellow>"
+    hand-empty: "<gray>Hãy cầm một vật phẩm rút ngắn hoặc nở tức thì.</gray>"
+    hand-unsupported: "<gray>Vật phẩm đó không có tác dụng với trứng.</gray>"
+    would-reduce: "<gray>Trừ đi</gray> <white><detail></white>"
+    would-finish: "<green>Làm quả trứng này nở ngay</green>"
+    spend-hint: "<yellow>Nhấn</yellow> <gray>dùng vật phẩm này</gray>"
+    refresh: "<yellow>Làm mới</yellow>"
+    refresh-hint: "<gray>Đọc lại thời gian và vật phẩm bạn đang cầm.</gray>"
   item:
     candy-name: "<green>Kẹo Kinh Nghiệm OmniPet</green>"
     candy-detail: "<gray>Cộng</gray> <white><detail> EXP</white>"

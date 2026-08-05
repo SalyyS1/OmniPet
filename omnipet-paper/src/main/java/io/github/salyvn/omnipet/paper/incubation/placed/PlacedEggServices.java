@@ -10,7 +10,9 @@ import java.util.function.Consumer;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import io.github.salyvn.omnipet.core.persistence.EggDefinitionRepository;
+import io.github.salyvn.omnipet.paper.gui.egg.PlacedEggMenuListener;
 import io.github.salyvn.omnipet.paper.incubation.PaperEggItemCodec;
+import io.github.salyvn.omnipet.paper.incubation.action.PaperIncubationItemActionCodec;
 
 /**
  * The placed-egg feature, assembled as one unit.
@@ -26,14 +28,18 @@ import io.github.salyvn.omnipet.paper.incubation.PaperEggItemCodec;
 public final class PlacedEggServices {
     private final PlacedEggView view;
     private final PlacedEggListener listener;
+    private final PlacedEggMenuListener menuListener;
 
-    private PlacedEggServices(PlacedEggView view, PlacedEggListener listener) {
+    private PlacedEggServices(
+            PlacedEggView view, PlacedEggListener listener, PlacedEggMenuListener menuListener) {
         this.view = view;
         this.listener = listener;
+        this.menuListener = menuListener;
     }
 
     /**
-     * Wires the feature. The caller registers {@link #listener()} and calls {@link #start()}.
+     * Wires the feature. The caller registers {@link #listener()} and {@link #menuListener()}, then calls
+     * {@link #start()}.
      *
      * @param onReady runs when a placed egg finishes its countdown, on the main thread
      */
@@ -52,13 +58,22 @@ public final class PlacedEggServices {
         PlacedEggCoordinator coordinator = new PlacedEggCoordinator(
                 new PlacedEggStore(dataRoot.resolve("data/placed-eggs")), eggDefinitions, warnings);
         PlacedEggView view = new PlacedEggView(plugin, coordinator, new PlacedEggHolograms(), onReady);
+        // Its own codec instance, matching the held-incubation path: the codec is stateless beyond its
+        // namespaced keys, which are derived from the plugin and therefore identical.
+        PlacedEggSupportController support = new PlacedEggSupportController(
+                coordinator, view, new PaperIncubationItemActionCodec(plugin));
         PlacedEggListener listener = new PlacedEggListener(
-                new PaperEggItemCodec(plugin), coordinator, view);
-        return new PlacedEggServices(view, listener);
+                new PaperEggItemCodec(plugin), coordinator, view, support);
+        return new PlacedEggServices(view, listener, new PlacedEggMenuListener(support));
     }
 
     public PlacedEggListener listener() {
         return listener;
+    }
+
+    /** Clicks inside the menu that right-clicking a placed egg opens. */
+    public PlacedEggMenuListener menuListener() {
+        return menuListener;
     }
 
     /** Drops the record and its hologram once the hatched pet has been admitted. */

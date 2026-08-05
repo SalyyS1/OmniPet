@@ -125,6 +125,25 @@ public final class PlacedEggCoordinator {
     }
 
     /**
+     * The record with this key, if it still exists.
+     *
+     * <p>For an open menu, which remembers a key rather than a block: a record reclaimed or hatched while
+     * the menu was open must resolve to nothing rather than to a stale copy.
+     */
+    public Optional<PlacedEggRecord> byKey(String key) {
+        if (key == null || key.isBlank()) return Optional.empty();
+        if (loaded) return Optional.ofNullable(records.get(key));
+        try {
+            Optional<PlacedEggRecord> found = store.read(key);
+            found.ifPresent(record -> records.put(record.key(), record));
+            return found;
+        } catch (IOException | RuntimeException failure) {
+            warnings.accept("could not read the placed egg " + key + ": " + failure.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Consumes the record and hands back the exact egg that was placed.
      *
      * <p>Deletes first, then returns the item: the record is the single owner, so it must stop existing
@@ -167,6 +186,42 @@ public final class PlacedEggCoordinator {
             warnings.accept("could not advance the placed egg " + record.key() + ": " + failure.getMessage());
             return Optional.empty();
         }
+    }
+
+    /**
+     * Credits a support item's effect to a placed egg and writes it before returning.
+     *
+     * <p>Written durably rather than deferred to {@link #flush}, unlike the per-second countdown. The
+     * countdown can afford to lose a flush interval because it regenerates: the clock keeps running. A
+     * redeemed item does not — it is gone from the player's inventory, and losing its effect to a crash
+     * would take the item with it. So the disk write happens here, and its caller only destroys the item
+     * once this has returned a record.
+     *
+     * <p>The placement requirement is deliberately <em>not</em> re-checked. Time only accrues while the
+     * heat holds, but a player spending an item is making a decision about their own egg, and refusing it
+     * because a neighbouring lava block was mined would consume nothing and explain nothing.
+     *
+     * @param millis effect to credit, or {@link Long#MAX_VALUE} to finish the incubation outright
+     * @return the advanced record, or empty when nothing was written and the item must be kept
+     */
+    public Optional<PlacedEggRecord> applyReduction(PlacedEggRecord record, long millis) {
+        Objects.requireNonNull(record, "placed egg record");
+        if (millis <= 0 || record.ready()) return Optional.empty();
+        // Saturating, so an instant-hatch item passing MAX_VALUE cannot wrap into a negative reduction
+        // and hand the egg more time than it started with.
+        long remaining = millis >= record.remainingMillis() ? 0 : record.remainingMillis() - millis;
+        PlacedEggRecord advanced = record.withRemaining(remaining);
+        try {
+            store.save(advanced);
+        } catch (IOException | RuntimeException failure) {
+            warnings.accept("could not credit a support item to the placed egg "
+                    + record.key() + ": " + failure.getMessage());
+            return Optional.empty();
+        }
+        records.put(advanced.key(), advanced);
+        // The saved copy is now the durable one, so any deferred write for this key is stale.
+        unflushed.remove(advanced.key());
+        return Optional.of(advanced);
     }
 
     /**

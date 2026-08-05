@@ -151,6 +151,7 @@ public enum MessageKey {
     GUI_TITLE_HUB("gui.title.hub", "OmniPet"),
     GUI_TITLE_VAULT("gui.title.vault", "OmniPet <dark_gray>▸</dark_gray> Vault <gray>(<page>/<pages>)</gray>"),
     GUI_TITLE_HATCH("gui.title.hatch", "OmniPet <dark_gray>▸</dark_gray> Hatch"),
+    GUI_TITLE_PLACED_EGG("gui.title.placed-egg", "OmniPet <dark_gray>▸</dark_gray> Egg"),
     GUI_TITLE_MANAGE("gui.title.manage", "OmniPet <dark_gray>▸</dark_gray> Manage"),
     GUI_TITLE_RELEASE("gui.title.release", "OmniPet <dark_gray>▸</dark_gray> Confirm release"),
     GUI_TITLE_ADMIN_TRANSACTIONS("gui.title.admin-transactions",
@@ -282,6 +283,44 @@ public enum MessageKey {
     // accident. The command stays first: it is the path that works anywhere.
     GUI_EGG_ITEM_PLACE_HINT("gui.egg.item-place-hint",
             "<gray>or place it beside a heat source</gray>"),
+
+    // --- placed egg menu ----------------------------------------------------------------------
+    // Support items previously worked only on a held incubation, so an egg on the ground could not be
+    // hurried at all. Right-clicking it opens this; the item is spent from the hand, never stored here.
+    GUI_PLACED_EGG_STATUS("gui.placed-egg.status", "<gold>Incubating</gold>"),
+    GUI_PLACED_EGG_REMAINING("gui.placed-egg.remaining",
+            "<gray>Time left</gray> <white><remaining></white>"),
+    GUI_PLACED_EGG_READY("gui.placed-egg.ready", "<green>Ready — break the egg to claim it</green>"),
+    GUI_PLACED_EGG_OWNER_NOTE("gui.placed-egg.owner-note",
+            "<gray>Only the player who placed it can hurry it along.</gray>"),
+    GUI_PLACED_EGG_MAIN_HAND("gui.placed-egg.main-hand", "<yellow>Main hand</yellow>"),
+    GUI_PLACED_EGG_OFF_HAND("gui.placed-egg.off-hand", "<yellow>Off hand</yellow>"),
+    GUI_PLACED_EGG_HAND_EMPTY("gui.placed-egg.hand-empty",
+            "<gray>Hold an accelerator or an instant hatch.</gray>"),
+    GUI_PLACED_EGG_HAND_UNSUPPORTED("gui.placed-egg.hand-unsupported",
+            "<gray>That item does nothing for an egg.</gray>"),
+    GUI_PLACED_EGG_WOULD_REDUCE("gui.placed-egg.would-reduce",
+            "<gray>Takes off</gray> <white><detail></white>"),
+    GUI_PLACED_EGG_WOULD_FINISH("gui.placed-egg.would-finish",
+            "<green>Finishes this egg at once</green>"),
+    GUI_PLACED_EGG_SPEND_HINT("gui.placed-egg.spend-hint",
+            "<yellow>Click</yellow> <gray>spend this item</gray>"),
+    GUI_PLACED_EGG_REFRESH("gui.placed-egg.refresh", "<yellow>Refresh</yellow>"),
+    GUI_PLACED_EGG_REFRESH_HINT("gui.placed-egg.refresh-hint",
+            "<gray>Re-reads the countdown and what you are holding.</gray>"),
+    PLACED_EGG_NOT_OWNER("placed-egg.not-owner",
+            "<yellow>OmniPet: Only the player who placed this egg can hurry it along.</yellow>"),
+    PLACED_EGG_GONE("placed-egg.gone", "<yellow>OmniPet: That egg is no longer there.</yellow>"),
+    PLACED_EGG_ALREADY_READY("placed-egg.already-ready",
+            "<green>OmniPet: That egg is ready; break it to claim your pet.</green>"),
+    PLACED_EGG_NOTHING_TO_SPEND("placed-egg.nothing-to-spend",
+            "<yellow>OmniPet: You are not holding anything that helps an egg.</yellow>"),
+    PLACED_EGG_REDUCED("placed-egg.reduced",
+            "<green>OmniPet: Took <detail> off the egg; <remaining> left.</green>"),
+    PLACED_EGG_FINISHED("placed-egg.finished",
+            "<green>OmniPet: The egg is ready — break it to claim your pet.</green>"),
+    PLACED_EGG_SPEND_FAILED("placed-egg.spend-failed",
+            "<red>OmniPet: That item could not be spent, so you still have it: <detail>.</red>"),
 
     // --- admin transaction menu ---------------------------------------------------------------
     // Operator-facing, but these are menu labels rather than the audit trail MessageKey deliberately

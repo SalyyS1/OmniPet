@@ -276,6 +276,7 @@ public final class OmniPetPlugin extends JavaPlugin {
                     warning -> getLogger().warning("OmniPet placed egg: " + warning),
                     this::hatchPlacedEgg);
             getServer().getPluginManager().registerEvents(placedEggs.listener(), this);
+            getServer().getPluginManager().registerEvents(placedEggs.menuListener(), this);
             placedEggs.start();
             getServer().getPluginManager().registerEvents(new HubMenuListener(hubController), this);
             // The only thing that tells a brand-new player OmniPet is here.

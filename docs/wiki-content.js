@@ -271,7 +271,13 @@ Some eggs are picky. A fire-affinity pet — a dragon, a phoenix — needs lava 
 
 ## Speeding it up
 
-Accelerator items shorten the wait. Hold one and click the matching button in \`/pet hatch\`, or run \`/pet hatch use-main\`. An instant-hatch item finishes it outright.
+Accelerator items shorten the wait. An instant-hatch item finishes it outright.
+
+For an egg you are **holding**, hold the accelerator and click the matching button in \`/pet hatch\`, or run \`/pet hatch use-main\`.
+
+For an egg **on the ground**, right-click the egg block. That opens a small screen showing the time left and one button per hand: hold the accelerator and click the button for the hand holding it. The item is spent straight from your hand — the screen has no slots to put anything in, so there is nowhere for an item to go missing.
+
+Only the player who placed an egg can hurry it. Anyone may right-click it to read the countdown.
 
 ## Your vault
 
@@ -282,6 +288,10 @@ Accelerator items shorten the wait. Hold one and click the matching button in \`
 - **Right-click your pet in the world** to open that same screen.
 
 Slot 46 cycles the sort order and slot 47 cycles the filter, so a large vault stays usable.
+
+Each pet's tile lists its level, its banked experience, and its largest stats, so two pets can be compared without opening either one.
+
+Just after your last pet, on the last page, sits a locked-slot tile. It names the next active slot on offer and every currency it can be bought with; click it to buy. When there is nothing to buy — the cap is reached, nothing further is priced, or you lack a permission that gates it — the tile says which of those applies and does nothing when clicked. The button in the bottom row does the same job and is always there, which is what you use when the last page is full.
 
 ## What your pet does on its own
 
@@ -333,7 +343,13 @@ Một số trứng khó tính. Pet hệ lửa — rồng, phượng hoàng — c
 
 ## Tăng tốc
 
-Vật phẩm tăng tốc giúp giảm thời gian chờ. Giữ nó và bấm nút tương ứng trong \`/pet hatch\`, hoặc chạy \`/pet hatch use-main\`. Vật phẩm nở tức thì kết thúc ngay.
+Vật phẩm tăng tốc giúp giảm thời gian chờ. Vật phẩm nở tức thì kết thúc ngay.
+
+Với trứng **đang giữ trên tay**, cầm vật phẩm tăng tốc rồi bấm nút tương ứng trong \`/pet hatch\`, hoặc chạy \`/pet hatch use-main\`.
+
+Với trứng **đã đặt xuống đất**, click phải vào khối trứng. Một màn hình nhỏ mở ra hiện thời gian còn lại và một nút cho mỗi tay: cầm vật phẩm rồi bấm nút của tay đang cầm nó. Vật phẩm được dùng trực tiếp từ tay bạn — màn hình này không có ô để đặt đồ vào, nên không có chỗ nào làm mất vật phẩm.
+
+Chỉ người đặt trứng mới rút ngắn được thời gian. Ai cũng có thể click phải để xem đồng hồ.
 
 ## Vault của bạn
 
@@ -344,6 +360,10 @@ Vật phẩm tăng tốc giúp giảm thời gian chờ. Giữ nó và bấm nú
 - **Click phải chính pet của bạn ngoài thế giới** cũng mở đúng màn hình đó.
 
 Ô 46 đổi thứ tự sắp xếp và ô 47 đổi bộ lọc, nên vault nhiều pet vẫn dễ dùng.
+
+Mỗi ô pet hiện cấp, kinh nghiệm đã tích, và các chỉ số lớn nhất của nó, nên bạn so sánh hai pet mà không cần mở từng con.
+
+Ngay sau con pet cuối cùng, ở trang cuối, có một ô khoá. Nó ghi rõ ô hoạt động kế tiếp đang được bán và mọi loại tiền có thể dùng; bấm vào để mua. Khi không còn gì để mua — đã đạt giới hạn, không còn ô nào được đặt giá, hoặc bạn thiếu quyền — ô đó nói rõ lý do và bấm vào không có tác dụng. Nút ở hàng dưới cùng làm cùng việc và luôn có mặt, đó là thứ bạn dùng khi trang cuối đã đầy.
 
 ## Pet tự làm gì khi bạn không ra lệnh
 
