@@ -162,6 +162,53 @@ public enum MessageKey {
     GUI_TITLE_SLOT_CONFIRM("gui.title.slot-confirm",
             "OmniPet <dark_gray>▸</dark_gray> Confirm slot <amount>"),
 
+    // --- management outcomes -------------------------------------------------------------------
+    // A status only reaches the player when the outcome carried no detail of its own. Without these it
+    // arrived as a lowercased enum name — "persisted consumption pending" told a player nothing and
+    // leaked internal vocabulary into the chat.
+    STATUS_REJECTED("status.rejected", "That change was refused."),
+    STATUS_PET_NOT_FOUND("status.pet-not-found", "That pet is no longer in your vault."),
+    STATUS_UNAUTHORIZED("status.unauthorized", "That pet is not yours."),
+    STATUS_STALE_SESSION("status.stale-session", "This menu is out of date; reopen it."),
+    STATUS_BUSY("status.busy", "Still working on your last change."),
+    STATUS_CONSUMABLE_UNAVAILABLE("status.consumable-unavailable",
+            "You are not holding the item that would apply."),
+    STATUS_CONSUMPTION_PENDING("status.consumption-pending",
+            "Applied, but the item is still being confirmed."),
+    STATUS_OUTBOX_PENDING("status.outbox-pending", "Released; your reward is on its way."),
+    STATUS_ERROR("status.error", "Something went wrong; try again."),
+
+    // --- first join ----------------------------------------------------------------------------
+    // The only guidance a new player gets. Without it nothing tells them the plugin exists: /pet is
+    // tab-completable, but only for someone who already suspects there is something to type.
+    ONBOARDING_WELCOME("onboarding.welcome",
+            "<gray>You have a pet companion system here.</gray>"),
+    ONBOARDING_WELCOME_HINT("onboarding.welcome-hint",
+            "<yellow>Run <white>/pet</white> to open it.</yellow>"),
+
+    // --- action bar ----------------------------------------------------------------------------
+    // The action bar is a second channel, not a louder one: it confirms what just happened without
+    // adding a chat line to scroll past. Only moments worth narrating get a key; a repeatable action
+    // like changing the vault sort stays sound-only.
+    ACTION_BAR_PET_ACTIVATED("action-bar.pet-activated", "<green>Pet summoned</green>"),
+    ACTION_BAR_PET_RECALLED("action-bar.pet-recalled", "<gray>Pet recalled</gray>"),
+    ACTION_BAR_HATCH_QUEUED("action-bar.hatch-queued", "<yellow>Incubation started</yellow>"),
+    ACTION_BAR_HATCH_CLAIMED("action-bar.hatch-claimed", "<green>Hatched! Check your vault</green>"),
+    ACTION_BAR_SLOT_UNLOCKED("action-bar.slot-unlocked", "<green>Active slot unlocked</green>"),
+    // Staff-facing, but titles rather than audit output: an operator translating the plugin has no
+    // reason to be left with six English screens, and a caption cannot distort a receipt.
+    GUI_TITLE_STUDIO_TIERS("gui.title.studio-tiers", "OmniPet <dark_gray>▸</dark_gray> Studio"),
+    GUI_TITLE_STUDIO_LIST("gui.title.studio-list",
+            "OmniPet <dark_gray>▸</dark_gray> Studio <dark_gray>▸</dark_gray> <detail>"),
+    GUI_TITLE_STUDIO_EDIT("gui.title.studio-edit",
+            "OmniPet <dark_gray>▸</dark_gray> Edit <detail>"),
+    GUI_TITLE_STUDIO_ARCHIVE("gui.title.studio-archive",
+            "OmniPet <dark_gray>▸</dark_gray> Archive"),
+    GUI_TITLE_STUDIO_STATS("gui.title.studio-stats",
+            "OmniPet <dark_gray>▸</dark_gray> Stats"),
+    GUI_TITLE_STUDIO_STAT("gui.title.studio-stat",
+            "OmniPet <dark_gray>▸</dark_gray> <detail>"),
+
     // --- vault menu --------------------------------------------------------------------------
     GUI_VAULT_PET_LEVEL("gui.vault.pet-level", "<gray>Level</gray> <white><level></white>"),
     GUI_VAULT_PET_RARITY("gui.vault.pet-rarity", "<gray>Rarity</gray> <white><status></white>"),
@@ -210,6 +257,10 @@ public enum MessageKey {
     GUI_EGG_ITEM_DURATION("gui.egg.item-duration", "<gray>Incubates in</gray> <white><detail></white>"),
     GUI_EGG_ITEM_HINT("gui.egg.item-hint",
             "<yellow>Hold and run <white>/pet hatch main</white></yellow> <gray>to start</gray>"),
+    // Placing an egg has always worked but nothing said so, so the feature was reachable only by
+    // accident. The command stays first: it is the path that works anywhere.
+    GUI_EGG_ITEM_PLACE_HINT("gui.egg.item-place-hint",
+            "<gray>or place it beside a heat source</gray>"),
 
     // --- admin transaction menu ---------------------------------------------------------------
     // Operator-facing, but these are menu labels rather than the audit trail MessageKey deliberately

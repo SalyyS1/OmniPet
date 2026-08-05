@@ -37,9 +37,15 @@ public final class HatchMenuRenderer {
     private static final int START_OFF_SLOT = 15;
     private static final int HUB_SLOT = 18;
     private static final int REFRESH_SLOT = 22;
-    /** Where the redeem controls sit while an egg is incubating: the slots the start buttons vacate. */
-    private static final int REDEEM_MAIN_SLOT = 11;
-    private static final int REDEEM_OFF_SLOT = 15;
+    /**
+     * Where the redeem controls sit while an egg is incubating: the slots the start buttons vacate.
+     *
+     * <p>Derived from the start slots rather than repeated, so moving a start button in config cannot
+     * leave the two sets describing different places. They never collide at runtime — the start and
+     * redeem controls render in mutually exclusive branches.
+     */
+    private static final int REDEEM_MAIN_SLOT = START_MAIN_SLOT;
+    private static final int REDEEM_OFF_SLOT = START_OFF_SLOT;
 
     public Inventory render(Player player, PlayerState state) {
         MenuLayout<HatchInventoryHolder.Action> layout = new MenuLayout<>(

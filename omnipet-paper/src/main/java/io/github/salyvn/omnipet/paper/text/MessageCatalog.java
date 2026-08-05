@@ -87,6 +87,21 @@ public final class MessageCatalog {
         return values.getOrDefault(key, key.defaultValue());
     }
 
+    /**
+     * This catalog layered over {@code fallback}: a key absent here falls through to it.
+     *
+     * <p>What makes a partial translation usable. A pack covering half the keys shows translated text
+     * where it has it and the underlying layer elsewhere, rather than being rejected for incompleteness.
+     */
+    public MessageCatalog withFallback(MessageCatalog fallback) {
+        Objects.requireNonNull(fallback, "fallback catalog");
+        if (fallback.values.isEmpty()) return this;
+        Map<MessageKey, String> merged = new EnumMap<>(MessageKey.class);
+        merged.putAll(fallback.values);
+        merged.putAll(values);
+        return new MessageCatalog(merged);
+    }
+
     /** True when the file supplied this key, rather than the built-in default being used. */
     public boolean overridden(MessageKey key) {
         return values.containsKey(Objects.requireNonNull(key, "message key"));
