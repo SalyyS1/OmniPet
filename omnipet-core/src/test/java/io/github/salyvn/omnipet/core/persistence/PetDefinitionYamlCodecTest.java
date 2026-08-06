@@ -44,6 +44,42 @@ class PetDefinitionYamlCodecTest {
         assertTrue(codec.encode(first).startsWith("schemaVersion:"));
     }
 
+    /**
+     * A stat's {@code vendorStatId} survives being written to disk and read back.
+     *
+     * <p>Load-bearing rather than incidental. The Studio's stat picker stores its own namespaced ID —
+     * {@code mythiclib:attack_damage} — and records the provider's real name in {@code vendorStatId}
+     * alongside it. That extra key is the only thing that lets the buff path recover the ID MythicLib
+     * actually answers to. If the codec dropped it on the way to disk, every pet would still carry a
+     * namespaced ID at runtime, the provider would never recognise it, and the stats would silently do
+     * nothing — which is exactly the symptom this whole area was reported for.
+     *
+     * <p>It survives because the codec copies the raw node wholesale, so this asserts a property the
+     * encoder never states explicitly and a future rewrite could quietly lose.
+     */
+    @Test
+    void preservesTheVendorStatIdThatMakesOwnerBuffsResolvable() {
+        String yaml = """
+                schemaVersion: 2
+                definitionId: nahara
+                revision: 1
+                classification: { tier: A }
+                icon:
+                  head: { source: TEXTURE_URL, value: 'https://textures.minecraft.net/texture/example' }
+                display: { provider: HEAD, model: null }
+                stats:
+                  - { id: 'mythiclib:attack_damage', vendorStatId: ATTACK_DAMAGE, type: FLAT, min: 10, max: 50 }
+                """;
+
+        var reloaded = codec.decode("nahara", codec.encode(codec.decode("nahara", yaml)));
+
+        var stats = (java.util.List<?>) reloaded.definition().rawNode().get("stats");
+        var stat = (java.util.Map<?, ?>) stats.getFirst();
+        assertEquals("mythiclib:attack_damage", stat.get("id"));
+        assertEquals("ATTACK_DAMAGE", stat.get("vendorStatId"),
+                "losing this key on disk would make every picked stat inert at runtime");
+    }
+
     @Test
     void preservesUnknownNestedDisplayIconAndClassificationNodes() {
         String yaml = """

@@ -137,6 +137,106 @@ class PaperPetRuntimeCoordinatorTest {
         assertFalse(fixture.failures.stream().anyMatch(failure -> petId.equals(failure.petInstanceId())));
     }
 
+    /**
+     * An activated pet reaches its renderer carrying a name.
+     *
+     * <p>The nameplate was reported missing three times, and each fix was checked one layer at a time — the
+     * resolver returned the right string, the renderer wrote whatever it was handed. Both passed while no
+     * pet on a live server had a plate, because nothing asserted that the string the resolver produces is
+     * the string that arrives in a spawn request.
+     *
+     * <p>This is the case that was actually broken: a name only existed if an operator had found
+     * {@code display.name}, an undocumented raw-node key with no Studio field, so in practice no definition
+     * had one and every pet was correctly resolved to nothing.
+     */
+    @Test
+    void anActivatedPetReachesItsRendererCarryingANameAndLevel() {
+        Fixture fixture = new Fixture(PaperRuntimeSettings.defaults());
+        UUID owner = UUID.randomUUID();
+        PetInstance pet = new PetInstance(
+                UUID.randomUUID(), "ember_fox", 0,
+                Map.of("progression", Map.of("level", 12)), Map.of());
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition("ember_fox")));
+        fixture.coordinator.start();
+
+        fixture.scheduler.runTick();
+
+        assertEquals("Ember fox  Lv.12",
+                fixture.renderer.spawnRequests.get(pet.id()).appearance().displayName(),
+                "an unnamed definition falls back to its readable ID, so no pet is anonymous");
+    }
+
+    /** An operator's name wins over the readable ID, and reaches the renderer unparsed. */
+    @Test
+    void anOperatorAuthoredNameReachesTheRenderer() {
+        Fixture fixture = new Fixture(PaperRuntimeSettings.defaults());
+        UUID owner = UUID.randomUUID();
+        PetInstance pet = RuntimeTestFixtures.pet(UUID.randomUUID(), "ember_fox");
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition(
+                        "ember_fox", DisplayDefinition.Provider.HEAD,
+                        Map.of("display", Map.of("name", "<gold>Ember</gold>")))));
+        fixture.coordinator.start();
+
+        fixture.scheduler.runTick();
+
+        assertEquals("<gold>Ember</gold>  Lv.1",
+                fixture.renderer.spawnRequests.get(pet.id()).appearance().displayName(),
+                "MiniMessage travels unparsed; the renderer parses it at the plate");
+    }
+
+    /** A player's own rename outranks both, which is the point of renaming. */
+    @Test
+    void aPlayerRenameOutranksTheDefinitionName() {
+        Fixture fixture = new Fixture(PaperRuntimeSettings.defaults());
+        UUID owner = UUID.randomUUID();
+        PetInstance pet = new PetInstance(
+                UUID.randomUUID(), "ember_fox", 0,
+                Map.of(),
+                // extensions, not components: a rename is per-instance metadata, which is where
+                // PetManagementMetadata reads and writes it.
+                Map.of("management", Map.of("customName", "Shadow")));
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(pet), List.of(pet.id())),
+                RuntimeTestFixtures.registry(0, RuntimeTestFixtures.definition(
+                        "ember_fox", DisplayDefinition.Provider.HEAD,
+                        Map.of("display", Map.of("name", "Ember")))));
+        fixture.coordinator.start();
+
+        fixture.scheduler.runTick();
+
+        assertEquals("Shadow  Lv.1",
+                fixture.renderer.spawnRequests.get(pet.id()).appearance().displayName());
+    }
+
+    /** A pet whose definition was deleted still gets a plate, from the only source left: its own ID. */
+    @Test
+    void aPetWhoseDefinitionIsGoneStillArrivesNamed() {
+        Fixture fixture = new Fixture(PaperRuntimeSettings.defaults());
+        UUID owner = UUID.randomUUID();
+        PetInstance persisted = new PetInstance(
+                UUID.randomUUID(), "archived_wolf", 7,
+                Map.of("appearance", Map.of(
+                        "provider", "HEAD",
+                        "fallbackHeadSource", "TEXTURE_URL",
+                        "fallbackHeadValue", "https://textures.minecraft.net/texture/archived_wolf")),
+                Map.of());
+        fixture.coordinator.acceptSnapshot(
+                RuntimeTestFixtures.storage(owner, 0, List.of(persisted), List.of(persisted.id())),
+                RuntimeTestFixtures.registry(1));
+        fixture.coordinator.start();
+
+        fixture.scheduler.runTick();
+
+        // Lv.1 because a pet with no progression node is level 1, matching ProgressionState.initial and
+        // the vault's own reader — an archived pet is not a level-less pet.
+        assertEquals("Archived wolf  Lv.1",
+                fixture.renderer.spawnRequests.get(persisted.id()).appearance().displayName());
+    }
+
     @Test
     void reloadRecompilesCachedStorageAgainstTheActivatedRegistry() {
         Fixture fixture = new Fixture(PaperRuntimeSettings.defaults());
