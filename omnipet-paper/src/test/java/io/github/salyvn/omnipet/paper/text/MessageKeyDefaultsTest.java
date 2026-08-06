@@ -52,7 +52,11 @@ class MessageKeyDefaultsTest {
         Set<String> allowed = Set.of(
                 "pet", "player", "amount", "total", "page", "pages", "status", "reason",
                 "detail", "provider", "cost", "balance", "level", "exp", "remaining",
-                "usage", "description", "field", "format", "example", "stat", "modifier");
+                "usage", "description", "field", "format", "example", "stat", "modifier",
+                // The nameplate template's parts. Substituted textually rather than through a resolver,
+                // because the plate is parsed once at the end so a colour opened around <name> can close
+                // after <status>.
+                "name");
         Pattern placeholder = Pattern.compile("<([a-z]+)>");
 
         for (MessageKey key : MessageKey.values()) {

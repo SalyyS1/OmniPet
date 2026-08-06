@@ -163,9 +163,11 @@ class PaperPetRuntimeCoordinatorTest {
 
         fixture.scheduler.runTick();
 
-        assertEquals("Ember fox  Lv.12",
+        assertEquals("Ember fox",
                 fixture.renderer.spawnRequests.get(pet.id()).appearance().displayName(),
                 "an unnamed definition falls back to its readable ID, so no pet is anonymous");
+        assertEquals(12, fixture.renderer.spawnRequests.get(pet.id()).appearance().level(),
+                "the level travels beside the name so the plate template can place it");
     }
 
     /** An operator's name wins over the readable ID, and reaches the renderer unparsed. */
@@ -183,7 +185,7 @@ class PaperPetRuntimeCoordinatorTest {
 
         fixture.scheduler.runTick();
 
-        assertEquals("<gold>Ember</gold>  Lv.1",
+        assertEquals("<gold>Ember</gold>",
                 fixture.renderer.spawnRequests.get(pet.id()).appearance().displayName(),
                 "MiniMessage travels unparsed; the renderer parses it at the plate");
     }
@@ -208,7 +210,7 @@ class PaperPetRuntimeCoordinatorTest {
 
         fixture.scheduler.runTick();
 
-        assertEquals("Shadow  Lv.1",
+        assertEquals("Shadow",
                 fixture.renderer.spawnRequests.get(pet.id()).appearance().displayName());
     }
 
@@ -231,10 +233,11 @@ class PaperPetRuntimeCoordinatorTest {
 
         fixture.scheduler.runTick();
 
-        // Lv.1 because a pet with no progression node is level 1, matching ProgressionState.initial and
-        // the vault's own reader — an archived pet is not a level-less pet.
-        assertEquals("Archived wolf  Lv.1",
+        assertEquals("Archived wolf",
                 fixture.renderer.spawnRequests.get(persisted.id()).appearance().displayName());
+        // Level 1 because a pet with no progression node is level 1, matching ProgressionState.initial and
+        // the vault's own reader — an archived pet is not a level-less pet.
+        assertEquals(1, fixture.renderer.spawnRequests.get(persisted.id()).appearance().level());
     }
 
     @Test

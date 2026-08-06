@@ -53,8 +53,8 @@ record PaperRuntimeOwnerSnapshot(
                         definition.display().model(),
                         definition.icon().source(),
                         definition.icon().value(),
-                        PaperRuntimeNameResolver.resolve(
-                                definition.rawNode(), instance, PaperRuntimeNameResolver.level(instance)));
+                        PaperRuntimeNameResolver.resolve(definition.rawNode(), instance),
+                        PaperRuntimeNameResolver.level(instance));
                 desired.add(new DesiredPet(
                         instance, definition.id(), appearance, behavior.movement(), behavior.scale()));
             } catch (RuntimeException failure) {
@@ -86,7 +86,8 @@ record PaperRuntimeOwnerSnapshot(
                 requiredText(appearance, "fallbackHeadSource"),
                 requiredText(appearance, "fallbackHeadValue"),
                 // No definition to read a default name from, so only a name its owner gave it.
-                PaperRuntimeNameResolver.resolve(null, instance, PaperRuntimeNameResolver.level(instance)));
+                PaperRuntimeNameResolver.resolve(null, instance),
+                PaperRuntimeNameResolver.level(instance));
         PaperRuntimeBehaviorResolver.ResolvedBehavior behavior = PaperRuntimeBehaviorResolver.resolve(Map.of());
         return new DesiredPet(
                 instance, instance.definitionId(), resolved, behavior.movement(), behavior.scale());

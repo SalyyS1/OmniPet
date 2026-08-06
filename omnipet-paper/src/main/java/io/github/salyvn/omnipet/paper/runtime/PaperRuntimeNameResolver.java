@@ -33,23 +33,26 @@ final class PaperRuntimeNameResolver {
     private PaperRuntimeNameResolver() {}
 
     /**
-     * The nameplate text for one pet.
+     * The pet's name, without its level.
+     *
+     * <p>The level used to be appended here. It is carried separately on the appearance now, so that the
+     * nameplate template decides where it goes and whether it appears at all — an operator who does not
+     * want a level writes a template without the placeholder, which was impossible while the two were
+     * already one string by the time the plate was composed.
      *
      * @param rawNode the definition's raw node, which may be absent for a pet whose definition is gone
      * @param instance the owned pet, carrying any name its owner gave it
-     * @param level the pet's level, appended when it is known
      */
-    static String resolve(Map<String, Object> rawNode, PetInstance instance, Integer level) {
+    static String resolve(Map<String, Object> rawNode, PetInstance instance) {
         String name = customName(instance);
         if (name.isEmpty()) name = definitionName(rawNode);
         if (name.isEmpty()) name = readableId(instance);
         if (name.isEmpty()) return "";
-        String withLevel = level == null ? name : name + "  Lv." + level;
         // Truncated rather than rejected: a name too long for a nameplate is a cosmetic problem, and
         // refusing it would cost the pet its render.
-        return withLevel.length() <= RendererAppearance.MAX_DISPLAY_NAME
-                ? withLevel
-                : withLevel.substring(0, RendererAppearance.MAX_DISPLAY_NAME);
+        return name.length() <= RendererAppearance.MAX_DISPLAY_NAME
+                ? name
+                : name.substring(0, RendererAppearance.MAX_DISPLAY_NAME);
     }
 
     /**

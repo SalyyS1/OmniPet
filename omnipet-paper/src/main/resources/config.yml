@@ -130,12 +130,22 @@ render:
   maximumLeanDegrees: 12.0
   # The floating name above an active pet. Shows, in order of priority: the name its owner gave it,
   # the definition's own `display.name`, or the definition ID made readable - so every pet has a
-  # plate whether or not you wrote one. The pet's level is appended.
+  # plate whether or not you wrote one.
   # false removes the plate from every pet, which is worth doing on a server where many pets are out
   # at once. Names stay visible in the vault and management screens either way.
+  #
+  # The plate's LAYOUT is not here - it is a template in messages.yml under gui.pet.nameplate, where
+  # you can move the level, restyle it, or drop it entirely:
+  #   gui.pet.nameplate:        "<name>[ <dark_gray>Lv.</dark_gray><white><level></white>]"
+  #   gui.pet.nameplate-status: "<name>[ <dark_gray>Lv.</dark_gray><white><level></white>] <status>"
+  # <name>, <level>, and <status> are the parts. Leave one out and it simply does not appear, so a
+  # plate of just the name is `gui.pet.nameplate: "<name>"`. Square brackets mark text that vanishes
+  # along with the level when a pet's level cannot be read, so you never see a bare "Lv." - keep the
+  # brackets around whatever belongs to the level. Works for both head and model pets.
   nameplates: true
   # Appends what the pet is doing to its plate: resting, idle, following, or dashing. Set false to
-  # show the name and level alone. Wording is in messages.yml under gui.pet.status-*
+  # show the name and level alone - the plate then uses the gui.pet.nameplate template instead of
+  # gui.pet.nameplate-status. Wording is in messages.yml under gui.pet.status-*
   nameplateStatus: true
 
 

@@ -21,6 +21,9 @@ import io.github.salyvn.omnipet.core.runtime.RendererAppearance;
  *
  * <p>The owner wins. Renaming is the entire point of the stored custom name, and a definition-level default
  * that overrode it would make the rename look broken.
+ *
+ * <p>This resolves the name alone. The level is carried beside it and placed by the nameplate template, so
+ * that an operator can move it, restyle it, or leave it out — see {@code NameplateTest}.
  */
 class PaperRuntimeNameResolverTest {
     @Test
@@ -28,13 +31,12 @@ class PaperRuntimeNameResolverTest {
         Map<String, Object> definition = display("Wolf Cub");
         PetInstance renamed = pet(Map.of("management", Map.of("customName", "Shadow")));
 
-        assertEquals("Shadow  Lv.1", PaperRuntimeNameResolver.resolve(definition, renamed, 1));
+        assertEquals("Shadow", PaperRuntimeNameResolver.resolve(definition, renamed));
     }
 
     @Test
     void theDefinitionDefaultIsUsedWhenNobodyHasRenamedIt() {
-        assertEquals("Wolf Cub  Lv.4",
-                PaperRuntimeNameResolver.resolve(display("Wolf Cub"), pet(Map.of()), 4));
+        assertEquals("Wolf Cub", PaperRuntimeNameResolver.resolve(display("Wolf Cub"), pet(Map.of())));
     }
 
     @Test
@@ -44,9 +46,9 @@ class PaperRuntimeNameResolverTest {
         // display.name, an undocumented raw-node key, so every pet on every server was unnamed and the
         // feature looked broken. A readable ID is a worse name than an operator would write and a far
         // better outcome than no plate, and it makes the rename button visibly do something.
-        assertEquals("Wolf  Lv.3", PaperRuntimeNameResolver.resolve(Map.of(), pet(Map.of()), 3));
-        assertEquals("Wolf  Lv.3", PaperRuntimeNameResolver.resolve(null, pet(Map.of()), 3));
-        assertEquals("Wolf  Lv.3", PaperRuntimeNameResolver.resolve(display("   "), pet(Map.of()), 3));
+        assertEquals("Wolf", PaperRuntimeNameResolver.resolve(Map.of(), pet(Map.of())));
+        assertEquals("Wolf", PaperRuntimeNameResolver.resolve(null, pet(Map.of())));
+        assertEquals("Wolf", PaperRuntimeNameResolver.resolve(display("   "), pet(Map.of())));
     }
 
     /** An underscored ID is made readable rather than shown raw. */
@@ -54,21 +56,26 @@ class PaperRuntimeNameResolverTest {
     void theFallbackReadsAsWordsRatherThanAsAnIdentifier() {
         PetInstance underscored = new PetInstance(UUID.randomUUID(), "tier_d_wolf", 1, Map.of(), Map.of());
 
-        assertEquals("Tier d wolf  Lv.3", PaperRuntimeNameResolver.resolve(Map.of(), underscored, 3));
+        assertEquals("Tier d wolf", PaperRuntimeNameResolver.resolve(Map.of(), underscored));
     }
 
     /** The operator's name and the player's rename both still outrank the ID. */
     @Test
     void theFallbackNeverOverridesANameSomebodyChose() {
-        assertEquals("Wolf Cub  Lv.3",
-                PaperRuntimeNameResolver.resolve(display("Wolf Cub"), pet(Map.of()), 3));
+        assertEquals("Wolf Cub", PaperRuntimeNameResolver.resolve(display("Wolf Cub"), pet(Map.of())));
     }
 
+    /**
+     * The level is not part of the name.
+     *
+     * <p>It used to be concatenated here, which meant the plate's layout was decided before anything
+     * operator-configurable saw it — an operator could not move the level, restyle it, or drop it, because
+     * by then it was already inside the name string.
+     */
     @Test
-    void theLevelIsAppendedOnlyWhenItIsKnown() {
-        assertEquals("Wolf Cub", PaperRuntimeNameResolver.resolve(display("Wolf Cub"), pet(Map.of()), null));
-        assertEquals("Wolf Cub  Lv.12",
-                PaperRuntimeNameResolver.resolve(display("Wolf Cub"), pet(Map.of()), 12));
+    void theLevelIsNotBakedIntoTheName() {
+        assertEquals("Wolf Cub", PaperRuntimeNameResolver.resolve(display("Wolf Cub"), pet(Map.of())));
+        assertEquals(1, PaperRuntimeNameResolver.level(pet(Map.of())));
     }
 
     @Test
@@ -101,7 +108,7 @@ class PaperRuntimeNameResolverTest {
         // A cosmetic label must never be able to cost a pet its render, so this trims instead of throwing.
         String long_ = "x".repeat(RendererAppearance.MAX_DISPLAY_NAME + 40);
 
-        String resolved = PaperRuntimeNameResolver.resolve(display(long_), pet(Map.of()), 5);
+        String resolved = PaperRuntimeNameResolver.resolve(display(long_), pet(Map.of()));
 
         assertEquals(RendererAppearance.MAX_DISPLAY_NAME, resolved.length());
         // And the result is still a legal appearance, which is the property that actually matters.
@@ -113,7 +120,7 @@ class PaperRuntimeNameResolverTest {
     void aMalformedManagementNodeCostsTheCustomNameAndNothingElse() {
         PetInstance broken = pet(Map.of("management", "not-a-map"));
 
-        assertEquals("Wolf Cub  Lv.1", PaperRuntimeNameResolver.resolve(display("Wolf Cub"), broken, 1));
+        assertEquals("Wolf Cub", PaperRuntimeNameResolver.resolve(display("Wolf Cub"), broken));
     }
 
     private static Map<String, Object> display(String name) {

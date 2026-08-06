@@ -616,6 +616,46 @@ production value.
 player may **own** — the vault ceiling is separate and much higher. Each rendered pet costs three tracked
 entities, which is why this number is 10 and not 64.
 
+## render — the name above a pet
+
+\`config.yml\` decides **whether** there is a plate; \`messages.yml\` decides **what it looks like**.
+
+\`\`\`yaml
+render:
+  nameplates: true       # false removes the plate from every pet
+  nameplateStatus: true  # false drops the status word
+\`\`\`
+
+The name itself reads, in falling priority: the name its owner gave it, the definition's own name (the
+Studio's **Nameplate** tile), or the definition ID made readable. That last fallback is why every active
+pet has a plate at all.
+
+The layout is a pair of templates:
+
+\`\`\`yaml
+gui:
+  pet:
+    nameplate: "<name>[ <dark_gray>Lv.</dark_gray><white><level></white>]"
+    nameplate-status: "<name>[ <dark_gray>Lv.</dark_gray><white><level></white>] <status>"
+\`\`\`
+
+\`<name>\`, \`<level>\`, and \`<status>\` are the parts; everything else on the line is yours. Leaving a
+placeholder out simply omits it, so a plate of nothing but the name is \`nameplate: "<name>"\`.
+
+Two keys rather than one because the separator dividing the name from the status belongs to the status —
+blanking a placeholder in a single template would leave that separator behind as trailing space.
+
+Square brackets mark text that disappears **with the level** when a pet's level cannot be read. Keep them
+around whatever belongs to the level, or a pet with a malformed progression node shows a bare \`Lv.\` with
+nothing after it.
+
+The whole line is parsed as MiniMessage once at the end, so a colour opened in the template closes around
+the name and the status alike. Both renderers use these templates, so a model pet and a head pet are
+labelled identically.
+
+The status word is only rewritten when the word itself changes, so a walking pet costs one packet per gait
+change rather than one per tick. The four words live at \`gui.pet.status-*\`.
+
 ## behavior.animations — clip names per pet
 
 On the pet definition rather than in \`config.yml\`, and only used by pets whose \`display.provider\` is
@@ -757,6 +797,46 @@ gian và chỉ dựa vào số đếm; đó là thiết lập để chẩn đoá
 \`maximumPetsPerOwner\` là số pet server đồng ý **vẽ ra** mỗi tick. Nó không phải số pet người chơi được
 **sở hữu** — trần vault là con số riêng và lớn hơn nhiều. Mỗi pet được dựng tốn ba thực thể được theo dõi, đó
 là lý do con số này là 10 chứ không phải 64.
+
+## render — tên hiện trên đầu pet
+
+\`config.yml\` quyết định **có** bảng tên hay không; \`messages.yml\` quyết định **nó trông thế nào**.
+
+\`\`\`yaml
+render:
+  nameplates: true       # false gỡ bảng tên khỏi mọi pet
+  nameplateStatus: true  # false bỏ chữ trạng thái
+\`\`\`
+
+Bản thân cái tên được lấy theo thứ tự ưu tiên giảm dần: tên chủ nhân tự đặt, tên riêng của định nghĩa (ô
+**Nameplate** trong Studio), hoặc mã định nghĩa được viết lại cho dễ đọc. Nhờ mức cuối cùng này mà mọi pet
+đang hoạt động đều có bảng tên.
+
+Bố cục nằm ở hai mẫu:
+
+\`\`\`yaml
+gui:
+  pet:
+    nameplate: "<name>[ <dark_gray>Cấp</dark_gray><white><level></white>]"
+    nameplate-status: "<name>[ <dark_gray>Cấp</dark_gray><white><level></white>] <status>"
+\`\`\`
+
+\`<name>\`, \`<level>\` và \`<status>\` là các thành phần; mọi thứ khác trên dòng là của bạn. Bỏ một placeholder
+đi thì phần đó đơn giản là không hiện, nên một bảng chỉ có tên là \`nameplate: "<name>"\`.
+
+Hai khoá chứ không phải một, vì dấu ngăn giữa tên và trạng thái thuộc về trạng thái — xoá placeholder trong
+một mẫu duy nhất sẽ để lại dấu ngăn đó thành khoảng trắng thừa.
+
+Dấu ngoặc vuông đánh dấu phần chữ sẽ biến mất **cùng với cấp độ** khi không đọc được cấp của pet. Hãy giữ
+chúng bao quanh những gì thuộc về cấp độ, nếu không một pet có node tiến trình hỏng sẽ hiện chữ \`Cấp\` trơ
+trọi không có số phía sau.
+
+Cả dòng được phân tích MiniMessage một lần ở cuối, nên một màu mở trong mẫu sẽ đóng lại bao trọn cả tên lẫn
+trạng thái. Cả hai renderer đều dùng chung mẫu này, nên pet dùng model và pet dùng head được gắn nhãn giống
+hệt nhau.
+
+Chữ trạng thái chỉ được ghi lại khi chính từ đó đổi, nên một pet đang đi tốn một gói tin mỗi lần đổi dáng
+đi chứ không phải mỗi tick. Bốn từ đó nằm ở \`gui.pet.status-*\`.
 
 ## behavior.animations — tên clip cho từng pet
 

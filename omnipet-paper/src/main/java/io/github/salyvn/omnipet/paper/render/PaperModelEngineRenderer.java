@@ -92,6 +92,7 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
         Location target = location(owner.getWorld(), request.transform());
         requireLoaded(target);
         ArmorStand carrier = null;
+        ArmorStand plate = null;
         Interaction interaction = null;
         Object modeled = null;
         Object active = null;
@@ -112,29 +113,54 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
                 stand.setSilent(true);
                 stand.setPersistent(false);
             });
+            plate = spawnPlate(owner.getWorld(), target);
             interaction = owner.getWorld().spawn(target, Interaction.class, entity -> {
                 entity.setResponsive(true);
                 entity.setPersistent(false);
                 setInteractionScale(entity, request.transform().scale());
             });
             if (!carrier.addPassenger(interaction)) throw new IllegalStateException("could not attach model interaction");
+            if (!carrier.addPassenger(plate)) throw new IllegalStateException("could not attach model nameplate");
             modeled = bindings.createModeled(carrier);
             active = bindings.createActive(request.appearance().assetId());
             bindings.scale(active, request.transform().scale());
             bindings.attach(modeled, active);
             ModelEngineRendererHandle handle = new ModelEngineRendererHandle(
                     request.ownerId(), request.petInstanceId(), request.rendererGeneration(),
-                    carrier, interaction, modeled, active, request.appearance().assetId(),
+                    carrier, plate, interaction, modeled, active, request.appearance().assetId(),
                     request.transform(), animations.available(), request.appearance());
             handles.put(request.petInstanceId(), handle);
-            Nameplate.apply(carrier, request.appearance(), settings);
+            Nameplate.apply(plate, request.appearance(), settings);
             driveAnimation(handle, request.transform());
             return handle;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
-            cleanup(modeled, active, interaction, carrier, failure);
+            cleanup(modeled, active, interaction, plate, carrier, failure);
             quarantine(failure);
             throw wrap(failure);
         }
+    }
+
+    /**
+     * The stand the nameplate is written to.
+     *
+     * <p>A separate entity because ModelEngine hides the carrier by despawning it client-side rather than
+     * by making it transparent, so a name on the carrier reaches no one. This one is invisible the vanilla
+     * way, which leaves its plate renderable, and rides the carrier so it tracks the model for free.
+     *
+     * <p>Not a marker: a marker armor stand has a zero-height bounding box, and the plate is drawn above
+     * that box, so it would sit inside the model instead of over it.
+     */
+    private static ArmorStand spawnPlate(World world, Location target) {
+        return world.spawn(target, ArmorStand.class, stand -> {
+            stand.setInvisible(true);
+            stand.setSmall(true);
+            stand.setGravity(false);
+            stand.setInvulnerable(true);
+            stand.setCollidable(false);
+            stand.setSilent(true);
+            stand.setPersistent(false);
+            stand.setCanPickupItems(false);
+        });
     }
 
     @Override
@@ -145,7 +171,7 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
         Location target = location(owner.getWorld(), transform);
         requireLoaded(target);
         ArmorStand carrier = handle.carrier();
-        if (!carrier.isValid() || !handle.interaction().isValid()) {
+        if (!carrier.isValid() || !handle.interaction().isValid() || !handle.plate().isValid()) {
             retire(handle);
             throw new IllegalStateException("ModelEngine renderer entities became invalid");
         }
@@ -153,11 +179,17 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
                 || carrier.getLocation().distanceSquared(target)
                         > settings.safetyDistance() * settings.safetyDistance()) {
             carrier.eject();
-            if (!carrier.teleport(target) || !handle.interaction().teleport(target)) {
+            if (!carrier.teleport(target) || !handle.interaction().teleport(target)
+                    || !handle.plate().teleport(target)) {
                 throw new IllegalStateException("ModelEngine renderer safety teleport failed");
             }
             if (!carrier.addPassenger(handle.interaction())) {
                 throw new IllegalStateException("could not reattach model interaction");
+            }
+            // The plate rides the carrier too, and ejecting dropped it along with the interaction. Missing
+            // this would leave the name floating where the pet was teleported from.
+            if (!carrier.addPassenger(handle.plate())) {
+                throw new IllegalStateException("could not reattach model nameplate");
             }
         } else {
             // Teleport, not setVelocity. The carrier is a marker armor stand with gravity off, so it has
@@ -194,7 +226,7 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
         io.github.salyvn.omnipet.core.runtime.PetStatus status =
                 io.github.salyvn.omnipet.core.runtime.PetStatus.of(transform, settings.maximumVelocity());
         if (handle.statusChanged(status) && handle.appearance() != null) {
-            Nameplate.apply(handle.carrier(), handle.appearance(), settings, status);
+            Nameplate.apply(handle.plate(), handle.appearance(), settings, status);
         }
         handle.transform(transform);
     }
@@ -233,7 +265,7 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
         // Written with the status the pet already has, or the rename would drop the status word until the
         // pet next changed gait.
         handle.appearance(appearance);
-        Nameplate.apply(handle.carrier(), appearance, settings,
+        Nameplate.apply(handle.plate(), appearance, settings,
                 io.github.salyvn.omnipet.core.runtime.PetStatus.of(
                         handle.transform(), settings.maximumVelocity()));
         if (handle.assetId().equals(appearance.assetId())) return;
@@ -267,6 +299,7 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             failure = error;
         }
         handle.interaction().remove();
+        handle.plate().remove();
         handle.carrier().remove();
         handle.markRemoved();
         handles.remove(handle.petInstanceId(), handle);
@@ -305,12 +338,15 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
         interaction.setInteractionHeight((float) Math.max(0.25, Math.min(8, scale * 1.25)));
     }
 
-    private void cleanup(Object modeled, Object active, Interaction interaction, ArmorStand carrier, Throwable primary) {
+    private void cleanup(
+            Object modeled, Object active, Interaction interaction, ArmorStand plate, ArmorStand carrier,
+            Throwable primary) {
         if (modeled != null && active != null) {
             try { bindings.destroy(modeled, active); }
             catch (ReflectiveOperationException | RuntimeException | LinkageError cleanup) { primary.addSuppressed(cleanup); }
         }
         if (interaction != null) interaction.remove();
+        if (plate != null) plate.remove();
         if (carrier != null) carrier.remove();
     }
 

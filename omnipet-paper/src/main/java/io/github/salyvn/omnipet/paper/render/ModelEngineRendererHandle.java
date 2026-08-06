@@ -15,6 +15,7 @@ final class ModelEngineRendererHandle implements RendererHandle {
     private final UUID petInstanceId;
     private final long generation;
     private final ArmorStand carrier;
+    private final ArmorStand plate;
     private final Interaction interaction;
     private final Object modeledEntity;
     private final boolean animation;
@@ -38,13 +39,14 @@ final class ModelEngineRendererHandle implements RendererHandle {
             UUID petInstanceId,
             long generation,
             ArmorStand carrier,
+            ArmorStand plate,
             Interaction interaction,
             Object modeledEntity,
             Object activeModel,
             String assetId,
             RuntimeTransform transform,
             boolean animation) {
-        this(ownerId, petInstanceId, generation, carrier, interaction, modeledEntity, activeModel,
+        this(ownerId, petInstanceId, generation, carrier, plate, interaction, modeledEntity, activeModel,
                 assetId, transform, animation, null);
     }
 
@@ -53,6 +55,7 @@ final class ModelEngineRendererHandle implements RendererHandle {
             UUID petInstanceId,
             long generation,
             ArmorStand carrier,
+            ArmorStand plate,
             Interaction interaction,
             Object modeledEntity,
             Object activeModel,
@@ -64,6 +67,7 @@ final class ModelEngineRendererHandle implements RendererHandle {
         this.petInstanceId = petInstanceId;
         this.generation = generation;
         this.carrier = carrier;
+        this.plate = plate;
         this.interaction = interaction;
         this.modeledEntity = modeledEntity;
         this.activeModel = activeModel;
@@ -85,6 +89,16 @@ final class ModelEngineRendererHandle implements RendererHandle {
     @Override public boolean removed() { return removed; }
 
     ArmorStand carrier() { return carrier; }
+
+    /**
+     * The entity the nameplate is written to.
+     *
+     * <p>Not the carrier. ModelEngine's {@code setBaseEntityVisible(false)} despawns the base entity for
+     * every tracking client rather than making it transparent, so a name written to the carrier reaches
+     * nobody — which is why model pets had no plate while head pets did. This stand is ModelEngine's to
+     * ignore: it rides the carrier, so it follows the model without the model knowing about it.
+     */
+    ArmorStand plate() { return plate; }
     Interaction interaction() { return interaction; }
     Object modeledEntity() { return modeledEntity; }
     Object activeModel() { return activeModel; }

@@ -184,6 +184,8 @@ gui:
     studio-stats: "OmniPet <dark_gray>▸</dark_gray> Chỉ số"
     studio-stat: "OmniPet <dark_gray>▸</dark_gray> <detail>"
   pet:
+    nameplate: "<name>[ <dark_gray>Cấp</dark_gray><white><level></white>]"
+    nameplate-status: "<name>[ <dark_gray>Cấp</dark_gray><white><level></white>] <status>"
     status-resting: "<dark_gray>đang nghỉ</dark_gray>"
     status-idle: "<gray>đứng chờ</gray>"
     status-following: "<green>đang theo</green>"

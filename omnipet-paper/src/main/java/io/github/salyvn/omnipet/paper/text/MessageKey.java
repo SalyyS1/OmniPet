@@ -213,9 +213,21 @@ public enum MessageKey {
     // --- vault menu --------------------------------------------------------------------------
     GUI_VAULT_PET_LEVEL("gui.vault.pet-level", "<gray>Level</gray> <white><level></white>"),
 
+    // --- nameplate layout -----------------------------------------------------------------------
+    // The whole plate floating above an active pet, as one template. Separate keys for with and without
+    // the status word, because an operator who turns the status off should not be left with the spacing
+    // that was there to separate it. <name>, <level>, and <status> are the parts; anything else on the
+    // line is the operator's own. Dropping a placeholder is allowed and simply omits that part, which is
+    // how somebody hides the level without touching config.
+    // Square brackets mark text that disappears with the level when a pet's level cannot be read, so a
+    // pet with a malformed progression node shows no plate furniture rather than a bare "Lv.".
+    GUI_PET_NAMEPLATE("gui.pet.nameplate", "<name>[ <dark_gray>Lv.</dark_gray><white><level></white>]"),
+    GUI_PET_NAMEPLATE_STATUS("gui.pet.nameplate-status",
+            "<name>[ <dark_gray>Lv.</dark_gray><white><level></white>] <status>"),
+
     // --- nameplate status -----------------------------------------------------------------------
-    // Appended to the name floating above an active pet, so its owner can see at a glance whether it
-    // is keeping up. Kept to one short word each: this sits over the pet's head, not in a menu.
+    // Substituted into <status> above, so its owner can see at a glance whether the pet is keeping up.
+    // Kept to one short word each: this sits over the pet's head, not in a menu.
     GUI_PET_STATUS_RESTING("gui.pet.status-resting", "<dark_gray>resting</dark_gray>"),
     GUI_PET_STATUS_IDLE("gui.pet.status-idle", "<gray>idle</gray>"),
     GUI_PET_STATUS_FOLLOWING("gui.pet.status-following", "<green>following</green>"),

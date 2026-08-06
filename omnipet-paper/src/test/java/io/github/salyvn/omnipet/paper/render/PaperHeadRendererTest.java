@@ -200,15 +200,15 @@ class PaperHeadRendererTest {
         FakeBackend backend = new FakeBackend();
         PaperHeadRenderer renderer = renderer(backend);
 
-        RendererHandle handle = renderer.spawn(named("Shadow  Lv.7"));
-        assertEquals("Shadow  Lv.7", backend.nameplate);
+        RendererHandle handle = renderer.spawn(named("Shadow", 7));
+        assertEquals(plate("Shadow", 7), backend.nameplate);
 
         renderer.updateAppearance(handle, new RendererAppearance(
-                "HEAD", "", "TEXTURE_URL", "https://example.invalid/a.png", "Ember  Lv.8"));
+                "HEAD", "", "TEXTURE_URL", "https://example.invalid/a.png", "Ember", 8));
 
         // The status rides along on a rename, so the plate does not lose its status word until the pet
         // next changes gait. A spawned pet has no velocity, so that word is "idle".
-        assertEquals("Ember  Lv.8  " + Messages.raw(MessageKey.GUI_PET_STATUS_IDLE), backend.nameplate);
+        assertEquals(plate("Ember", 8, MessageKey.GUI_PET_STATUS_IDLE), backend.nameplate);
     }
 
     /**
@@ -226,7 +226,7 @@ class PaperHeadRendererTest {
         int afterSpawn = backend.statusWrites;
 
         renderer.update(handle, walking(1.0));
-        assertEquals("Shadow  " + Messages.raw(MessageKey.GUI_PET_STATUS_FOLLOWING), backend.nameplate);
+        assertEquals(plate("Shadow", null, MessageKey.GUI_PET_STATUS_FOLLOWING), backend.nameplate);
         int afterFirstWalk = backend.statusWrites;
         assertEquals(afterSpawn + 1, afterFirstWalk, "entering a new status has to reach the plate");
 
@@ -236,8 +236,24 @@ class PaperHeadRendererTest {
         assertEquals(afterFirstWalk, backend.statusWrites, "an unchanged word must not cost a packet");
 
         renderer.update(handle, new RuntimeTransform(new RuntimeVector(9, 3, 4), 0, 0, 1));
-        assertEquals("Shadow  " + Messages.raw(MessageKey.GUI_PET_STATUS_IDLE), backend.nameplate);
+        assertEquals(plate("Shadow", null, MessageKey.GUI_PET_STATUS_IDLE), backend.nameplate);
         assertEquals(afterFirstWalk + 1, backend.statusWrites);
+    }
+
+    /**
+     * A pet whose level cannot be read shows no level furniture, rather than a bare "Lv.".
+     *
+     * <p>The reason the level's surrounding text is bracketed in the template instead of being guessed at
+     * by stripping the placeholder: an operator writing {@code Lv.<level>} means the two as one thing.
+     */
+    @Test
+    void aPetWithNoReadableLevelShowsNoLevelFurniture() {
+        FakeBackend backend = new FakeBackend();
+        PaperHeadRenderer renderer = renderer(backend);
+
+        renderer.spawn(named("Shadow"));
+
+        assertEquals("Shadow", backend.nameplate);
     }
 
     /** An operator who wants the name alone gets the name alone. */
@@ -251,6 +267,23 @@ class PaperHeadRendererTest {
         renderer.update(handle, walking(1.0));
 
         assertEquals("Shadow", backend.nameplate);
+    }
+
+    /** What the shipped template produces, so these assertions restate the layout rather than duplicate it. */
+    private static String plate(String name, Integer level) {
+        return plate(name, level, null);
+    }
+
+    private static String plate(String name, Integer level, MessageKey status) {
+        String template = Messages.raw(
+                status == null ? MessageKey.GUI_PET_NAMEPLATE : MessageKey.GUI_PET_NAMEPLATE_STATUS);
+        String rendered = level == null
+                ? template.replaceAll("\\[[^\\[\\]]*\\]", "")
+                : template.replace("[", "").replace("]", "").replace("<level>", String.valueOf(level));
+        return rendered
+                .replace("<name>", name)
+                .replace("<status>", status == null ? "" : Messages.raw(status))
+                .strip();
     }
 
     /** A pet moving at walking speed, for the status assertions above. */
@@ -282,13 +315,18 @@ class PaperHeadRendererTest {
     }
 
     private static RendererSpawnRequest named(String displayName) {
+        return named(displayName, null);
+    }
+
+    /** A spawn request for a pet with a name and, optionally, a level for the plate to place. */
+    private static RendererSpawnRequest named(String displayName, Integer level) {
         return new RendererSpawnRequest(
                 UUID.fromString("541642d7-62ee-4620-b35f-1fdb14cddae1"),
                 UUID.fromString("e08e475f-d2ee-4249-aef6-9955f30de59f"),
                 7,
                 "wolf",
                 new RendererAppearance(
-                        "HEAD", "", "TEXTURE_URL", "https://example.invalid/a.png", displayName),
+                        "HEAD", "", "TEXTURE_URL", "https://example.invalid/a.png", displayName, level),
                 new RuntimeTransform(new RuntimeVector(0, 1, 0), 0, 0, 1));
     }
 
@@ -342,8 +380,11 @@ class PaperHeadRendererTest {
         @Override public void updateAppearance(EntityRef visual, RendererAppearance appearance) { appearanceUpdates++; }
         @Override public void updateName(EntityRef carrier, RendererAppearance appearance, PaperHeadRendererSettings settings) {
             // Recorded rather than counted: whether the plate shows the right text is the question, and a
-            // call count cannot answer it.
-            nameplate = settings.nameplates() && appearance.named() ? appearance.displayName() : null;
+            // call count cannot answer it. Through Nameplate.text like the status path below, because the
+            // layout is the thing under test — reading displayName straight off the appearance would skip
+            // the template and pass no matter what it produced.
+            nameplate = Nameplate.text(appearance, settings, null);
+            if (nameplate.isEmpty()) nameplate = null;
         }
         @Override public void updateStatus(
                 EntityRef carrier,

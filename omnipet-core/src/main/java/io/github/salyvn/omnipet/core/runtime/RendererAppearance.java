@@ -9,14 +9,20 @@ import java.util.Locale;
  * change: it flows through {@code updateAppearance}, which already exists on the port, instead of needing
  * a new method every implementor would have to grow.
  *
+ * <p>The level is carried beside the name rather than baked into it, so the nameplate template can place
+ * the two independently. An operator who wants no level writes a template without {@code <level>}; one
+ * who wants it in front writes it in front. Baking it in made both impossible.
+ *
  * @param displayName the name to show above the pet, or empty for no nameplate at all
+ * @param level the pet's level, or null when it could not be read
  */
 public record RendererAppearance(
         String provider,
         String assetId,
         String fallbackHeadSource,
         String fallbackHeadValue,
-        String displayName) {
+        String displayName,
+        Integer level) {
     /** How long a nameplate may be. Long enough for a name and a level, short enough not to be a banner. */
     public static final int MAX_DISPLAY_NAME = 64;
 
@@ -36,10 +42,20 @@ public record RendererAppearance(
         }
     }
 
+    /** An appearance carrying a name but no level, for a caller that could not read one. */
+    public RendererAppearance(
+            String provider,
+            String assetId,
+            String fallbackHeadSource,
+            String fallbackHeadValue,
+            String displayName) {
+        this(provider, assetId, fallbackHeadSource, fallbackHeadValue, displayName, null);
+    }
+
     /** An appearance with no nameplate, for a caller that does not have a name to show. */
     public RendererAppearance(
             String provider, String assetId, String fallbackHeadSource, String fallbackHeadValue) {
-        this(provider, assetId, fallbackHeadSource, fallbackHeadValue, "");
+        this(provider, assetId, fallbackHeadSource, fallbackHeadValue, "", null);
     }
 
     /** Whether this pet should carry a nameplate. */
