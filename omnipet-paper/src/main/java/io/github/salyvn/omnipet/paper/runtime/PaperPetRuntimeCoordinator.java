@@ -171,6 +171,23 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
     }
 
     /**
+     * The pets an owner currently has rendered.
+     *
+     * <p>Read from the live renderers rather than from the player's stored desired-active list, because
+     * those two differ exactly when it matters: a pet the player wants out but which failed to render is
+     * not in the world, and crediting it for a kill it was not present for would be wrong.
+     *
+     * <p>For kill experience, which needs this on every mob death — so it reads engine state rather than
+     * touching disk.
+     */
+    public List<UUID> activePetIds(UUID ownerId) {
+        if (ownerId == null) return List.of();
+        return engine.activeRenderers(ownerId).stream()
+                .map(io.github.salyvn.omnipet.core.runtime.ActiveRendererSnapshot::petInstanceId)
+                .toList();
+    }
+
+    /**
      * Which pet, if any, a clicked entity belongs to.
      *
      * <p>Pure delegation to {@link InteractionIndex#resolve} plus a staleness check — deliberately no

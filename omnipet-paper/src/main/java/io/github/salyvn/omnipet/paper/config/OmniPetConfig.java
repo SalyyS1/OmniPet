@@ -12,6 +12,7 @@ public record OmniPetConfig(
         PaperHeadRendererSettings render,
         ProgressionConfig progression,
         String experienceFormulaSource,
+        io.github.salyvn.omnipet.core.progression.KillExperienceRules killExperience,
         CultivationItems cultivationItems,
         ItemAppearances appearances,
         GuiConfig gui) {
@@ -23,6 +24,10 @@ public record OmniPetConfig(
         runtime = Objects.requireNonNull(runtime, "runtime config");
         render = render == null ? PaperHeadRendererSettings.defaults() : render;
         progression = Objects.requireNonNull(progression, "progression config");
+        // Absent means off, so an existing config keeps behaving as it did until an operator opts in.
+        killExperience = killExperience == null
+                ? io.github.salyvn.omnipet.core.progression.KillExperienceRules.disabled()
+                : killExperience;
         // Retained beside the compiled formula because compilation is one-way: ProgressionConfig holds
         // only a lambda, so without the source text encode() could not write back what the operator
         // configured and a migration would silently reset a custom formula to the default.

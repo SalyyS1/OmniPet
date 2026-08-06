@@ -79,6 +79,8 @@ import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeSnapshotPublisher;
 import io.github.salyvn.omnipet.paper.render.RendererProviderLifecycleListener;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioController;
 import io.github.salyvn.omnipet.paper.studio.bukkit.PetStudioListener;
+import io.github.salyvn.omnipet.paper.progression.KillExperienceFlusher;
+import io.github.salyvn.omnipet.paper.progression.KillExperienceListener;
 import io.github.salyvn.omnipet.paper.task.PerPlayerTaskQueue;
 import io.github.salyvn.omnipet.paper.task.PlayerTaskShutdown;
 import io.github.salyvn.omnipet.paper.text.MessageCatalog;
@@ -105,6 +107,16 @@ public final class OmniPetPlugin extends JavaPlugin {
     private PaperOwnerBuffCoordinator ownerBuffs;
     private PlayerSlotPurchaseController slotPurchases;
     private PerPlayerTaskQueue playerTasks;
+    /** Kill experience banked between flushes, and the timer that writes it. */
+    private final io.github.salyvn.omnipet.core.progression.PendingExperienceLedger killExperience =
+            new io.github.salyvn.omnipet.core.progression.PendingExperienceLedger();
+    private final io.github.salyvn.omnipet.paper.progression.ReflectiveMythicMobsIdentity mythicMobsIdentity =
+            new io.github.salyvn.omnipet.paper.progression.ReflectiveMythicMobsIdentity(
+                    () -> org.bukkit.Bukkit.getPluginManager().isPluginEnabled("MythicMobs"));
+    private org.bukkit.scheduler.BukkitTask killExperienceFlush;
+    private KillExperienceFlusher killExperienceFlusher;
+    /** How often banked kill experience is written, in ticks. */
+    private static final long KILL_EXPERIENCE_FLUSH_TICKS = 100;
     private PaperEconomyProviderRegistry economyProviders;
     private PaperLuckPermsEntitlementRegistry luckPermsEntitlements;
     private SlotTransactionAdminController transactionAdmin;
@@ -253,6 +265,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new MythicLibBuffLifecycleListener(ownerBuffs), this);
             getServer().getPluginManager().registerEvents(new RendererProviderLifecycleListener(petRuntime), this);
             getServer().getPluginManager().registerEvents(new MythicMobsSkillLifecycleListener(skillProviders), this);
+            registerKillExperience();
             getServer().getPluginManager().registerEvents(
                     new PlayerPetMenuListener(playerPets, slotPurchases, managementServices.menu()), this);
             getServer().getPluginManager().registerEvents(managementServices.listener(), this);
@@ -315,6 +328,10 @@ public final class OmniPetPlugin extends JavaPlugin {
         try {
             boolean idle = PlayerTaskShutdown.stopAndDrain(
                     () -> {
+                        // Before the queue stops accepting work, so the last few kills are written rather
+                        // than refused and lost. The ledger is in memory only; this is its one chance.
+                        if (killExperienceFlush != null) killExperienceFlush.cancel();
+                        if (killExperienceFlusher != null) killExperienceFlusher.flush();
                         if (hatchController != null) hatchController.close();
                         if (hubController != null) hubController.close();
                         if (incubationCoordinator != null) incubationCoordinator.close();
@@ -495,6 +512,31 @@ public final class OmniPetPlugin extends JavaPlugin {
                 dataRoot,
                 activeConfig.gui().locale(),
                 warning -> getLogger().warning("OmniPet messages: " + warning));
+    }
+
+    /**
+     * Kill experience: a listener that banks, and a timer that writes.
+     *
+     * <p>Registered whatever the config says, because the rules are read per kill rather than captured —
+     * an operator who enables this and reloads gets it without a restart, and while it is off the listener
+     * costs one boolean per mob death.
+     *
+     * <p>The flush interval is the most experience a crash can lose. Five seconds is short enough that
+     * nobody notices and long enough that a grinder is one write rather than hundreds.
+     */
+    private void registerKillExperience() {
+        killExperienceFlusher = new KillExperienceFlusher(
+                killExperience, playerStates, registry, playerTasks,
+                () -> activeConfig.progression(),
+                warning -> getLogger().warning("OmniPet: " + warning));
+        getServer().getPluginManager().registerEvents(
+                new KillExperienceListener(
+                        killExperience, mythicMobsIdentity,
+                        () -> activeConfig.killExperience(),
+                        petRuntime::activePetIds),
+                this);
+        killExperienceFlush = getServer().getScheduler().runTaskTimer(
+                this, killExperienceFlusher::flush, KILL_EXPERIENCE_FLUSH_TICKS, KILL_EXPERIENCE_FLUSH_TICKS);
     }
 
     PlayerStateRepository playerStates() {

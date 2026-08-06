@@ -656,6 +656,41 @@ labelled identically.
 The status word is only rewritten when the word itself changes, so a walking pet costs one packet per gait
 change rather than one per tick. The four words live at \`gui.pet.status-*\`.
 
+## progression.killExperience — pets that level by fighting
+
+Absent means off, so an existing config keeps behaving exactly as it did until you opt in.
+
+\`\`\`yaml
+progression:
+  killExperience:
+    default: 5.0      # any mob not named below
+    share: EACH       # or SPLIT
+    perMob:
+      ZOMBIE: 8.0
+      ARMOR_STAND: 0.0
+      SkeletalKnight: 250.0
+\`\`\`
+
+Vanilla entity types and MythicMobs internal names go in the **same map**, with no prefix and no regard to
+case. A MythicMobs mob is matched by its own name first, so a custom boss built on a zombie is not paid as a
+zombie. \`0\` excludes a mob without deleting the feature.
+
+| \`share\` | Two pets out, a kill worth 30 |
+| --- | --- |
+| \`EACH\` | Each pet earns 30 |
+| \`SPLIT\` | Each pet earns 15 |
+
+\`EACH\` is the default because \`SPLIT\` means a second pet halves the first one's growth — unlocking a slot
+you paid for would make every pet progress more slowly, which is a strange reward for spending.
+
+Only pets **actually rendered** earn. A pet the player wants out but which failed to render was not there
+for the kill, so it is not paid for it.
+
+Kills are banked in memory and written every five seconds, not saved one at a time: a grinder costs one disk
+write instead of hundreds, and each write takes the player's revision lock that their vault also needs. The
+trade is that a crash loses at most those five seconds of experience, which is why this path is not
+journalled the way an EXP candy is — a candy is an item the player spent, and a kill is a stream.
+
 ## behavior.animations — clip names per pet
 
 On the pet definition rather than in \`config.yml\`, and only used by pets whose \`display.provider\` is
@@ -837,6 +872,41 @@ hệt nhau.
 
 Chữ trạng thái chỉ được ghi lại khi chính từ đó đổi, nên một pet đang đi tốn một gói tin mỗi lần đổi dáng
 đi chứ không phải mỗi tick. Bốn từ đó nằm ở \`gui.pet.status-*\`.
+
+## progression.killExperience — pet lên cấp bằng cách đánh nhau
+
+Không có mục này nghĩa là tắt, nên file cấu hình cũ vẫn chạy y như trước cho tới khi bạn tự bật.
+
+\`\`\`yaml
+progression:
+  killExperience:
+    default: 5.0      # mọi quái không được nêu bên dưới
+    share: EACH       # hoặc SPLIT
+    perMob:
+      ZOMBIE: 8.0
+      ARMOR_STAND: 0.0
+      SkeletalKnight: 250.0
+\`\`\`
+
+Tên entity vanilla và tên nội bộ của MythicMobs viết **chung một map**, không cần tiền tố và không phân biệt
+hoa thường. Quái MythicMobs được so theo tên riêng của nó trước, nên một con boss dựng trên nền zombie sẽ
+không bị tính tiền như zombie. Số \`0\` loại một loại quái ra mà không phải xoá cả tính năng.
+
+| \`share\` | Hai pet đang ra, một mạng quái đáng 30 |
+| --- | --- |
+| \`EACH\` | Mỗi pet nhận 30 |
+| \`SPLIT\` | Mỗi pet nhận 15 |
+
+\`EACH\` là mặc định, vì \`SPLIT\` khiến pet thứ hai làm chậm một nửa tốc độ lớn của pet thứ nhất — mở thêm ô
+mà bạn đã trả tiền lại làm mọi pet lên cấp chậm hơn, đó là một phần thưởng kỳ lạ cho việc chi tiền.
+
+Chỉ những pet **thực sự đang được dựng ra** mới nhận. Một pet mà người chơi muốn ra nhưng dựng thất bại thì
+đã không có mặt lúc giết quái, nên không được tính.
+
+EXP được cộng dồn trong bộ nhớ và ghi mỗi 5 giây, không ghi từng mạng một: một chỗ farm quái tốn một lần ghi
+đĩa thay vì hàng trăm lần, mà mỗi lần ghi đều phải giữ khoá revision mà kho pet của người chơi cũng cần. Đổi
+lại, một lần sập server làm mất tối đa 5 giây EXP — đó là lý do đường này không ghi sổ bền vững như viên kẹo
+EXP: viên kẹo là vật phẩm người chơi đã tiêu, còn mạng quái là một dòng chảy liên tục.
 
 ## behavior.animations — tên clip cho từng pet
 

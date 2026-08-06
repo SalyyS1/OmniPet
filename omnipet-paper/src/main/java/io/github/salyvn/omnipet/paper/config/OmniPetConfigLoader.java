@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import io.github.salyvn.omnipet.core.persistence.YamlDocuments;
+import io.github.salyvn.omnipet.core.progression.KillExperienceRules;
 import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
 import io.github.salyvn.omnipet.core.studio.input.CompiledFormula;
 import io.github.salyvn.omnipet.core.studio.input.StudioFormulaValidator;
@@ -65,7 +66,10 @@ public final class OmniPetConfigLoader {
         OmniPetConfig.CultivationItems items = items(itemValues);
         GuiConfig gui = new GuiConfigLoader().parse(root.get("gui"), warnings);
         return new LoadResult(new OmniPetConfig(storage.config(), runtime, render, progression,
-                experienceFormulaSource(progressionValues), items,
+                experienceFormulaSource(progressionValues),
+                killExperience(optionalMap(
+                        progressionValues.get("killExperience"), "progression.killExperience")),
+                items,
                 appearances(itemValues, warnings), gui),
                 legacy || storage.migratedLegacy());
     }
@@ -94,6 +98,17 @@ public final class OmniPetConfigLoader {
         progression.put("defaultExperienceFormula", config.experienceFormulaSource());
         progression.put("formulaSamples", config.progression().formulaSamples());
         progression.put("overflowPolicy", config.progression().overflowPolicy().name());
+        // Only when it is on. Writing a disabled block back would put a feature nobody enabled into every
+        // migrated config, and an operator reading it could not tell it from one they had chosen.
+        if (config.killExperience().enabled()) {
+            LinkedHashMap<String, Object> kills = new LinkedHashMap<>();
+            kills.put("default", config.killExperience().defaultExperience());
+            kills.put("share", config.killExperience().share().name());
+            if (!config.killExperience().perMob().isEmpty()) {
+                kills.put("perMob", config.killExperience().perMob());
+            }
+            progression.put("killExperience", kills);
+        }
         LinkedHashMap<String, Object> items = new LinkedHashMap<>();
         items.put("experienceCandy", Map.of(
                 "material", config.cultivationItems().experienceMaterial(),
@@ -213,7 +228,7 @@ public final class OmniPetConfigLoader {
 
     private static ProgressionConfig progression(Map<String, Object> values) {
         rejectUnknown(values, Set.of("maxLevel", "maxStamina", "staminaRegenPerSecond",
-                "defaultExperienceFormula", "formulaSamples", "overflowPolicy"), "progression");
+                "defaultExperienceFormula", "formulaSamples", "overflowPolicy", "killExperience"), "progression");
         String formula = experienceFormulaSource(values);
         Map<String, Double> samples = numberMap(optionalMap(values.get("formulaSamples"), "progression.formulaSamples"));
         if (samples.isEmpty()) samples = Map.of("level", 1.0, "rarity", 1.0, "quality", 0.5, "evolution", 0.0);
@@ -232,8 +247,28 @@ public final class OmniPetConfigLoader {
                 overflow);
     }
 
-    private static OmniPetConfig.CultivationItems items(Map<String, Object> values) {
-        rejectUnknown(values, Set.of("experienceCandy", "breakthroughStone", "egg", "hatchReducer",
+    /**
+     * How much experience a mob kill grants the killer's active pets.
+     *
+     * <p>Under {@code progression:} rather than as a root section: it is a rule about how a pet levels,
+     * and it needs the same {@code maxLevel} and overflow policy the rest of that section owns.
+     *
+     * <p>An absent block is the feature switched off, so an existing config keeps behaving as it did.
+     */
+    private static KillExperienceRules killExperience(Map<String, Object> values) {
+        if (values.isEmpty()) return KillExperienceRules.disabled();
+        rejectUnknown(values, Set.of("default", "share", "perMob"), "progression.killExperience");
+        Map<String, Double> perMob = numberMap(
+                optionalMap(values.get("perMob"), "progression.killExperience.perMob"));
+        KillExperienceRules.Share share = KillExperienceRules.Share.valueOf(
+                text(values.getOrDefault("share", "EACH"), "progression.killExperience.share")
+                        .toUpperCase(java.util.Locale.ROOT));
+        return new KillExperienceRules(
+                number(values.getOrDefault("default", 0), "progression.killExperience.default"),
+                perMob, share);
+    }
+
+    private static OmniPetConfig.CultivationItems items(Map<String, Object> values) {        rejectUnknown(values, Set.of("experienceCandy", "breakthroughStone", "egg", "hatchReducer",
                 "instantHatch"), "items");
         Map<String, Object> candy = optionalMap(values.get("experienceCandy"), "items.experienceCandy");
         Map<String, Object> stone = optionalMap(values.get("breakthroughStone"), "items.breakthroughStone");

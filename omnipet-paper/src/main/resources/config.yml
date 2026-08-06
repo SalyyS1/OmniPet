@@ -169,6 +169,34 @@ progression:
   # Leftover EXP from a level-up: CARRY keeps it, DISCARD drops it.
   overflowPolicy: CARRY
 
+  # --------------------------------------------------------------------------------------------
+  # Experience a pet earns when its owner kills something. Delete this whole block to switch the
+  # feature off; that is also what an upgraded config gets, so nothing changes until you opt in.
+  #
+  # Only pets actually rendered in the world earn. A pet the player wants out but which failed to
+  # render was not there for the kill and is not paid for it.
+  #
+  # Kills are banked and written every 5 seconds rather than saved one at a time, so a grinder
+  # costs one disk write instead of hundreds. A crash loses at most those 5 seconds.
+  # --------------------------------------------------------------------------------------------
+  killExperience:
+    # What any mob not named below is worth. 0 means only the mobs you list pay anything.
+    default: 5.0
+    # EACH  - every active pet earns the full amount (default)
+    # SPLIT - the amount is divided between them, so total EXP per kill ignores slot count
+    #
+    # EACH by default because SPLIT means a second pet halves the first one's growth, which makes
+    # unlocking a slot you paid for feel like a downgrade.
+    share: EACH
+    # Per-mob overrides. Vanilla entity types and MythicMobs internal names go in the same map and
+    # neither needs a prefix - a MythicMobs mob is matched by its own name first, so a custom boss
+    # built on a zombie is not paid as a zombie. Case does not matter.
+    # 0 excludes a mob without deleting the feature.
+    perMob:
+      ZOMBIE: 8.0
+      ARMOR_STAND: 0.0
+      # SkeletalKnight: 250.0
+
 
 # ----------------------------------------------------------------------------------------------
 #  ITEMS - what an EXP candy and a breakthrough stone are made of
