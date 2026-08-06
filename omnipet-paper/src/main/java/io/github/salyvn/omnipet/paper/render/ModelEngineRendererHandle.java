@@ -22,6 +22,15 @@ final class ModelEngineRendererHandle implements RendererHandle {
     private String assetId;
     private RuntimeTransform transform;
     private String playingAnimation;
+    /**
+     * The appearance the plate was last written from.
+     *
+     * <p>Retained so a per-tick status update can rebuild the plate without the caller having to pass the
+     * appearance again — the status changes as the pet walks, the appearance only on a rename.
+     */
+    private io.github.salyvn.omnipet.core.runtime.RendererAppearance appearance;
+    /** The status word currently on the plate, so an unchanged one costs no packet. */
+    private io.github.salyvn.omnipet.core.runtime.PetStatus status;
     private boolean removed;
 
     ModelEngineRendererHandle(
@@ -35,6 +44,22 @@ final class ModelEngineRendererHandle implements RendererHandle {
             String assetId,
             RuntimeTransform transform,
             boolean animation) {
+        this(ownerId, petInstanceId, generation, carrier, interaction, modeledEntity, activeModel,
+                assetId, transform, animation, null);
+    }
+
+    ModelEngineRendererHandle(
+            UUID ownerId,
+            UUID petInstanceId,
+            long generation,
+            ArmorStand carrier,
+            Interaction interaction,
+            Object modeledEntity,
+            Object activeModel,
+            String assetId,
+            RuntimeTransform transform,
+            boolean animation,
+            io.github.salyvn.omnipet.core.runtime.RendererAppearance appearance) {
         this.ownerId = ownerId;
         this.petInstanceId = petInstanceId;
         this.generation = generation;
@@ -45,6 +70,7 @@ final class ModelEngineRendererHandle implements RendererHandle {
         this.assetId = assetId;
         this.transform = transform;
         this.animation = animation;
+        this.appearance = appearance;
     }
 
     @Override public UUID ownerId() { return ownerId; }
@@ -79,6 +105,21 @@ final class ModelEngineRendererHandle implements RendererHandle {
     /** The clip currently driven, so a gait change stops the old one before starting the new. */
     String playingAnimation() { return playingAnimation; }
     void playingAnimation(String next) { playingAnimation = next; }
+
+    io.github.salyvn.omnipet.core.runtime.RendererAppearance appearance() { return appearance; }
+    void appearance(io.github.salyvn.omnipet.core.runtime.RendererAppearance next) { appearance = next; }
+
+    /**
+     * Records the status now on the plate, reporting whether it is new.
+     *
+     * <p>Compare-and-set in one call, so a caller cannot read the old value, write the plate, and forget
+     * to store the new one — which would rewrite an identical plate every tick.
+     */
+    boolean statusChanged(io.github.salyvn.omnipet.core.runtime.PetStatus next) {
+        if (status == next) return false;
+        status = next;
+        return true;
+    }
 
     void assetId(String next) { assetId = next; }
     void activeModel(Object next) {

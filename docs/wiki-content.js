@@ -297,7 +297,7 @@ Just after your last pet, on the last page, sits a locked-slot tile. It names th
 
 An active pet follows you, turns to face where it is going, and speeds up to catch you when you get ahead.
 
-Its name floats above it, with its level. That is the name you gave it if you renamed it, otherwise the name the server's operator wrote for that kind of pet, otherwise the pet's own kind. Rename it from the management screen — right-click the pet, in the world or in the vault.
+Its name floats above it, with its level and what it is currently doing — resting, idle, following, or dashing. The name is the one you gave it if you renamed it, otherwise the name the server's operator wrote for that kind of pet, otherwise the pet's own kind. Rename it from the management screen — right-click the pet, in the world or in the vault.
 
 When you stop, it stops watching the road and starts watching you. Stand still long enough and it settles
 down — sits, curls up, whatever its model has for that. Move again and it gets up.
@@ -371,7 +371,7 @@ Ngay sau con pet cuối cùng, ở trang cuối, có một ô khoá. Nó ghi rõ
 
 Pet đang hoạt động sẽ đi theo bạn, quay về hướng nó đang đi, và tăng tốc để bắt kịp khi bạn đi trước.
 
-Tên của nó hiện phía trên đầu, kèm cấp. Đó là tên bạn đặt nếu bạn đã đổi tên, nếu chưa thì là tên chủ server viết cho loại pet đó, nếu vẫn chưa thì là chính tên loài của nó. Đổi tên ở màn hình quản lý — click phải vào pet, ngoài thế giới hoặc trong vault.
+Tên của nó hiện phía trên đầu, kèm cấp và việc nó đang làm — đang nghỉ, đứng chờ, đang theo, hay đang chạy. Tên đó là tên bạn đặt nếu bạn đã đổi tên, nếu chưa thì là tên chủ server viết cho loại pet đó, nếu vẫn chưa thì là chính tên loài của nó. Đổi tên ở màn hình quản lý — click phải vào pet, ngoài thế giới hoặc trong vault.
 
 Khi bạn dừng, nó ngừng nhìn đường và bắt đầu nhìn bạn. Đứng yên đủ lâu thì nó ngồi nghỉ — ngồi, cuộn tròn,
 tuỳ model của nó có gì cho dáng đó. Bạn đi tiếp thì nó đứng lên.

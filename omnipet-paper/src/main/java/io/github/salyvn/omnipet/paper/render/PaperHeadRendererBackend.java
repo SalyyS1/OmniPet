@@ -58,6 +58,19 @@ interface PaperHeadRendererBackend {
      */
     void updateName(EntityRef carrier, RendererAppearance appearance, PaperHeadRendererSettings settings);
 
+    /**
+     * Rewrites the nameplate with the pet's current status.
+     *
+     * <p>Separate from {@link #updateName} because the two change for different reasons and at different
+     * rates: a name changes when somebody renames the pet, a status changes as it walks. The renderer only
+     * calls this when the resulting text actually differs, so a pet holding one status costs nothing.
+     */
+    void updateStatus(
+            EntityRef carrier,
+            RendererAppearance appearance,
+            PaperHeadRendererSettings settings,
+            io.github.salyvn.omnipet.core.runtime.PetStatus status);
+
     void updateScale(
             EntityRef visual,
             EntityRef interaction,

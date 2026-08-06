@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import io.github.salyvn.omnipet.core.runtime.PetRendererPort;
+import io.github.salyvn.omnipet.core.runtime.PetStatus;
 import io.github.salyvn.omnipet.core.runtime.RendererAppearance;
 import io.github.salyvn.omnipet.core.runtime.RendererHandle;
 import io.github.salyvn.omnipet.core.runtime.RendererHealth;
@@ -115,6 +116,13 @@ public final class PaperHeadRenderer implements PetRendererPort {
         if (handle.displayTransformChanged(transform)) {
             backend.updateScale(handle.visual(), handle.interaction(), transform, settings);
         }
+        // Only when the word itself changes. The status is derived from speed, which moves every tick,
+        // but resolves to one of four words — so a walking pet would otherwise rewrite an identical plate
+        // twenty times a second, to every player who can see it.
+        PetStatus status = PetStatus.of(transform, settings.maximumVelocity());
+        if (handle.statusChanged(status)) {
+            backend.updateStatus(handle.carrier(), handle.appearance(), settings, status);
+        }
         handle.transform(transform);
     }
 
@@ -126,7 +134,10 @@ public final class PaperHeadRenderer implements PetRendererPort {
         backend.updateAppearance(handle.visual(), appearance);
         backend.updateScale(handle.visual(), handle.interaction(), handle.transform(), settings);
         // The name rides the appearance, so a rename arrives here rather than needing its own port method.
-        backend.updateName(handle.carrier(), appearance, settings);
+        // Written with the status the pet already had, or the rename would drop the status word until the
+        // pet next changed gait.
+        backend.updateStatus(handle.carrier(), appearance, settings,
+                PetStatus.of(handle.transform(), settings.maximumVelocity()));
         handle.appearance(appearance);
     }
 

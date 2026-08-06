@@ -130,7 +130,7 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             ModelEngineRendererHandle handle = new ModelEngineRendererHandle(
                     request.ownerId(), request.petInstanceId(), request.rendererGeneration(),
                     carrier, interaction, modeled, active, request.appearance().assetId(),
-                    request.transform(), animations.available());
+                    request.transform(), animations.available(), request.appearance());
             handles.put(request.petInstanceId(), handle);
             Nameplate.apply(carrier, request.appearance(), settings);
             driveAnimation(handle, request.transform());
@@ -193,6 +193,14 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
             setInteractionScale(handle.interaction(), transform.scale());
         }
         driveAnimation(handle, transform);
+        // Only when the word itself changes: the status comes from speed, which moves every tick, but
+        // resolves to one of four words, so a walking pet would otherwise rewrite an identical plate
+        // twenty times a second to every player nearby.
+        io.github.salyvn.omnipet.core.runtime.PetStatus status =
+                io.github.salyvn.omnipet.core.runtime.PetStatus.of(transform, settings.maximumVelocity());
+        if (handle.statusChanged(status) && handle.appearance() != null) {
+            Nameplate.apply(handle.carrier(), handle.appearance(), settings, status);
+        }
         handle.transform(transform);
     }
 
@@ -227,7 +235,12 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
         ModelEngineRendererHandle handle = requireHandle(raw);
         // Before the asset check, because a rename changes the name and not the model: returning early on
         // an unchanged asset ID would make renaming a ModelEngine pet do nothing.
-        Nameplate.apply(handle.carrier(), appearance, settings);
+        // Written with the status the pet already has, or the rename would drop the status word until the
+        // pet next changed gait.
+        handle.appearance(appearance);
+        Nameplate.apply(handle.carrier(), appearance, settings,
+                io.github.salyvn.omnipet.core.runtime.PetStatus.of(
+                        handle.transform(), settings.maximumVelocity()));
         if (handle.assetId().equals(appearance.assetId())) return;
         try {
             if (!bindings.hasBlueprint(appearance.assetId())) {

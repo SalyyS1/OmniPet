@@ -17,6 +17,8 @@ final class PaperHeadRendererHandle implements RendererHandle {
     private final PaperHeadRendererBackend.EntityRef interaction;
     private RendererAppearance appearance;
     private RuntimeTransform transform;
+    /** The status word currently on the plate, so an unchanged one costs no packet. */
+    private io.github.salyvn.omnipet.core.runtime.PetStatus status;
     private boolean removed;
 
     PaperHeadRendererHandle(
@@ -52,6 +54,18 @@ final class PaperHeadRendererHandle implements RendererHandle {
     void appearance(RendererAppearance value) { appearance = value; }
     RuntimeTransform transform() { return transform; }
     void transform(RuntimeTransform value) { transform = value; }
+
+    /**
+     * Records the status now on the plate, reporting whether it is new.
+     *
+     * <p>Compare-and-set in one call so a caller cannot read the old value, write the plate, and forget to
+     * store the new one — which would rewrite the plate every tick forever.
+     */
+    boolean statusChanged(io.github.salyvn.omnipet.core.runtime.PetStatus next) {
+        if (status == next) return false;
+        status = next;
+        return true;
+    }
 
     /**
      * Whether the display's transformation would actually differ from the one already sent.

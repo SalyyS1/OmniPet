@@ -159,7 +159,7 @@ public final class OmniPetConfigLoader {
     private static PaperHeadRendererSettings render(Map<String, Object> values) {
         rejectUnknown(values, Set.of(
                 "safetyDistance", "movementGain", "maximumVelocity", "interpolationTicks",
-                "maximumLeanDegrees", "nameplates"), "render");
+                "maximumLeanDegrees", "nameplates", "nameplateStatus"), "render");
         PaperHeadRendererSettings defaults = PaperHeadRendererSettings.defaults();
         return new PaperHeadRendererSettings(
                 number(values.getOrDefault("safetyDistance", defaults.safetyDistance()),
@@ -172,7 +172,9 @@ public final class OmniPetConfigLoader {
                         "render.interpolationTicks"),
                 number(values.getOrDefault("maximumLeanDegrees", defaults.maximumLeanDegrees()),
                         "render.maximumLeanDegrees"),
-                truthy(values.getOrDefault("nameplates", defaults.nameplates()), "render.nameplates"));
+                truthy(values.getOrDefault("nameplates", defaults.nameplates()), "render.nameplates"),
+                truthy(values.getOrDefault("nameplateStatus", defaults.nameplateStatus()),
+                        "render.nameplateStatus"));
     }
 
     private static PaperRuntimeSettings runtime(Map<String, Object> values) {

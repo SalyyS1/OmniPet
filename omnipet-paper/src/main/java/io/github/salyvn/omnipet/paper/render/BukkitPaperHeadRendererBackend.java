@@ -191,6 +191,15 @@ final class BukkitPaperHeadRendererBackend implements PaperHeadRendererBackend {
     }
 
     @Override
+    public void updateStatus(
+            EntityRef carrier,
+            RendererAppearance appearance,
+            PaperHeadRendererSettings settings,
+            io.github.salyvn.omnipet.core.runtime.PetStatus status) {
+        Nameplate.apply(entity(carrier), appearance, settings, status);
+    }
+
+    @Override
     public void updateScale(
             EntityRef visual,
             EntityRef interaction,

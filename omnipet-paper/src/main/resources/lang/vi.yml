@@ -183,6 +183,11 @@ gui:
     studio-archive: "OmniPet <dark_gray>▸</dark_gray> Lưu trữ"
     studio-stats: "OmniPet <dark_gray>▸</dark_gray> Chỉ số"
     studio-stat: "OmniPet <dark_gray>▸</dark_gray> <detail>"
+  pet:
+    status-resting: "<dark_gray>đang nghỉ</dark_gray>"
+    status-idle: "<gray>đứng chờ</gray>"
+    status-following: "<green>đang theo</green>"
+    status-dashing: "<yellow>đang chạy</yellow>"
   vault:
     pet-level: "<gray>Cấp</gray> <white><level></white>"
     pet-experience: "<gray>Kinh nghiệm</gray> <white><exp></white>"

@@ -26,6 +26,16 @@ public final class MythicLib {
             return new LinkedHashSet<>(Set.of("HEALTH_REGEN", "ATTACK_DAMAGE"));
         }
 
+        /**
+         * Whether MythicLib registered this stat.
+         *
+         * <p>The only way to catch a stat ID it has never heard of, since {@code StatMap.getInstance} mints
+         * a live instance for any name at all.
+         */
+        public boolean isRegistered(String stat) {
+            return getRegisteredStats().contains(stat);
+        }
+
         public Optional<StatHandler> getHandler(String id) {
             if (handlerFailure) throw new IllegalStateException("handler ABI failure");
             return Optional.of(new StatHandler(id));

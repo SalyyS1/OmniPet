@@ -134,6 +134,9 @@ render:
   # false removes the plate from every pet, which is worth doing on a server where many pets are out
   # at once. Names stay visible in the vault and management screens either way.
   nameplates: true
+  # Appends what the pet is doing to its plate: resting, idle, following, or dashing. Set false to
+  # show the name and level alone. Wording is in messages.yml under gui.pet.status-*
+  nameplateStatus: true
 
 
 # ----------------------------------------------------------------------------------------------

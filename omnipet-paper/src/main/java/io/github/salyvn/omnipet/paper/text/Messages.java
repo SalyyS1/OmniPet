@@ -57,6 +57,17 @@ public final class Messages {
     }
 
     /**
+     * One catalog entry as its unparsed MiniMessage source.
+     *
+     * <p>For the few places that have to concatenate catalog text with other operator-authored MiniMessage
+     * and parse the result once — a pet's nameplate joins its name to its status that way, so that a colour
+     * opened in the name can close in the status. Everywhere else should use {@link #line}, which parses.
+     */
+    public static String raw(MessageKey key) {
+        return catalog().raw(key);
+    }
+
+    /**
      * Renders one operator-authored MiniMessage line that is not a catalog key.
      *
      * <p>For a pet's nameplate, where the name comes from a definition or from a player rename rather than

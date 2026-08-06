@@ -212,6 +212,14 @@ public enum MessageKey {
 
     // --- vault menu --------------------------------------------------------------------------
     GUI_VAULT_PET_LEVEL("gui.vault.pet-level", "<gray>Level</gray> <white><level></white>"),
+
+    // --- nameplate status -----------------------------------------------------------------------
+    // Appended to the name floating above an active pet, so its owner can see at a glance whether it
+    // is keeping up. Kept to one short word each: this sits over the pet's head, not in a menu.
+    GUI_PET_STATUS_RESTING("gui.pet.status-resting", "<dark_gray>resting</dark_gray>"),
+    GUI_PET_STATUS_IDLE("gui.pet.status-idle", "<gray>idle</gray>"),
+    GUI_PET_STATUS_FOLLOWING("gui.pet.status-following", "<green>following</green>"),
+    GUI_PET_STATUS_DASHING("gui.pet.status-dashing", "<yellow>dashing</yellow>"),
     GUI_VAULT_PET_EXPERIENCE("gui.vault.pet-experience", "<gray>Experience</gray> <white><exp></white>"),
     GUI_VAULT_PET_RARITY("gui.vault.pet-rarity", "<gray>Rarity</gray> <white><status></white>"),
     GUI_VAULT_PET_STATS("gui.vault.pet-stats", "<gray>Stats</gray>"),

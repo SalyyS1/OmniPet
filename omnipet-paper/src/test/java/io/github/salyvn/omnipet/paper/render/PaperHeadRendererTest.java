@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import io.github.salyvn.omnipet.core.runtime.RendererAppearance;
@@ -17,8 +18,17 @@ import io.github.salyvn.omnipet.core.runtime.RendererHandle;
 import io.github.salyvn.omnipet.core.runtime.RendererSpawnRequest;
 import io.github.salyvn.omnipet.core.runtime.RuntimeTransform;
 import io.github.salyvn.omnipet.core.runtime.RuntimeVector;
+import io.github.salyvn.omnipet.paper.text.MessageCatalog;
+import io.github.salyvn.omnipet.paper.text.MessageKey;
+import io.github.salyvn.omnipet.paper.text.Messages;
 
 class PaperHeadRendererTest {
+    /** The nameplate joins catalog text to the pet's name, so the catalog has to be bound. */
+    @BeforeAll
+    static void bindMessageCatalog() {
+        Messages.bind(MessageCatalog.defaults());
+    }
+
     @Test
     void spawnIsIdempotentAndExposesHeadCapabilities() {
         FakeBackend backend = new FakeBackend();
@@ -195,7 +205,58 @@ class PaperHeadRendererTest {
 
         renderer.updateAppearance(handle, new RendererAppearance(
                 "HEAD", "", "TEXTURE_URL", "https://example.invalid/a.png", "Ember  Lv.8"));
-        assertEquals("Ember  Lv.8", backend.nameplate);
+
+        // The status rides along on a rename, so the plate does not lose its status word until the pet
+        // next changes gait. A spawned pet has no velocity, so that word is "idle".
+        assertEquals("Ember  Lv.8  " + Messages.raw(MessageKey.GUI_PET_STATUS_IDLE), backend.nameplate);
+    }
+
+    /**
+     * The status word follows what the pet is doing, and only costs a packet when the word changes.
+     *
+     * <p>Both halves matter. Without the first, the plate says nothing about the pet. Without the second,
+     * a walking pet rewrites an identical plate every tick to every player who can see it, because the
+     * status is derived from a speed that moves continuously but resolves to one of four words.
+     */
+    @Test
+    void theStatusWordFollowsThePetAndIsOnlyWrittenWhenItChanges() {
+        FakeBackend backend = new FakeBackend();
+        PaperHeadRenderer renderer = renderer(backend);
+        RendererHandle handle = renderer.spawn(named("Shadow"));
+        int afterSpawn = backend.statusWrites;
+
+        renderer.update(handle, walking(1.0));
+        assertEquals("Shadow  " + Messages.raw(MessageKey.GUI_PET_STATUS_FOLLOWING), backend.nameplate);
+        int afterFirstWalk = backend.statusWrites;
+        assertEquals(afterSpawn + 1, afterFirstWalk, "entering a new status has to reach the plate");
+
+        // Still walking, at a different speed: same word, so nothing may be written.
+        renderer.update(handle, walking(0.9));
+        renderer.update(handle, walking(0.8));
+        assertEquals(afterFirstWalk, backend.statusWrites, "an unchanged word must not cost a packet");
+
+        renderer.update(handle, new RuntimeTransform(new RuntimeVector(9, 3, 4), 0, 0, 1));
+        assertEquals("Shadow  " + Messages.raw(MessageKey.GUI_PET_STATUS_IDLE), backend.nameplate);
+        assertEquals(afterFirstWalk + 1, backend.statusWrites);
+    }
+
+    /** An operator who wants the name alone gets the name alone. */
+    @Test
+    void theStatusWordCanBeTurnedOffWithoutLosingTheName() {
+        FakeBackend backend = new FakeBackend();
+        PaperHeadRenderer renderer = new PaperHeadRenderer(backend,
+                new PaperHeadRendererSettings(8.0, 0.35, 1.2, 3, 12.0, true, false));
+
+        RendererHandle handle = renderer.spawn(named("Shadow"));
+        renderer.update(handle, walking(1.0));
+
+        assertEquals("Shadow", backend.nameplate);
+    }
+
+    /** A pet moving at walking speed, for the status assertions above. */
+    private static RuntimeTransform walking(double metresPerSecond) {
+        return new RuntimeTransform(new RuntimeVector(2, 3, 4), 0, 0, 1,
+                new RuntimeVector(0, 0, metresPerSecond), false);
     }
 
     @Test
@@ -245,6 +306,8 @@ class PaperHeadRendererTest {
         private String nameplate;
         /** Where the head display is pointing, or null when it has never been turned. */
         private Float headYaw;
+        /** How many times the plate was rewritten, so a per-tick rewrite is visible. */
+        private int statusWrites;
         private double distanceSquared;
         private boolean failInteraction;
         private boolean entitiesValid = true;
@@ -281,6 +344,17 @@ class PaperHeadRendererTest {
             // Recorded rather than counted: whether the plate shows the right text is the question, and a
             // call count cannot answer it.
             nameplate = settings.nameplates() && appearance.named() ? appearance.displayName() : null;
+        }
+        @Override public void updateStatus(
+                EntityRef carrier,
+                RendererAppearance appearance,
+                PaperHeadRendererSettings settings,
+                io.github.salyvn.omnipet.core.runtime.PetStatus status) {
+            // The full plate text, for the same reason: a status written in the wrong place, or one that
+            // silently dropped the name, would satisfy a counter.
+            nameplate = Nameplate.text(appearance, settings, status);
+            if (nameplate.isEmpty()) nameplate = null;
+            statusWrites++;
         }
         @Override public void updateScale(EntityRef visual, EntityRef interaction, RuntimeTransform transform, PaperHeadRendererSettings settings) { scaleUpdates++; }
         @Override public void remove(EntityRef entity) { removed.add(names.get(entity)); }

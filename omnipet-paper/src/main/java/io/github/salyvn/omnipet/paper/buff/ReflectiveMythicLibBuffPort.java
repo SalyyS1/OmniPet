@@ -51,6 +51,13 @@ public final class ReflectiveMythicLibBuffPort {
                 "buff owner is offline");
         try {
             Object statMap = bindings.statMap(ownerId);
+            if (statMap == null) {
+                // MythicLib has no data loaded for this player yet — it loads on its own join handler, and
+                // ours can run first. Not a quarantine: the adapter is fine, this one owner is early. The
+                // next reconcile (activation, respawn, or a vault change) picks them up.
+                return result(MythicLibBuffResult.Status.UNAVAILABLE, 0, 0, desired.size(),
+                        "MythicLib player data is not loaded yet");
+            }
             Set<Installed> next = new LinkedHashSet<>();
             int applied = 0;
             int removed = 0;
@@ -58,7 +65,18 @@ public final class ReflectiveMythicLibBuffPort {
             for (PetStatBuff buff : desired) {
                 Installed key = Installed.of(ownerId, buff);
                 Object instance = bindings.statInstance(statMap, buff.statId());
+                // Null-checked for safety, but this is not how an unknown stat shows up: MythicLib's
+                // getInstance is a computeIfAbsent, so it mints a live instance for any name at all. An ID
+                // it has never registered therefore installs successfully onto a stat nothing reads — which
+                // is exactly how pet stats came to do nothing while reporting success. Detection lives in
+                // knownStat below instead, against the registry.
                 if (instance == null) {
+                    skipped++;
+                    continue;
+                }
+                if (!bindings.knownStat(buff.statId())) {
+                    // Counted as skipped and NOT installed. Installing onto an orphan instance is what made
+                    // the failure invisible; refusing it is what lets the coordinator warn about it.
                     skipped++;
                     continue;
                 }
@@ -127,7 +145,10 @@ public final class ReflectiveMythicLibBuffPort {
             Constructor<?> modifierConstructor,
             Class<? extends Enum> modifierType,
             Object equipmentOther,
-            Object sourceOther) {
+            Object sourceOther,
+            Method mythicLibInstance,
+            Method statsOf,
+            Method isRegistered) {
         static Bindings load(ClassLoader loader) throws ReflectiveOperationException {
             Class<?> playerData = Class.forName("io.lumine.mythic.lib.api.player.MMOPlayerData", true, loader);
             Class<?> statMap = Class.forName("io.lumine.mythic.lib.api.stat.StatMap", true, loader);
@@ -136,8 +157,29 @@ public final class ReflectiveMythicLibBuffPort {
             Class<? extends Enum> type = enumType(loader, "io.lumine.mythic.lib.player.modifier.ModifierType");
             Class<? extends Enum> equipment = enumType(loader, "io.lumine.mythic.lib.api.player.EquipmentSlot");
             Class<? extends Enum> source = enumType(loader, "io.lumine.mythic.lib.player.modifier.ModifierSource");
+            // Optional: the registry lookup is how an unknown stat ID is caught, but losing it must cost
+            // the diagnostic rather than the whole adapter. Nulls mean "cannot check", and every stat is
+            // then treated as known — the behaviour before this check existed.
+            Method mythicLibInstance = null;
+            Method statsOf = null;
+            Method isRegistered = null;
+            try {
+                Class<?> mythicLib = Class.forName("io.lumine.mythic.lib.MythicLib", true, loader);
+                mythicLibInstance = mythicLib.getMethod("inst");
+                statsOf = mythicLib.getMethod("getStats");
+                isRegistered = statsOf.getReturnType().getMethod("isRegistered", String.class);
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                mythicLibInstance = null;
+                statsOf = null;
+                isRegistered = null;
+            }
             return new Bindings(
-                    playerData.getMethod("get", UUID.class),
+                    // getOrNull, not get. MythicLib's get() throws "Player data not loaded" for a player it
+                    // has not set up yet, and this adapter treats a throw as an ABI mismatch and quarantines
+                    // itself permanently — for every owner, not just that one. So one player reconciled a
+                    // moment too early after a restart would silently disable pet stats server-wide until
+                    // the next reload. getOrNull answers null for exactly that case.
+                    playerData.getMethod("getOrNull", UUID.class),
                     playerData.getMethod("getStatMap"),
                     statMap.getMethod("getInstance", String.class),
                     statInstance.getMethod("getModifier", UUID.class),
@@ -147,12 +189,40 @@ public final class ReflectiveMythicLibBuffPort {
                             type, equipment, source),
                     type,
                     Enum.valueOf(equipment, "OTHER"),
-                    Enum.valueOf(source, "OTHER"));
+                    Enum.valueOf(source, "OTHER"),
+                    mythicLibInstance,
+                    statsOf,
+                    isRegistered);
         }
 
+        /** The owner's stat map, or null when MythicLib has not loaded their data yet. */
         Object statMap(UUID ownerId) throws ReflectiveOperationException {
-            Object data = Objects.requireNonNull(playerDataGet.invoke(null, ownerId), "MythicLib player data is unavailable");
-            return Objects.requireNonNull(getStatMap.invoke(data), "MythicLib stat map is unavailable");
+            Object data = playerDataGet.invoke(null, ownerId);
+            if (data == null) return null;
+            return getStatMap.invoke(data);
+        }
+
+        /**
+         * Whether MythicLib actually registered this stat.
+         *
+         * <p>The only way to catch a stat ID MythicLib has never heard of. Its {@code getInstance} is a
+         * {@code computeIfAbsent}, so it answers every name with a live instance and a modifier installs
+         * happily onto a stat nothing reads — success, reported, invisible, no effect.
+         *
+         * <p>Answers true when the registry cannot be reached, so a vendor ABI change costs the diagnostic
+         * rather than every pet's stats.
+         */
+        boolean knownStat(String statId) {
+            if (mythicLibInstance == null || statsOf == null || isRegistered == null) return true;
+            try {
+                Object instance = mythicLibInstance.invoke(null);
+                if (instance == null) return true;
+                Object manager = statsOf.invoke(instance);
+                if (manager == null) return true;
+                return Boolean.TRUE.equals(isRegistered.invoke(manager, statId));
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                return true;
+            }
         }
 
         Object statInstance(Object map, String stat) throws ReflectiveOperationException {

@@ -13,7 +13,8 @@ public record PaperHeadRendererSettings(
         double maximumVelocity,
         int interpolationTicks,
         double maximumLeanDegrees,
-        boolean nameplates) {
+        boolean nameplates,
+        boolean nameplateStatus) {
     public PaperHeadRendererSettings {
         if (!Double.isFinite(safetyDistance) || safetyDistance <= 0) {
             throw new IllegalArgumentException("HEAD safety distance must be positive and finite");
@@ -34,7 +35,23 @@ public record PaperHeadRendererSettings(
     }
 
     public static PaperHeadRendererSettings defaults() {
-        return new PaperHeadRendererSettings(8.0, 0.35, 1.2, 3, 12.0, true);
+        return new PaperHeadRendererSettings(8.0, 0.35, 1.2, 3, 12.0, true, true);
+    }
+
+    /**
+     * Movement and nameplate settings with the status word left on.
+     *
+     * <p>Kept so the six-argument call sites that predate the status word keep meaning what they meant.
+     */
+    public PaperHeadRendererSettings(
+            double safetyDistance,
+            double movementGain,
+            double maximumVelocity,
+            int interpolationTicks,
+            double maximumLeanDegrees,
+            boolean nameplates) {
+        this(safetyDistance, movementGain, maximumVelocity, interpolationTicks, maximumLeanDegrees,
+                nameplates, true);
     }
 
     /**
