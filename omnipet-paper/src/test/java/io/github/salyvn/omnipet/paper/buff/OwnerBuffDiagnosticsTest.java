@@ -50,13 +50,33 @@ class OwnerBuffDiagnosticsTest {
         assertFalse(noStats.contains("No pet is out"));
     }
 
+    /**
+     * A healthy server gets a verdict, not an audit.
+     *
+     * <p>The report used to print every stat on its own line whether or not anything was wrong, so the one
+     * sentence that answers the question was buried under a list an operator could already read off their
+     * own character sheet. Detail is for the broken cases.
+     */
     @Test
-    void aRecognisedStatIsReportedAsBeingApplied() {
-        String text = joined(OwnerBuffDiagnostics.describe(
+    void aWorkingSetupIsReportedInOneLineRatherThanListed() {
+        List<String> lines = OwnerBuffDiagnostics.describe(
+                true, null, 1, buffs("ATTACK_DAMAGE", "MAX_HEALTH"), Set.of("ATTACK_DAMAGE", "MAX_HEALTH"));
+        String text = joined(lines);
+
+        assertTrue(text.startsWith("OK — "), text);
+        assertTrue(text.contains("2 stat(s)"), text);
+        assertFalse(text.contains("ok  ATTACK_DAMAGE"), "the per-stat list is what made this too long");
+        assertTrue(lines.size() <= 4, "a healthy answer must stay short: " + lines.size() + " lines");
+    }
+
+    /** An operator who wants the full list asks for it, and then gets it. */
+    @Test
+    void theFullListIsAvailableOnRequest() {
+        String text = joined(OwnerBuffDiagnostics.describeVerbose(
                 true, null, 1, buffs("ATTACK_DAMAGE"), Set.of("ATTACK_DAMAGE", "MAX_HEALTH")));
 
-        assertTrue(text.contains("ok  ATTACK_DAMAGE"));
-        assertTrue(text.contains("these are being applied"));
+        assertTrue(text.startsWith("OK — "), "the verdict still comes first: " + text);
+        assertTrue(text.contains("ok  ATTACK_DAMAGE"), text);
     }
 
     /** The case that was invisible: an ID MythicLib never registered. */
@@ -65,8 +85,9 @@ class OwnerBuffDiagnosticsTest {
         String text = joined(OwnerBuffDiagnostics.describe(
                 true, null, 1, buffs("mythiclib:attack_damage"), Set.of("ATTACK_DAMAGE", "MAX_HEALTH")));
 
-        assertTrue(text.contains("BAD mythiclib:attack_damage"));
-        assertTrue(text.contains("does not know 1"));
+        assertTrue(text.startsWith("BROKEN —"), text);
+        assertTrue(text.contains("mythiclib:attack_damage"), "the bad ID has to be named: " + text);
+        assertTrue(text.contains("does not know 1"), text);
         assertTrue(text.contains("ATTACK_DAMAGE"), "the operator needs the name to correct it to");
     }
 

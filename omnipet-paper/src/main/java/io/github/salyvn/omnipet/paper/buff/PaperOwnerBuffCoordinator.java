@@ -66,6 +66,15 @@ public final class PaperOwnerBuffCoordinator implements Consumer<PetStorageSnaps
      * with the code it is diagnosing, which is the opposite of useful.
      */
     public List<String> diagnose(UUID ownerId) {
+        return diagnose(ownerId, false);
+    }
+
+    /**
+     * The same report, optionally listing every stat.
+     *
+     * @param verbose true to append the per-stat list, for an operator who asked for it
+     */
+    public List<String> diagnose(UUID ownerId, boolean verbose) {
         Objects.requireNonNull(ownerId, "buff owner ID");
         requireMainThread();
         ReflectiveMythicLibBuffPort current = port;
@@ -74,12 +83,13 @@ public final class PaperOwnerBuffCoordinator implements Consumer<PetStorageSnaps
             desired = desiredByOwner.get(ownerId);
         }
         List<PetStatBuff> buffs = desired == null ? List.of() : desired.buffs();
-        return OwnerBuffDiagnostics.describe(
-                current != null,
-                current == null ? null : current.unavailableDetail(),
-                desired == null ? 0 : desired.activePets(),
-                buffs,
-                current == null ? null : current.registeredStats());
+        boolean present = current != null;
+        String detail = current == null ? null : current.unavailableDetail();
+        int activePets = desired == null ? 0 : desired.activePets();
+        java.util.Set<String> registered = current == null ? null : current.registeredStats();
+        return verbose
+                ? OwnerBuffDiagnostics.describeVerbose(present, detail, activePets, buffs, registered)
+                : OwnerBuffDiagnostics.describe(present, detail, activePets, buffs, registered);
     }
 
     public void ownerQuit(UUID ownerId) {        Objects.requireNonNull(ownerId, "buff owner ID");

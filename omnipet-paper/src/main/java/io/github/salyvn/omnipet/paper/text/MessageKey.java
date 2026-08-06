@@ -102,8 +102,14 @@ public enum MessageKey {
     SKILL_PET_NOT_OWNED("skill.pet-not-owned", "<yellow>OmniPet: Pet is no longer owned.</yellow>"),
     SKILL_BINDING_NOT_FOUND("skill.binding-not-found",
             "<yellow>OmniPet: Active skill binding was not found.</yellow>"),
+    // Three separate reasons a cast is refused before the provider is called. They shared one message that
+    // named none of them, so a skill that silently never fired gave an operator nothing to act on.
     SKILL_PROVIDER_UNAVAILABLE("skill.provider-unavailable",
-            "<yellow>OmniPet: Skill provider or skill ID is unavailable.</yellow>"),
+            "<yellow>OmniPet: The skill provider is unavailable: <detail></yellow>"),
+    SKILL_PROVIDER_MISMATCH("skill.provider-mismatch",
+            "<yellow>OmniPet: This skill wants provider <provider>, but <detail> is installed.</yellow>"),
+    SKILL_NOT_REGISTERED("skill.not-registered",
+            "<yellow>OmniPet: The provider has no skill named <detail>.</yellow>"),
     SKILL_CHANCE_MISSED("skill.chance-missed", "<gray>OmniPet: The pet skill chance did not trigger.</gray>"),
     SKILL_REJECTED("skill.rejected", "<yellow>OmniPet: Skill rejected: <status>.</yellow>"),
     SKILL_PREPARE_FAILED("skill.prepare-failed", "<red>OmniPet: Skill preparation failed: <detail>.</red>"),

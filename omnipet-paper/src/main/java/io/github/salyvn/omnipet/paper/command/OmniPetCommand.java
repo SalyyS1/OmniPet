@@ -445,7 +445,7 @@ public final class OmniPetCommand implements BasicCommand {
     /** Produces the diagnostic lines for one owner. */
     @FunctionalInterface
     public interface StatDiagnosticTarget {
-        java.util.List<String> describe(java.util.UUID ownerId);
+        java.util.List<String> describe(java.util.UUID ownerId, boolean verbose);
     }
 
     /**
@@ -492,6 +492,10 @@ public final class OmniPetCommand implements BasicCommand {
      * <p>Shares the reload permission rather than minting a node for one read-only command: an operator who
      * can reload definitions is exactly the person who needs this, and a new node would be one more thing to
      * grant before the diagnostic could be used — at the moment it is most needed.
+     *
+     * <p>{@code all} appends every stat. The default is a verdict and little else: a healthy server has
+     * nothing to read in a per-stat list that the character sheet does not already show, and burying the
+     * verdict under it was the complaint.
      */
     private void dispatchStatDiagnostics(CommandSender sender, List<String> arguments) {
         StatDiagnosticTarget target = statDiagnostics;
@@ -499,17 +503,21 @@ public final class OmniPetCommand implements BasicCommand {
             sender.sendMessage("OmniPet: stat diagnostics are not available yet.");
             return;
         }
-        Player subject = arguments.isEmpty()
+        List<String> named = new java.util.ArrayList<>(arguments);
+        // Accepted in either position, because "stats all" for yourself reads as naturally as
+        // "stats <player> all" and refusing one of the two would be a rule to remember for no reason.
+        boolean verbose = named.removeIf(argument -> argument.equalsIgnoreCase("all"));
+        Player subject = named.isEmpty()
                 ? (sender instanceof Player self ? self : null)
-                : org.bukkit.Bukkit.getPlayerExact(arguments.getFirst());
+                : org.bukkit.Bukkit.getPlayerExact(named.getFirst());
         if (subject == null) {
-            sender.sendMessage(arguments.isEmpty()
-                    ? "OmniPet: name a player — /pet admin stats <online-player>"
-                    : "OmniPet: no online player named " + arguments.getFirst() + ".");
+            sender.sendMessage(named.isEmpty()
+                    ? "OmniPet: name a player — /pet admin stats <online-player> [all]"
+                    : "OmniPet: no online player named " + named.getFirst() + ".");
             return;
         }
         sender.sendMessage("OmniPet stat check for " + subject.getName() + ":");
-        target.describe(subject.getUniqueId()).forEach(sender::sendMessage);
+        target.describe(subject.getUniqueId(), verbose).forEach(sender::sendMessage);
     }
 
     /**

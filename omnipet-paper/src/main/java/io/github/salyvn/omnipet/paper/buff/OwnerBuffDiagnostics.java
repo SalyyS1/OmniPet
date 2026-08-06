@@ -48,41 +48,68 @@ public final class OwnerBuffDiagnostics {
             return List.copyOf(lines);
         }
 
-        lines.add("Active pets: " + activePets);
         if (activePets == 0) {
             lines.add("No pet is out, so there is nothing to apply. Summon one and run this again.");
             return List.copyOf(lines);
         }
         if (stats.isEmpty()) {
-            lines.add("Those pets grant no stats at all. Either their definition has no stats: block,");
-            lines.add("or they were granted before stats were rolled — hatch a fresh one to compare.");
+            lines.add("Those " + activePets + " active pet(s) grant no stats at all. Either their definition");
+            lines.add("has no stats: block, or they predate stat rolling — hatch a fresh one to compare.");
             return List.copyOf(lines);
         }
 
-        lines.add("Stats those pets grant, as they will be sent to MythicLib:");
         List<String> unknown = new ArrayList<>();
         for (PetStatBuff buff : stats) {
-            boolean known = registeredStats == null || registeredStats.contains(buff.statId());
-            if (!known) unknown.add(buff.statId());
-            lines.add("  " + (known ? "ok  " : "BAD ") + buff.statId()
-                    + "  " + buff.modifierType() + "  " + buff.value());
+            if (registeredStats != null && !registeredStats.contains(buff.statId())) unknown.add(buff.statId());
         }
 
+        // The healthy answer is one line. An operator running this on a working server is confirming a
+        // suspicion, not auditing: listing every stat buries that answer, and the numbers are already
+        // visible on their character sheet. Only the broken cases earn detail, because only they need it.
         if (registeredStats == null) {
-            lines.add("MythicLib's stat registry could not be read, so the IDs above are unverified.");
+            lines.add(activePets + " pet(s), " + stats.size() + " stat(s) sent to MythicLib.");
+            lines.add("Its stat registry could not be read, so those IDs are unverified.");
             return List.copyOf(lines);
         }
         if (unknown.isEmpty()) {
-            lines.add("Every ID above is registered with MythicLib, so these are being applied.");
-            lines.add("If a number still looks wrong in game, the stat is applied but something else");
-            lines.add("is reading it — check MythicLib's own stat configuration for that stat.");
+            lines.add("OK — " + activePets + " pet(s), " + stats.size()
+                    + " stat(s), all registered with MythicLib and being applied.");
+            lines.add("A number still wrong in game means something else is reading it: check");
+            lines.add("MythicLib's own configuration for that stat. Add 'all' to list them.");
             return List.copyOf(lines);
         }
 
-        lines.add("MythicLib does not know " + unknown.size() + " of these, so they do nothing:");
+        lines.add("BROKEN — MythicLib does not know " + unknown.size() + " of " + stats.size()
+                + " stat(s), so they do nothing:");
         unknown.forEach(id -> lines.add("  " + id));
         lines.add("Fix the stat ID in the pet definition. MythicLib knows these:");
         lines.add("  " + preview(registeredStats));
+        return List.copyOf(lines);
+    }
+
+    /**
+     * The same report with every stat listed, for {@code /pet admin stats <player> all}.
+     *
+     * <p>Kept as a separate entry point rather than as a flag threaded through the summary, so the default
+     * cannot drift back into the wall of text it was. An operator who wants the full list asks for it.
+     */
+    public static List<String> describeVerbose(
+            boolean providerPresent,
+            String providerDetail,
+            int activePets,
+            List<PetStatBuff> buffs,
+            java.util.Set<String> registeredStats) {
+        List<String> summary = describe(providerPresent, providerDetail, activePets, buffs, registeredStats);
+        List<PetStatBuff> stats = List.copyOf(buffs == null ? List.of() : buffs);
+        if (stats.isEmpty()) return summary;
+
+        List<String> lines = new ArrayList<>(summary);
+        lines.add("Every stat, as it will be sent to MythicLib:");
+        for (PetStatBuff buff : stats) {
+            boolean known = registeredStats == null || registeredStats.contains(buff.statId());
+            lines.add("  " + (known ? "ok  " : "BAD ") + buff.statId()
+                    + "  " + buff.modifierType() + "  " + buff.value());
+        }
         return List.copyOf(lines);
     }
 

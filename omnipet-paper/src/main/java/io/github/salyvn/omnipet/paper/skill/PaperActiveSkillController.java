@@ -123,10 +123,28 @@ public final class PaperActiveSkillController {
                 return;
             }
             SkillProvider provider = providers.provider();
-            if (!provider.providerId().equalsIgnoreCase(binding.provider())
-                    || !provider.catalog().health().available()
-                    || !provider.catalog().contains(binding.skillId())) {
-                finish(playerId, Messages.line(MessageKey.SKILL_PROVIDER_UNAVAILABLE));
+            // Each refusal names itself. All three used to send one message that said only "provider or
+            // skill ID is unavailable", so an operator whose skill silently never fired could not tell a
+            // misspelled provider from a MythicMobs that had not loaded from a skill name that did not
+            // exist — and the most common cause, a casing mismatch, is now not a refusal at all.
+            if (!provider.providerId().equalsIgnoreCase(binding.provider())) {
+                finish(playerId, Messages.line(MessageKey.SKILL_PROVIDER_MISMATCH,
+                        Messages.of("provider", binding.provider()),
+                        Messages.of("detail", provider.providerId())));
+                return;
+            }
+            if (!provider.catalog().health().available()) {
+                finish(playerId, Messages.line(MessageKey.SKILL_PROVIDER_UNAVAILABLE,
+                        Messages.of("detail", providerDetail(provider))));
+                return;
+            }
+            // The provider's own spelling, not the definition's. MythicMobs registers a skill under its
+            // YAML node name exactly as written, so a definition that names it in another casing has to be
+            // translated before the cast rather than refused.
+            String skillId = provider.catalog().canonical(binding.skillId());
+            if (skillId == null) {
+                finish(playerId, Messages.line(MessageKey.SKILL_NOT_REGISTERED,
+                        Messages.of("detail", binding.skillId())));
                 return;
             }
             if (Math.random() >= binding.chance()) {
@@ -145,14 +163,21 @@ public final class PaperActiveSkillController {
                         Messages.of("status", words(prepared.status()))), FeedbackEvent.SKILL_REJECTED);
                 return;
             }
-            runMain(playerId, () -> castPrepared(playerId, petId, binding, actionId));
+            runMain(playerId, () -> castPrepared(playerId, petId, binding, skillId, actionId));
         } catch (IOException | RuntimeException failure) {
             finish(playerId, Messages.line(MessageKey.SKILL_PREPARE_FAILED,
                     Messages.of("detail", detail(failure))));
         }
     }
 
-    private void castPrepared(UUID playerId, UUID petId, SkillBinding binding, UUID actionId) {
+    /** Why the provider says it is unusable, or a stand-in when it did not say. */
+    private static String providerDetail(SkillProvider provider) {
+        String detail = provider.catalog().health().detail();
+        return detail == null || detail.isBlank() ? "no reason given" : detail;
+    }
+
+    private void castPrepared(
+            UUID playerId, UUID petId, SkillBinding binding, String skillId, UUID actionId) {
         Player player = Bukkit.getPlayer(playerId);
         if (player == null || !player.isOnline()) {
             queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(MessageKey.SKILL_PLAYER_LEFT)));
@@ -161,7 +186,7 @@ public final class PaperActiveSkillController {
         SkillCastResult cast;
         try {
             cast = providers.provider().cast(new SkillCastRequest(
-                    actionId, playerId, playerId, petId, binding.skillId(), binding.targetPolicy(),
+                    actionId, playerId, playerId, petId, skillId, binding.targetPolicy(),
                     Map.of("world", player.getWorld().getName())));
         } catch (RuntimeException | LinkageError failure) {
             queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(

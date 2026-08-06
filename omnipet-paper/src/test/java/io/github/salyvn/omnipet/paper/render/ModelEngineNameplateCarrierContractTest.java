@@ -10,29 +10,29 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /**
- * A model pet's nameplate is written to its own entity, not to the one ModelEngine hides.
+ * A model pet's nameplate and hitbox are entities of their own, positioned independently.
  *
- * <p>The defect this pins down was invisible to every unit test in the suite. Head pets showed a name and
- * model pets did not, while {@code Nameplate.apply} was called correctly at all three sites in both
- * renderers — spawn, per-tick status, and rename. Asserting the name on the carrier passed; the plate still
- * reached nobody.
+ * <p>Two defects, one cause, and both invisible to every unit test in the suite.
  *
- * <p>The cause is in ModelEngine's own code. {@code ModeledEntity.setBaseEntityVisible(false)}, which the
- * adapter calls on attach so the placeholder stand does not show through the model, forwards to
- * {@code BukkitEntity.setVisible(false)} — and that sends a despawn packet to every tracking client rather
- * than making the entity transparent. The carrier stops existing client-side, so its {@code customName}
- * data-watcher field is never delivered. Vanilla's {@code setInvisible(true)}, which the head renderer
- * uses, does not do this, which is the whole difference between the two.
+ * <p>{@code ModeledEntity.setBaseEntityVisible(false)}, which the adapter calls on attach so the placeholder
+ * stand does not show through the model, forwards to {@code BukkitEntity.setVisible(false)} — and that sends
+ * {@code ClientboundRemoveEntitiesPacket} to every tracking client rather than making the entity
+ * transparent. The carrier stops existing client-side. Vanilla's {@code setInvisible(true)}, which the head
+ * renderer uses, does not do this, which is the whole difference between the two renderers.
  *
- * <p>So the plate needs an entity ModelEngine does not own. It rides the carrier as a passenger, which
- * makes it follow the model for free, and it is invisible the vanilla way, which leaves its plate
- * renderable.
+ * <p>The first consequence was a plate written to the carrier reaching nobody. The fix for that put the
+ * plate on its own stand — and mounted it on the carrier, which reintroduced the same bug by another route:
+ * the server never sends a passenger's position, because the client derives it from the vehicle. With the
+ * vehicle despawned client-side there is nothing to derive from. That is also why the interaction entity was
+ * unclickable, so an operator could not feed a model pet by clicking it the way a head pet allows.
+ *
+ * <p>So neither may ride the carrier. Each is teleported on its own every tick.
  *
  * <p>Asserted against the source rather than by driving the renderer, because reproducing this needs a real
  * client to observe a packet that was never sent. A stub cannot fail the way the live server did: the test
- * double for {@code ModeledEntity} tracks {@code baseEntityVisible} as a boolean and despawns nothing. That
- * is exactly why this went unnoticed, and asserting on the source is the only check available that would
- * have caught it.
+ * double for {@code ModeledEntity} tracks {@code baseEntityVisible} as a boolean and despawns nothing, and
+ * Bukkit's passenger semantics are not modelled at all. That is exactly why this survived a round of fixes,
+ * and asserting on the source is the only check available that would have caught it.
  */
 class ModelEngineNameplateCarrierContractTest {
     @Test
@@ -49,6 +49,24 @@ class ModelEngineNameplateCarrierContractTest {
                 "spawn, per-tick status, and rename all have to write the plate, or it goes stale");
         assertEquals(3, count(renderer, "Nameplate.apply(plate") + count(renderer, "Nameplate.apply(handle.plate()"),
                 "every one of those three writes goes to the plate entity");
+    }
+
+    /**
+     * Nothing rides the carrier.
+     *
+     * <p>The assertion that pins down the second face of this defect. A passenger's position is never sent
+     * to clients — the client computes it from the vehicle — and this vehicle does not exist client-side, so
+     * a passenger has no position on screen at all. Mounting is the intuitive way to make one entity follow
+     * another, and it is exactly wrong here, which is why this is asserted rather than left to a comment.
+     */
+    @Test
+    void neitherThePlateNorTheHitboxRidesTheCarrier() throws Exception {
+        String renderer = code(source("PaperModelEngineRenderer.java"));
+
+        assertFalse(renderer.contains("addPassenger"),
+                "a passenger of a client-side-despawned vehicle has no position: teleport each instead");
+        assertFalse(renderer.contains(".eject()"),
+                "nothing is mounted, so nothing needs ejecting");
     }
 
     /**
@@ -70,20 +88,22 @@ class ModelEngineNameplateCarrierContractTest {
     }
 
     /**
-     * The plate is cleaned up and re-seated everywhere the interaction is.
+     * Every entity is moved, cleaned up, and validated on every path.
      *
-     * <p>Both are passengers of the carrier, so they share every hazard: a safety teleport ejects them, and
-     * a torn-down renderer has to remove them. Missing the eject leaves a name floating where the pet used
-     * to be; missing the removal leaks an armor stand per activation.
+     * <p>Since none of them ride the carrier, each one the renderer owns has to be moved explicitly. A
+     * missed teleport leaves that entity where the pet used to be — the name stranded behind, or a hitbox
+     * that can only be clicked at the pet's last position. A missed removal leaks an entity per activation.
      */
     @Test
-    void thePlateSharesTheInteractionsLifecycle() throws Exception {
+    void everyOwnedEntityIsMovedAndRetiredTogether() throws Exception {
         String renderer = code(source("PaperModelEngineRenderer.java"));
 
-        assertTrue(renderer.contains("addPassenger(handle.plate())"),
-                "an ejected plate has to be re-seated, or the name stays where the pet was");
-        assertTrue(renderer.contains("handle.plate().teleport(target)"),
-                "the plate moves with the carrier on a safety teleport");
+        assertTrue(renderer.contains("handle.interaction().teleport(destination)"),
+                "the hitbox follows the pet every tick, or a model pet can only be clicked where it was");
+        assertTrue(renderer.contains("handle.plate().teleport(plateLocation(destination))"),
+                "so does the name");
+        assertTrue(renderer.contains("handle.plate().teleport(plateLocation(target))"),
+                "and both move on a safety teleport as well");
         assertTrue(renderer.contains("handle.plate().remove()"),
                 "a retired renderer removes its plate, or every activation leaks an armor stand");
         assertTrue(renderer.contains("plate != null) plate.remove()"),

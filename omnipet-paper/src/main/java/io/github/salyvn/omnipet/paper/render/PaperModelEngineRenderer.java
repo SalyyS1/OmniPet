@@ -113,14 +113,12 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
                 stand.setSilent(true);
                 stand.setPersistent(false);
             });
-            plate = spawnPlate(owner.getWorld(), target);
+            plate = spawnPlate(owner.getWorld(), plateLocation(target));
             interaction = owner.getWorld().spawn(target, Interaction.class, entity -> {
                 entity.setResponsive(true);
                 entity.setPersistent(false);
                 setInteractionScale(entity, request.transform().scale());
             });
-            if (!carrier.addPassenger(interaction)) throw new IllegalStateException("could not attach model interaction");
-            if (!carrier.addPassenger(plate)) throw new IllegalStateException("could not attach model nameplate");
             modeled = bindings.createModeled(carrier);
             active = bindings.createActive(request.appearance().assetId());
             bindings.scale(active, request.transform().scale());
@@ -145,7 +143,7 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
      *
      * <p>A separate entity because ModelEngine hides the carrier by despawning it client-side rather than
      * by making it transparent, so a name on the carrier reaches no one. This one is invisible the vanilla
-     * way, which leaves its plate renderable, and rides the carrier so it tracks the model for free.
+     * way, which leaves its plate renderable.
      *
      * <p>Not a marker: a marker armor stand has a zero-height bounding box, and the plate is drawn above
      * that box, so it would sit inside the model instead of over it.
@@ -178,18 +176,9 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
         if (!carrier.getWorld().equals(owner.getWorld())
                 || carrier.getLocation().distanceSquared(target)
                         > settings.safetyDistance() * settings.safetyDistance()) {
-            carrier.eject();
             if (!carrier.teleport(target) || !handle.interaction().teleport(target)
-                    || !handle.plate().teleport(target)) {
+                    || !handle.plate().teleport(plateLocation(target))) {
                 throw new IllegalStateException("ModelEngine renderer safety teleport failed");
-            }
-            if (!carrier.addPassenger(handle.interaction())) {
-                throw new IllegalStateException("could not reattach model interaction");
-            }
-            // The plate rides the carrier too, and ejecting dropped it along with the interaction. Missing
-            // this would leave the name floating where the pet was teleported from.
-            if (!carrier.addPassenger(handle.plate())) {
-                throw new IllegalStateException("could not reattach model nameplate");
             }
         } else {
             // Teleport, not setVelocity. The carrier is a marker armor stand with gravity off, so it has
@@ -205,6 +194,12 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
                 // Best-effort: a refused teleport leaves the carrier alone and the safety branch above
                 // picks it up on a later tick rather than tearing the renderer down over one frame.
                 carrier.teleport(destination);
+                // Each on its own, because neither rides the carrier. A passenger's position is not sent
+                // to clients at all — the client derives it from the vehicle — and ModelEngine despawns
+                // this vehicle client-side, so a passenger would have no position anywhere on screen. That
+                // is one bug with two faces: an unclickable pet and, before this, a nameplate nobody saw.
+                handle.interaction().teleport(destination);
+                handle.plate().teleport(plateLocation(destination));
             }
         }
         // Only when the size actually changed. setScale is a reflective call and the interaction's width
@@ -337,6 +332,25 @@ public final class PaperModelEngineRenderer implements PetRendererPort {
         interaction.setInteractionWidth((float) Math.max(0.25, Math.min(8, scale)));
         interaction.setInteractionHeight((float) Math.max(0.25, Math.min(8, scale * 1.25)));
     }
+
+    /**
+     * Where the nameplate stand sits: the pet's position, lifted clear of the model.
+     *
+     * <p>Its own offset because the stand no longer rides the carrier. Riding gave it the vehicle's
+     * mount height for free, and cost the plate its position entirely — a passenger's location is never
+     * sent to clients, and ModelEngine despawns the vehicle client-side, so there was nothing left to
+     * derive a position from.
+     *
+     * <p>A small armor stand's plate already floats above its own head, so this only has to clear the
+     * model's feet rather than guess the model's height. Deliberately not scaled by the pet: a large model
+     * would push its name out of sight, and no blueprint height is available without a vendor call.
+     */
+    private static Location plateLocation(Location target) {
+        return target.clone().add(0, PLATE_HEIGHT, 0);
+    }
+
+    /** How far above a pet's feet its name floats. */
+    private static final double PLATE_HEIGHT = 0.6;
 
     private void cleanup(
             Object modeled, Object active, Interaction interaction, ArmorStand plate, ArmorStand carrier,
