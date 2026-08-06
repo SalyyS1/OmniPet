@@ -2,7 +2,6 @@ package io.github.salyvn.omnipet.paper.render;
 
 import java.lang.reflect.Method;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.entity.Entity;
 
@@ -46,11 +45,25 @@ final class ReflectiveModelEngineBindings {
         return Objects.requireNonNull(result, "ModelEngine returned no active model");
     }
 
+    /**
+     * Attaches the model to the carrier.
+     *
+     * <p>{@code addModel} returns the model it <em>replaced</em>, not the one it added — an
+     * {@code Optional} holding whatever was previously registered under the same blueprint name. For a pet
+     * being spawned there is no previous model, so success is {@code Optional.empty()}.
+     *
+     * <p>This adapter read that empty as a rejection and threw. Every ModelEngine pet therefore failed at
+     * spawn, the resolver caught it and fell back to the built-in head renderer, and the operator was told
+     * "ModelEngine rejected the active model" — which is why a MODELENGINE pet rendered as a head, faced
+     * the wrong way, and looked as though its provider had been ignored. One inverted condition accounted
+     * for the whole cluster of symptoms.
+     *
+     * <p>A genuine refusal is not silent: {@code addModel} only bails early when a plugin cancels the
+     * {@code AddModelEvent}, and the other failure modes throw. So there is nothing to detect here beyond
+     * letting the call return.
+     */
     void attach(Object modeled, Object active) throws ReflectiveOperationException {
-        Object result = addModel.invoke(modeled, active, true);
-        if (result instanceof Optional<?> optional && optional.isEmpty()) {
-            throw new IllegalStateException("ModelEngine rejected the active model");
-        }
+        addModel.invoke(modeled, active, true);
         setBaseEntityVisible.invoke(modeled, false);
     }
 
