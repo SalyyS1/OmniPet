@@ -111,6 +111,9 @@ public enum MessageKey {
     SKILL_NOT_REGISTERED("skill.not-registered",
             "<yellow>OmniPet: The provider has no skill named <detail>.</yellow>"),
     SKILL_CHANCE_MISSED("skill.chance-missed", "<gray>OmniPet: The pet skill chance did not trigger.</gray>"),
+    // A cooldown refusal that names the wait. "Skill rejected: cooldown" left a player with no way to find
+    // out how long except by asking again, which is the one thing a cooldown exists to discourage.
+    SKILL_COOLDOWN("skill.cooldown", "<yellow>OmniPet: That pet skill is ready in <remaining>.</yellow>"),
     SKILL_REJECTED("skill.rejected", "<yellow>OmniPet: Skill rejected: <status>.</yellow>"),
     SKILL_PREPARE_FAILED("skill.prepare-failed", "<red>OmniPet: Skill preparation failed: <detail>.</red>"),
     SKILL_SUCCEEDED("skill.succeeded", "<green>OmniPet: Pet skill cast succeeded.</green>"),
@@ -202,6 +205,10 @@ public enum MessageKey {
     ACTION_BAR_HATCH_QUEUED("action-bar.hatch-queued", "<yellow>Incubation started</yellow>"),
     ACTION_BAR_HATCH_CLAIMED("action-bar.hatch-claimed", "<green>Hatched! Check your vault</green>"),
     ACTION_BAR_SLOT_UNLOCKED("action-bar.slot-unlocked", "<green>Active slot unlocked</green>"),
+    // A pet skill fires from a key press, not a command, so its outcome belongs where the player's eyes
+    // already are. Routing it through chat would put a line in the log for every keypress.
+    ACTION_BAR_SKILL_CAST("action-bar.skill-cast", "<green>◆ Pet skill cast</green>"),
+    ACTION_BAR_SKILL_COOLDOWN("action-bar.skill-cooldown", "<yellow>◆ Ready in <remaining></yellow>"),
     // Staff-facing, but titles rather than audit output: an operator translating the plugin has no
     // reason to be left with six English screens, and a caption cannot distort a receipt.
     GUI_TITLE_STUDIO_TIERS("gui.title.studio-tiers", "OmniPet <dark_gray>▸</dark_gray> Studio"),

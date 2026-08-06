@@ -69,7 +69,18 @@ public final class FeedbackService {
 
     /** Emits using the event's own category, for call sites that already hold the event. */
     public void emit(Player player, FeedbackEvent event) {
-        emit(player, event, event == null ? null : event.category());
+        emit(player, event, event == null ? null : event.category(), null);
+    }
+
+    /**
+     * Emits with the action bar text supplied rather than read from the event's key.
+     *
+     * <p>For an outcome whose wording depends on a value only the caller knows — a remaining cooldown, say.
+     * The sound, the rate limit and the {@code enabled}/{@code actionBar} switches all behave identically;
+     * only the source of the text differs.
+     */
+    public void emit(Player player, FeedbackEvent event, net.kyori.adventure.text.Component actionBarText) {
+        emit(player, event, event == null ? null : event.category(), actionBarText);
     }
 
     /** Frees the rate-limit entry. Called on quit, so the map cannot grow for the server's lifetime. */
@@ -86,6 +97,14 @@ public final class FeedbackService {
     }
 
     private void emit(Player player, FeedbackEvent event, FeedbackCategory category) {
+        emit(player, event, category, null);
+    }
+
+    private void emit(
+            Player player,
+            FeedbackEvent event,
+            FeedbackCategory category,
+            net.kyori.adventure.text.Component suppliedText) {
         FeedbackSettings current = settings;
         if (player == null || event == null || category == null || !current.enabled()) return;
         if (!allow(player.getUniqueId(), current.minimumInterval())) return;
@@ -96,6 +115,10 @@ public final class FeedbackService {
             current.celebration().ifPresent(particle -> output.particle(player, particle));
         }
         if (!current.actionBar()) return;
+        if (suppliedText != null) {
+            output.actionBar(player, suppliedText);
+            return;
+        }
         MessageKey key = event.actionBar();
         if (key != null) output.actionBar(player, Messages.line(key));
     }

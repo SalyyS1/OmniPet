@@ -58,4 +58,27 @@ class DisplaysTest {
         assertThrows(NullPointerException.class, () -> Displays.of(null));
         assertThrows(NullPointerException.class, () -> Displays.words(null));
     }
+
+    @Test
+    void aRemainingWaitReadsTheWayAPlayerWouldSayIt() {
+        assertEquals("7s", Displays.remaining(7_000));
+        assertEquals("1m 20s", Displays.remaining(80_000));
+        assertEquals("2m", Displays.remaining(120_000));
+        assertEquals("1h 5m", Displays.remaining(3_900_000));
+    }
+
+    /**
+     * A wait still in force must never read as zero.
+     *
+     * <p>Truncating 400ms to "0s" tells a player the skill is ready while the cast is still refused, which
+     * reads as the skill being broken. Rounding up overstates by at most a fraction of a second, which
+     * nobody can perceive.
+     */
+    @Test
+    void aSubSecondWaitIsNeverReportedAsReady() {
+        assertEquals("0.4s", Displays.remaining(400));
+        assertEquals("0.1s", Displays.remaining(20));
+        assertEquals("2s", Displays.remaining(1_001));
+        assertEquals("0s", Displays.remaining(0));
+    }
 }

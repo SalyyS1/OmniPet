@@ -34,6 +34,25 @@ public final class Displays {
         return sentence(value.trim());
     }
 
+    /**
+     * A short wait a player can read at a glance: {@code 0.8s}, {@code 7s}, {@code 1m 20s}.
+     *
+     * <p>Rounds a sub-second remainder up rather than down, because a cooldown displayed as {@code 0s} that
+     * still refuses the cast is worse than one tenth of a second of overstatement.
+     */
+    public static String remaining(long millis) {
+        if (millis <= 0) return "0s";
+        if (millis < 1000) return "0." + Math.max(1, millis / 100) + "s";
+        long seconds = (millis + 999) / 1000;
+        if (seconds < 60) return seconds + "s";
+        long minutes = seconds / 60;
+        long rest = seconds % 60;
+        if (minutes < 60) return rest == 0 ? minutes + "m" : minutes + "m " + rest + "s";
+        long hours = minutes / 60;
+        long restMinutes = minutes % 60;
+        return restMinutes == 0 ? hours + "h" : hours + "h " + restMinutes + "m";
+    }
+
     private static String sentence(String raw) {
         String words = raw.toLowerCase(Locale.ROOT).replace('_', ' ');
         if (words.isEmpty()) return words;

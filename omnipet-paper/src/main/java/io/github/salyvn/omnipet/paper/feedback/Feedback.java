@@ -52,6 +52,12 @@ public final class Feedback {
         if (current != null) current.emit(player, event);
     }
 
+    /** Emits with action bar text the caller supplies, for wording that depends on a runtime value. */
+    public static void emit(Player player, FeedbackEvent event, net.kyori.adventure.text.Component actionBar) {
+        FeedbackService current = active;
+        if (current != null) current.emit(player, event, actionBar);
+    }
+
     /** Drops a player's rate-limit entry on quit. */
     public static void release(UUID playerId) {
         FeedbackService current = active;

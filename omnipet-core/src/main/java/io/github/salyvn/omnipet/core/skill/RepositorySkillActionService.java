@@ -50,12 +50,13 @@ public final class RepositorySkillActionService {
                 return rejected(RepositorySkillActionResult.Status.ACTION_PENDING, current, pet, null,
                         "this skill already has a pending cast outcome");
             }
-            if (skill.cooldownDeadlines().getOrDefault(binding.bindingId(), 0L) > nowEpochMillis) {
-                return rejected(RepositorySkillActionResult.Status.COOLDOWN, current, pet, null, "skill is cooling down");
-            }
-            if (!binding.persistCooldown()
-                    && transientDeadline(playerId, petId, binding.bindingId()) > nowEpochMillis) {
-                return rejected(RepositorySkillActionResult.Status.COOLDOWN, current, pet, null, "skill is cooling down");
+            long persisted = skill.cooldownDeadlines().getOrDefault(binding.bindingId(), 0L);
+            long ephemeral = binding.persistCooldown()
+                    ? 0L
+                    : transientDeadline(playerId, petId, binding.bindingId());
+            long deadlineNow = Math.max(persisted, ephemeral);
+            if (deadlineNow > nowEpochMillis) {
+                return cooling(current, pet, deadlineNow - nowEpochMillis);
             }
             ProgressionState progression = PetProgressionProjection.read(pet, initialStamina, nowEpochMillis);
             double reserved = skill.pendingActions().values().stream()
@@ -199,6 +200,13 @@ public final class RepositorySkillActionService {
             RepositorySkillActionResult.Status status, PlayerState state, PetInstance pet,
             SkillActionReservation reservation, String detail) {
         return new MutationResult(false, result(status, state, pet, reservation, detail));
+    }
+
+    /** A cooldown refusal that says how much longer, so the caller can put a number in front of the player. */
+    private static MutationResult cooling(PlayerState state, PetInstance pet, long remainingMillis) {
+        return new MutationResult(false, new RepositorySkillActionResult(
+                RepositorySkillActionResult.Status.COOLDOWN, state, pet, null, "skill is cooling down",
+                remainingMillis));
     }
 
     private static RepositorySkillActionResult result(

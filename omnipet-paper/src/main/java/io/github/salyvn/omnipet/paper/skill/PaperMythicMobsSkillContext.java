@@ -26,7 +26,8 @@ public final class PaperMythicMobsSkillContext {
                 loader,
                 () -> mythic != null && mythic.isEnabled(),
                 Bukkit::isPrimaryThread,
-                ownerId -> Bukkit.getPlayer(ownerId));
+                ownerId -> Bukkit.getPlayer(ownerId),
+                targetId -> Bukkit.getEntity(targetId));
         provider.refresh(++epoch);
     }
 

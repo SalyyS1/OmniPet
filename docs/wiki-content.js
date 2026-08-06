@@ -113,7 +113,8 @@ An honest summary, because a roadmap that reads as a promise is worse than no ro
 | Visible pets that follow you | Shipped. Player-head renderer built in, ModelEngine when present. |
 | Idle behaviour and per-pet temperament | Shipped. |
 | Feeding, bonding, temporary buffs, multiple pets at once | Not yet. |
-| Vendor skill execution, MMOItems item bridge | Not yet. |
+| Pet skills on seventeen triggers, aimed by OmniPet | Shipped. Needs MythicMobs for the skills themselves. |
+| MMOItems item bridge | Not yet. |
 
 Every number and claim on this site comes from the build. See [the roadmap](#/roadmap) for what is
 deferred and why, including the one gap that matters most: **no live-server smoke certification has been
@@ -154,7 +155,8 @@ Một bản tóm tắt trung thực, vì một lộ trình bị đọc thành l�
 | Pet hiện hình đi theo người chơi | Đã có. Renderer đầu người dựng sẵn, dùng ModelEngine khi có. |
 | Hành vi nhàn rỗi và tính cách riêng từng pet | Đã có. |
 | Cho ăn, độ thân thiết, buff tạm thời, nhiều pet cùng lúc | Chưa. |
-| Thực thi kỹ năng qua vendor, cầu nối vật phẩm MMOItems | Chưa. |
+| Kỹ năng pet với mười bảy trigger, do OmniPet tự nhắm mục tiêu | Đã có. Cần MythicMobs cho bản thân kỹ năng. |
+| Cầu nối vật phẩm MMOItems | Chưa. |
 
 Mọi số liệu và tuyên bố trên site này đều lấy từ bản build. Xem [lộ trình](#/roadmap) để biết cái gì còn
 hoãn và vì sao, gồm cả khoảng trống quan trọng nhất: **chưa có chứng nhận smoke test trên server thật.**
@@ -691,6 +693,108 @@ write instead of hundreds, and each write takes the player's revision lock that 
 trade is that a crash loses at most those five seconds of experience, which is why this path is not
 journalled the way an EXP candy is — a candy is an item the player spent, and a kill is a stream.
 
+## skills — what a pet casts, and what makes it cast
+
+On the pet definition, not in \`config.yml\`. The shortest usable entry is two lines:
+
+\`\`\`yaml
+skills:
+  - provider: MYTHICMOBS
+    id: Fireball
+\`\`\`
+
+Everything else has a default worth having. A fuller one:
+
+\`\`\`yaml
+skills:
+  - provider: MYTHICMOBS
+    id: Fireball
+    trigger: SHIFT_RIGHT_CLICK
+    cooldown: 8s
+    targetPolicy: LOOK_THEN_NEAREST
+    chance: 1.0
+    staminaCost: 5
+    power: 1.5
+  - provider: MYTHICMOBS
+    id: EmergencyHeal
+    trigger: ON_LOW_HEALTH
+    healthThreshold: 0.35
+    cooldown: 60s
+    targetPolicy: OWNER
+\`\`\`
+
+### Triggers
+
+Active triggers are something the owner deliberately does. A refused active cast tells the player why, because they asked for it.
+
+| Trigger | Fires on |
+| --- | --- |
+| \`ACTIVE\` | \`/pet skill\`, which is also how a macro or a menu button casts |
+| \`SHIFT_RIGHT_CLICK\` | Right-click while sneaking. The least likely to collide with ordinary play |
+| \`SHIFT_LEFT_CLICK\` | Left-click while sneaking |
+| \`RIGHT_CLICK\` | Right-click without sneaking. Collides with placing blocks; pair it with a cooldown |
+| \`LEFT_CLICK\` | Left-click without sneaking, which is also the attack swing |
+| \`DROP_KEY\` | Q by default. Free of collisions, because the drop itself is cancelled |
+| \`SWAP_HAND_KEY\` | F by default. The swap is cancelled so nothing moves |
+| \`JUMP\` | Space. Fires often, so it needs a cooldown |
+| \`SNEAK\` | Beginning to sneak, not ending |
+| \`SPRINT\` | Beginning to sprint |
+
+Passive triggers are things that happen. They stay silent when refused, because a message on every hit would be unreadable — except a cooldown, which always shows on the action bar.
+
+| Trigger | Fires on |
+| --- | --- |
+| \`ON_ATTACK\` | The owner landed a hit |
+| \`ON_DAMAGE_TAKEN\` | The owner took damage from anything, including drowning and falling |
+| \`ON_LOW_HEALTH\` | The owner crossed below \`healthThreshold\`. Re-arms only when they heal back above it |
+| \`ON_KILL\` | The owner killed something |
+| \`ON_TARGETED\` | A mob started targeting the owner |
+| \`ON_DEATH\` | The owner died, cast before they drop |
+| \`INTERVAL\` | Every \`interval\` while the pet is out |
+
+A critical hit and a dodge were asked for and are deliberately absent: vanilla exposes no event for either, and inferring a crit from fall distance and sprint state, or a dodge from a damage event that never arrived, would fire wrongly often enough to look broken. \`ON_DAMAGE_TAKEN\` with a \`chance\` covers most of what a dodge trigger would have been for.
+
+### Targeting
+
+\`targetPolicy\` decides what the skill aims at. OmniPet resolves this itself and hands MythicMobs the answer, rather than letting MythicMobs pick — because MythicMobs picks from the caster, and the caster is the owning *player*. A skill left to the vendor's targeter aims wherever the player's own rules point, which is usually nothing.
+
+| Policy | Aims at |
+| --- | --- |
+| \`LOOK_THEN_NEAREST\` | What the owner is looking at, and failing that the nearest hostile mob. **The default** |
+| \`LOOK_TARGET\` | Only what the owner is looking at. Refuses the cast when they are looking at nothing |
+| \`NEAREST_HOSTILE\` | The nearest hostile mob in range |
+| \`OWNER\` | The owner themself, for a heal or a buff |
+| \`PET\` | The pet itself |
+| \`AREA_AROUND_OWNER\` | Every hostile mob within range of the owner |
+| \`AREA_AROUND_PET\` | Every hostile mob within range of the pet |
+| \`PROVIDER_DEFAULT\` | Nothing. The skill's own \`@Target\` clause decides |
+
+"Looking at" is a ray trace, so it means the same thing to the skill as it does to the player's crosshair. Blocks are ignored: a mob behind a fence post is still what the player is aiming at.
+
+The owner's own pets are never targeted and never count as the nearest hostile.
+
+### Everything else
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| \`bindingId\` | \`skill_<index>\` | Names the binding, for \`/pet skill\` and for the cooldown record |
+| \`cooldown\` | none | The wait between casts of this binding |
+| \`chance\` | \`1.0\` | Odds of firing, in [0,1], rolled after every other gate |
+| \`staminaCost\` | \`0\` | Stamina spent on a successful cast |
+| \`power\` | \`1.0\` | The provider's power multiplier, scaling the skill's own damage and duration numbers |
+| \`targetRange\` | \`20\` | How far the target resolver may look, in blocks. Maximum 64 |
+| \`healthThreshold\` | \`0.3\` | For \`ON_LOW_HEALTH\`: the fraction of maximum health it fires at |
+| \`interval\` | \`10s\` | For \`INTERVAL\`: the period between casts |
+| \`persistCooldown\` | \`false\` | Whether the cooldown survives a restart |
+
+Durations accept \`8s\`, \`2m\`, \`500ms\`, \`20t\` (ticks), a bare number of seconds, or ISO-8601 \`PT8S\`. Only ISO-8601 was accepted before, which is a format nobody writing a config guesses — so every hand-written \`cooldown: 8s\` was silently disabling its whole binding.
+
+An invalid entry is skipped rather than failing the definition: one bad skill must not cost a pet its model, its stats, and its nameplate. But it is reported, because a silently skipped typo is indistinguishable from a skill that simply never fires.
+
+### Cooldown feedback
+
+A trigger that fires while the skill is cooling down shows the remaining wait on the action bar with a sound — whether or not the player asked for the cast, because "nothing happened" and "not yet" look identical in the world and only one of them is worth reporting as a bug. A hand-typed \`/pet skill\` also gets a chat line, since the player is already reading chat.
+
 ## behavior.animations — clip names per pet
 
 On the pet definition rather than in \`config.yml\`, and only used by pets whose \`display.provider\` is
@@ -907,6 +1011,108 @@ EXP được cộng dồn trong bộ nhớ và ghi mỗi 5 giây, không ghi t�
 đĩa thay vì hàng trăm lần, mà mỗi lần ghi đều phải giữ khoá revision mà kho pet của người chơi cũng cần. Đổi
 lại, một lần sập server làm mất tối đa 5 giây EXP — đó là lý do đường này không ghi sổ bền vững như viên kẹo
 EXP: viên kẹo là vật phẩm người chơi đã tiêu, còn mạng quái là một dòng chảy liên tục.
+
+## skills — pet thi triển gì, và cái gì khiến nó thi triển
+
+Đặt trong định nghĩa pet chứ không phải \`config.yml\`. Mục ngắn nhất dùng được chỉ có hai dòng:
+
+\`\`\`yaml
+skills:
+  - provider: MYTHICMOBS
+    id: Fireball
+\`\`\`
+
+Mọi khoá còn lại đều có mặc định đáng dùng. Một mục đầy đủ hơn:
+
+\`\`\`yaml
+skills:
+  - provider: MYTHICMOBS
+    id: Fireball
+    trigger: SHIFT_RIGHT_CLICK
+    cooldown: 8s
+    targetPolicy: LOOK_THEN_NEAREST
+    chance: 1.0
+    staminaCost: 5
+    power: 1.5
+  - provider: MYTHICMOBS
+    id: EmergencyHeal
+    trigger: ON_LOW_HEALTH
+    healthThreshold: 0.35
+    cooldown: 60s
+    targetPolicy: OWNER
+\`\`\`
+
+### Trigger chủ động
+
+Trigger chủ động là việc người chơi cố ý làm. Khi bị từ chối, nó nói rõ lý do, vì chính người chơi đã yêu cầu.
+
+| Trigger | Kích hoạt khi |
+| --- | --- |
+| \`ACTIVE\` | \`/pet skill\`, cũng là cách macro hoặc nút trong menu thi triển |
+| \`SHIFT_RIGHT_CLICK\` | Chuột phải khi đang shift. Ít đụng với thao tác thường nhất |
+| \`SHIFT_LEFT_CLICK\` | Chuột trái khi đang shift |
+| \`RIGHT_CLICK\` | Chuột phải không shift. Đụng với việc đặt khối; nên kèm cooldown |
+| \`LEFT_CLICK\` | Chuột trái không shift, cũng là cú vung đánh thường |
+| \`DROP_KEY\` | Mặc định phím Q. Không đụng gì, vì thao tác vứt đồ bị huỷ |
+| \`SWAP_HAND_KEY\` | Mặc định phím F. Việc đổi tay bị huỷ nên không có gì di chuyển |
+| \`JUMP\` | Phím Space. Kích hoạt rất thường xuyên, nên cần cooldown |
+| \`SNEAK\` | Lúc bắt đầu shift, không phải lúc thả |
+| \`SPRINT\` | Lúc bắt đầu chạy |
+
+Trigger bị động là những việc xảy ra. Khi bị từ chối, chúng im lặng, vì một tin nhắn mỗi lần trúng đòn sẽ không ai đọc nổi — trừ cooldown, luôn hiện trên action bar.
+
+| Trigger | Kích hoạt khi |
+| --- | --- |
+| \`ON_ATTACK\` | Chủ đánh trúng |
+| \`ON_DAMAGE_TAKEN\` | Chủ nhận sát thương từ bất cứ đâu, kể cả chết đuối và ngã |
+| \`ON_LOW_HEALTH\` | Máu chủ tụt xuống dưới \`healthThreshold\`. Chỉ nạp lại khi hồi máu lên trên ngưỡng |
+| \`ON_KILL\` | Chủ giết được thứ gì đó |
+| \`ON_TARGETED\` | Một con quái bắt đầu nhắm vào chủ |
+| \`ON_DEATH\` | Chủ chết, thi triển trước khi rơi đồ |
+| \`INTERVAL\` | Mỗi \`interval\` khi pet đang ra ngoài |
+
+Đòn chí mạng và né đòn đã được yêu cầu nhưng cố ý không có: vanilla không phát event nào cho cả hai, và việc đoán chí mạng từ độ cao rơi cộng trạng thái chạy, hay đoán né từ một event sát thương không đến, sẽ sai đủ thường xuyên để trông như hỏng. \`ON_DAMAGE_TAKEN\` kèm \`chance\` bao được phần lớn công dụng của một trigger né đòn.
+
+### Chọn mục tiêu
+
+\`targetPolicy\` quyết định kỹ năng nhắm vào đâu. OmniPet tự tính rồi đưa kết quả cho MythicMobs, thay vì để MythicMobs tự chọn — vì MythicMobs chọn từ caster, mà caster là *người chơi* chủ pet. Kỹ năng để mặc targeter của nhà cung cấp sẽ nhắm theo luật của chính người chơi, và thường là không trúng gì cả.
+
+| Chính sách | Nhắm vào |
+| --- | --- |
+| \`LOOK_THEN_NEAREST\` | Thứ chủ đang nhắm, không có thì quái thù địch gần nhất. **Mặc định** |
+| \`LOOK_TARGET\` | Chỉ thứ chủ đang nhắm. Không nhắm gì thì từ chối thi triển |
+| \`NEAREST_HOSTILE\` | Quái thù địch gần nhất trong tầm |
+| \`OWNER\` | Chính chủ, cho kỹ năng hồi máu hoặc buff |
+| \`PET\` | Chính pet |
+| \`AREA_AROUND_OWNER\` | Mọi quái thù địch trong tầm quanh chủ |
+| \`AREA_AROUND_PET\` | Mọi quái thù địch trong tầm quanh pet |
+| \`PROVIDER_DEFAULT\` | Không gì cả. Mệnh đề \`@Target\` của chính kỹ năng quyết định |
+
+"Đang nhắm" được tính bằng ray trace, nên nó có nghĩa giống hệt tâm ngắm của người chơi. Khối được bỏ qua: con quái sau cọc hàng rào vẫn là thứ người chơi đang nhắm.
+
+Pet của chính chủ không bao giờ bị nhắm và không bao giờ được tính là quái gần nhất.
+
+### Các khoá còn lại
+
+| Khoá | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| \`bindingId\` | \`skill_<số thứ tự>\` | Đặt tên cho binding, dùng cho \`/pet skill\` và cho bản ghi cooldown |
+| \`cooldown\` | không | Thời gian chờ giữa hai lần thi triển của binding này |
+| \`chance\` | \`1.0\` | Tỉ lệ kích hoạt, trong [0,1], quay sau mọi điều kiện khác |
+| \`staminaCost\` | \`0\` | Thể lực tiêu tốn khi thi triển thành công |
+| \`power\` | \`1.0\` | Hệ số sức mạnh của nhà cung cấp, nhân vào sát thương và thời lượng của chính kỹ năng |
+| \`targetRange\` | \`20\` | Tầm tìm mục tiêu, tính bằng khối. Tối đa 64 |
+| \`healthThreshold\` | \`0.3\` | Cho \`ON_LOW_HEALTH\`: tỉ lệ máu tối đa mà tại đó kỹ năng kích hoạt |
+| \`interval\` | \`10s\` | Cho \`INTERVAL\`: chu kỳ giữa hai lần thi triển |
+| \`persistCooldown\` | \`false\` | Cooldown có sống sót qua lần khởi động lại hay không |
+
+Thời lượng nhận \`8s\`, \`2m\`, \`500ms\`, \`20t\` (tick), một số trần tính bằng giây, hoặc ISO-8601 \`PT8S\`. Trước đây chỉ nhận ISO-8601 — một định dạng không ai viết config đoán ra — nên mọi \`cooldown: 8s\` viết tay đều âm thầm vô hiệu hoá cả binding của nó.
+
+Một mục sai sẽ bị bỏ qua chứ không làm hỏng cả định nghĩa: một kỹ năng lỗi không được phép khiến pet mất model, mất chỉ số và mất tên hiện trên đầu. Nhưng nó *được báo*, vì một lỗi gõ bị bỏ qua trong im lặng thì không phân biệt được với một kỹ năng đơn giản là không bao giờ chạy.
+
+### Thông báo cooldown
+
+Trigger kích hoạt trong lúc kỹ năng còn cooldown sẽ hiện thời gian còn lại trên action bar kèm âm thanh — dù người chơi có chủ động yêu cầu hay không, vì "không có gì xảy ra" và "chưa tới lúc" nhìn y hệt nhau trong game mà chỉ một trong hai đáng báo lỗi. Lệnh \`/pet skill\` gõ tay còn nhận thêm một dòng chat, vì người chơi lúc đó đang đọc chat sẵn.
 
 ## behavior.animations — tên clip cho từng pet
 
@@ -1146,7 +1352,7 @@ present and is skipped when absent, and "skipped" always means a documented fall
 | Point currency | PlayerPoints | Shipped | That currency is not offered. |
 | Slot permission nodes | LuckPerms | Shipped | OmniPet stays authoritative over slots. |
 | Studio stat catalog | MythicLib | Shipped | The picker is gone; typing stat IDs still works. |
-| Skill execution | MythicMobs | Shipped, uncertified | Bindings persist; nothing is cast. |
+| Skill execution | MythicMobs | Shipped, uncertified | Bindings persist and are validated; nothing is cast. |
 | Owner stat buffs | MythicLib | Shipped | No stat modifier is applied; pets are otherwise unaffected. |
 | Item stats | MMOItems | Not yet | No item bridge exists. |
 
@@ -1203,7 +1409,7 @@ mặt và được bỏ qua khi không có, và "bỏ qua" luôn nghĩa là có 
 | Tiền điểm | PlayerPoints | Đã có | Loại tiền đó không được đưa ra. |
 | Node quyền cho ô | LuckPerms | Đã có | OmniPet tự quyết định số ô. |
 | Danh mục chỉ số Studio | MythicLib | Đã có | Mất bộ chọn; gõ tay ID chỉ số vẫn được. |
-| Thực thi kỹ năng | MythicMobs | Đã có, chưa chứng nhận | Binding vẫn lưu; không có gì được thi triển. |
+| Thực thi kỹ năng | MythicMobs | Đã có, chưa chứng nhận | Binding vẫn lưu và được kiểm tra; không có gì được thi triển. |
 | Buff chỉ số cho chủ | MythicLib | Đã có | Không chỉ số nào được áp; pet vẫn hoạt động bình thường. |
 | Chỉ số vật phẩm | MMOItems | Chưa | Chưa có cầu nối vật phẩm. |
 

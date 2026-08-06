@@ -188,6 +188,36 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
     }
 
     /**
+     * The world entities that make up an owner's rendered pets.
+     *
+     * <p>For skill targeting, which needs to know what <em>not</em> to hit: a pet's area skill that
+     * included its own side would make an owner's second pet the nearest thing to aim at.
+     */
+    public List<UUID> petEntityIds(UUID ownerId) {
+        if (ownerId == null) return List.of();
+        return engine.activeRenderers(ownerId).stream()
+                .flatMap(active -> active.interactionEntityIds().stream())
+                .toList();
+    }
+
+    /**
+     * A live entity standing in for one pet, for a skill aimed from or at the pet itself.
+     *
+     * <p>The interaction entity, because it is the one that tracks the pet's position for every renderer —
+     * a model pet has no Bukkit entity of its own that the client can see.
+     */
+    public org.bukkit.entity.Entity petEntity(UUID ownerId, UUID petInstanceId) {
+        if (ownerId == null || petInstanceId == null) return null;
+        return engine.activeRenderers(ownerId).stream()
+                .filter(active -> active.petInstanceId().equals(petInstanceId))
+                .flatMap(active -> active.interactionEntityIds().stream())
+                .map(org.bukkit.Bukkit::getEntity)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
      * Which pet, if any, a clicked entity belongs to.
      *
      * <p>Pure delegation to {@link InteractionIndex#resolve} plus a staleness check — deliberately no

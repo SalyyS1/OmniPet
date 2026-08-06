@@ -1,5 +1,7 @@
 package io.lumine.mythic.bukkit;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 public final class MythicBukkit {
@@ -14,6 +16,9 @@ public final class MythicBukkit {
     public static void reset() {
         INSTANCE.helper.fail = false;
         INSTANCE.helper.caster = null;
+        INSTANCE.helper.entityTargets = null;
+        INSTANCE.helper.power = 0;
+        INSTANCE.helper.usedTargetedOverload = false;
     }
 
     public SkillManager getSkillManager() {
@@ -33,10 +38,30 @@ public final class MythicBukkit {
     public static final class APIHelper {
         public boolean fail;
         public Object caster;
+        public List<Object> entityTargets;
+        public float power;
+        public boolean usedTargetedOverload;
 
         public boolean castSkill(Object caster, String skill) {
             if (fail) throw new IllegalStateException("simulated provider failure");
             this.caster = caster;
+            return !skill.equals("rejected");
+        }
+
+        /** Mirrors the real seven-argument overload, which is the only one that accepts targets. */
+        public boolean castSkill(
+                Object caster,
+                String skill,
+                Object trigger,
+                org.bukkit.Location origin,
+                Collection<Object> entityTargets,
+                Collection<org.bukkit.Location> locationTargets,
+                float power) {
+            if (fail) throw new IllegalStateException("simulated provider failure");
+            this.caster = caster;
+            this.entityTargets = List.copyOf(entityTargets);
+            this.power = power;
+            this.usedTargetedOverload = true;
             return !skill.equals("rejected");
         }
     }

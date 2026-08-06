@@ -115,6 +115,42 @@ class RepositorySkillActionServiceTest {
         assertEquals(90.0, PetProgressionProjection.read(retried.pet(), 100, 1_200).stamina());
     }
 
+    /**
+     * A cooldown refusal has to say how much longer.
+     *
+     * <p>Without the number the player is told only "rejected: cooldown", and the only way to find out when
+     * the skill is ready is to keep pressing — which is the behaviour a cooldown exists to prevent. The
+     * remaining time is known only here, at the refusal, so it has to travel out on the result.
+     */
+    @Test
+    void aCooldownRefusalReportsHowMuchLongerIsLeft() throws Exception {
+        Fixture fixture = fixture();
+        UUID first = UUID.randomUUID();
+        var prepared = fixture.service.prepare(
+                fixture.playerId, fixture.revision(), fixture.petId, binding(), first, 1_000, 100);
+        var completed = fixture.service.complete(
+                fixture.playerId, prepared.state().revision(), fixture.petId, first, 1_100, 100);
+
+        // The binding's cooldown is five seconds from 1_000, so at 3_500 there are 2_500ms left.
+        var blocked = fixture.service.prepare(
+                fixture.playerId, completed.state().revision(), fixture.petId, binding(),
+                UUID.randomUUID(), 3_500, 100);
+
+        assertEquals(RepositorySkillActionResult.Status.COOLDOWN, blocked.status());
+        assertEquals(2_500L, blocked.cooldownRemainingMillis());
+    }
+
+    /** An outcome that is not a cooldown refusal has no wait to report, and must not invent one. */
+    @Test
+    void anAcceptedPrepareReportsNoCooldownRemaining() throws Exception {
+        Fixture fixture = fixture();
+        var prepared = fixture.service.prepare(
+                fixture.playerId, fixture.revision(), fixture.petId, binding(), UUID.randomUUID(), 1_000, 100);
+
+        assertEquals(RepositorySkillActionResult.Status.PREPARED, prepared.status());
+        assertEquals(0L, prepared.cooldownRemainingMillis());
+    }
+
     private Fixture fixture() throws Exception {
         UUID playerId = UUID.randomUUID();
         UUID petId = UUID.randomUUID();

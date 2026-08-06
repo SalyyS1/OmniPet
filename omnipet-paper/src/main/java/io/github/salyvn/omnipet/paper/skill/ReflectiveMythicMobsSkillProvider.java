@@ -2,13 +2,18 @@ package io.github.salyvn.omnipet.paper.skill;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 
 import io.github.salyvn.omnipet.core.skill.SkillCastRequest;
 import io.github.salyvn.omnipet.core.skill.SkillCastResult;
@@ -25,6 +30,7 @@ public final class ReflectiveMythicMobsSkillProvider implements SkillProvider {
     private final BooleanSupplier pluginEnabled;
     private final BooleanSupplier mainThread;
     private final Function<UUID, Object> casterResolver;
+    private final Function<UUID, Object> targetResolver;
     private volatile State state = State.unavailable(0, "provider has not been probed");
 
     public ReflectiveMythicMobsSkillProvider(
@@ -32,10 +38,23 @@ public final class ReflectiveMythicMobsSkillProvider implements SkillProvider {
             BooleanSupplier pluginEnabled,
             BooleanSupplier mainThread,
             Function<UUID, Object> casterResolver) {
+        this(loader, pluginEnabled, mainThread, casterResolver, id -> null);
+    }
+
+    /**
+     * @param targetResolver turns a resolved target ID back into a live entity, or null when it has left
+     */
+    public ReflectiveMythicMobsSkillProvider(
+            ClassLoader loader,
+            BooleanSupplier pluginEnabled,
+            BooleanSupplier mainThread,
+            Function<UUID, Object> casterResolver,
+            Function<UUID, Object> targetResolver) {
         this.loader = Objects.requireNonNull(loader, "MythicMobs class loader");
         this.pluginEnabled = Objects.requireNonNull(pluginEnabled, "MythicMobs enabled probe");
         this.mainThread = Objects.requireNonNull(mainThread, "main-thread probe");
         this.casterResolver = Objects.requireNonNull(casterResolver, "skill caster resolver");
+        this.targetResolver = Objects.requireNonNull(targetResolver, "skill target resolver");
     }
 
     public synchronized SkillCatalogSnapshot refresh(long epoch) {
@@ -89,16 +108,40 @@ public final class ReflectiveMythicMobsSkillProvider implements SkillProvider {
         }
         try {
             Object helper = invokeNoArgs(observed.api(), "getAPIHelper");
+            List<Object> targets = resolveTargets(request);
+            if (!targets.isEmpty()) {
+                Method targeted = findTargetedCast(helper.getClass());
+                if (targeted != null) {
+                    Object origin = caster instanceof Entity entity ? entity.getLocation() : null;
+                    Object result = targeted.invoke(helper, caster, request.skillId(), caster, origin,
+                            targets, List.of(), (float) request.power());
+                    return outcome(result);
+                }
+            }
             Method cast = findSimpleCast(helper.getClass(), caster.getClass());
             Object result = cast.invoke(helper, caster, request.skillId());
-            if (result instanceof Boolean succeeded && !succeeded) {
-                return castResult(SkillCastResult.Status.REJECTED, "MythicMobs rejected the skill cast");
-            }
-            return castResult(SkillCastResult.Status.SUCCESS, "MythicMobs accepted the skill cast");
+            return outcome(result);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
             quarantine(observed.catalog().epoch(), failure);
             return castResult(SkillCastResult.Status.FAILED, detail(failure));
         }
+    }
+
+    private static SkillCastResult outcome(Object result) {
+        if (result instanceof Boolean succeeded && !succeeded) {
+            return castResult(SkillCastResult.Status.REJECTED, "MythicMobs rejected the skill cast");
+        }
+        return castResult(SkillCastResult.Status.SUCCESS, "MythicMobs accepted the skill cast");
+    }
+
+    /** The still-present entities among the resolved targets, in the order the resolver chose them. */
+    private List<Object> resolveTargets(SkillCastRequest request) {
+        List<Object> targets = new ArrayList<>();
+        for (UUID id : request.entityTargets()) {
+            Object entity = targetResolver.apply(id);
+            if (entity != null) targets.add(entity);
+        }
+        return targets;
     }
 
     private Object instance() throws ReflectiveOperationException {
@@ -109,6 +152,29 @@ public final class ReflectiveMythicMobsSkillProvider implements SkillProvider {
 
     private synchronized void quarantine(long epoch, Throwable failure) {
         if (state.catalog().epoch() == epoch) state = State.quarantined(epoch, "adapter quarantined: " + detail(failure));
+    }
+
+    /**
+     * {@code castSkill(caster, skill, trigger, origin, entityTargets, locationTargets, power)}.
+     *
+     * <p>The two-argument overload leaves the choice of target to MythicMobs, which picks from the caster —
+     * and the caster is the owning <em>player</em>, so a pet's attack skill aimed at whatever the player's
+     * own targeting rules found. This overload is how a pet hits what the pet is supposed to hit. Null when
+     * the installed MythicMobs does not offer it, so an older build still casts, just untargeted.
+     */
+    private static Method findTargetedCast(Class<?> helperType) {
+        for (Method method : helperType.getMethods()) {
+            Class<?>[] parameters = method.getParameterTypes();
+            if (method.getName().equals("castSkill") && parameters.length == 7
+                    && parameters[1] == String.class
+                    && parameters[3] == Location.class
+                    && Collection.class.isAssignableFrom(parameters[4])
+                    && Collection.class.isAssignableFrom(parameters[5])
+                    && parameters[6] == float.class) {
+                return method;
+            }
+        }
+        return null;
     }
 
     private static Method findSimpleCast(Class<?> helperType, Class<?> casterType) throws NoSuchMethodException {

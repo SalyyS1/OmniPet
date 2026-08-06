@@ -114,6 +114,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             new io.github.salyvn.omnipet.paper.progression.ReflectiveMythicMobsIdentity(
                     () -> org.bukkit.Bukkit.getPluginManager().isPluginEnabled("MythicMobs"));
     private org.bukkit.scheduler.BukkitTask killExperienceFlush;
+    private io.github.salyvn.omnipet.paper.skill.SkillIntervalTicker skillIntervals;
     private KillExperienceFlusher killExperienceFlusher;
     /** How often banked kill experience is written, in ticks. */
     private static final long KILL_EXPERIENCE_FLUSH_TICKS = 100;
@@ -212,6 +213,9 @@ public final class OmniPetPlugin extends JavaPlugin {
                     snapshotUpdate -> {
                         runtimeSnapshots.accept(snapshotUpdate);
                         ownerBuffs.accept(snapshotUpdate);
+                        // Summoning or recalling a pet changes what its owner can be triggered by, and the
+                        // listeners answer that from an index rather than from disk.
+                        activeSkills.refreshTriggers(snapshotUpdate.playerId());
                     });
             managementServices = OmniPetManagementServices.open(
                     this, dataRoot, playerStates, registry, activeConfig, economyProviders, playerPets);
@@ -308,12 +312,14 @@ public final class OmniPetPlugin extends JavaPlugin {
                     economyProviders,
                     luckPermsEntitlements), this);
             registerCommands();
+            registerSkillTriggers();
             petRuntime.start();
             incubationCoordinator.start();
             getServer().getOnlinePlayers().forEach(player -> {
                 playerPets.reconcile(player);
                 incubationCoordinator.onJoin(player);
                 managementServices.onJoin(player);
+                activeSkills.refreshTriggers(player.getUniqueId());
             });
             getLogger().info("OmniPet enabled with Pet Studio, " + snapshot.definitions().size()
                     + " pet definitions, and " + incubation.eggDefinitionCount() + " egg definitions.");
@@ -331,6 +337,7 @@ public final class OmniPetPlugin extends JavaPlugin {
                         // Before the queue stops accepting work, so the last few kills are written rather
                         // than refused and lost. The ledger is in memory only; this is its one chance.
                         if (killExperienceFlush != null) killExperienceFlush.cancel();
+                        if (skillIntervals != null) skillIntervals.close();
                         if (killExperienceFlusher != null) killExperienceFlusher.flush();
                         if (hatchController != null) hatchController.close();
                         if (hubController != null) hubController.close();
@@ -524,6 +531,25 @@ public final class OmniPetPlugin extends JavaPlugin {
      * <p>The flush interval is the most experience a crash can lose. Five seconds is short enough that
      * nobody notices and long enough that a grinder is one write rather than hundreds.
      */
+    /**
+     * Wires the pet skill triggers.
+     *
+     * <p>Every trigger a Paper server can observe goes through one listener, and the interval trigger
+     * through one shared ticker. Both consult the controller's trigger index first, so a server whose pets
+     * have no skills pays a set lookup per event and nothing else.
+     */
+    private void registerSkillTriggers() {
+        activeSkills.bindRuntime(petRuntime);
+        getServer().getPluginManager().registerEvents(
+                new io.github.salyvn.omnipet.paper.skill.SkillTriggerListener(
+                        activeSkills, activeSkills::lowHealthThreshold),
+                this);
+        getServer().getPluginManager().registerEvents(
+                new io.github.salyvn.omnipet.paper.skill.SkillOwnerLifecycleListener(activeSkills), this);
+        skillIntervals = new io.github.salyvn.omnipet.paper.skill.SkillIntervalTicker(this, activeSkills);
+        skillIntervals.start();
+    }
+
     private void registerKillExperience() {
         killExperienceFlusher = new KillExperienceFlusher(
                 killExperience, playerStates, registry, playerTasks,

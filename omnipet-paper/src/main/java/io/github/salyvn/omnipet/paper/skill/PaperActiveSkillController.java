@@ -44,6 +44,20 @@ public final class PaperActiveSkillController {
     private final PaperMythicMobsSkillContext providers;
     private final PerPlayerTaskQueue tasks;
     private final java.util.Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
+    /** Where the pets actually are. Null in tests that only exercise the durable workflow. */
+    private volatile io.github.salyvn.omnipet.paper.runtime.PaperPetRuntimeCoordinator runtime;
+    /**
+     * What each owner's active pets can be triggered by.
+     *
+     * <p>An index rather than a lookup, because two of the callers are event handlers that must decide
+     * whether to cancel a vanilla action — a drop, an off-hand swap — before the event returns, and reading
+     * player state from disk on the main thread to answer that is not an option.
+     *
+     * <p>Rebuilt on the player's own queue whenever a trigger is dispatched or their pets change, so it
+     * trails reality by at most one event. A stale entry costs at most one skipped or one wasted cast, both
+     * of which the durable prepare step catches.
+     */
+    private final Map<UUID, OwnerTriggers> triggerIndex = new ConcurrentHashMap<>();
     private volatile ProgressionConfig progression;
 
     public PaperActiveSkillController(
@@ -66,6 +80,17 @@ public final class PaperActiveSkillController {
         progression = Objects.requireNonNull(next, "progression config");
     }
 
+    /**
+     * Binds the runtime that knows where the pets are.
+     *
+     * <p>Set after construction because the runtime and this controller are built in the same pass and one
+     * of them has to come second. Without it, targeting still works for owner-relative policies and yields
+     * nothing for pet-relative ones.
+     */
+    public void bindRuntime(io.github.salyvn.omnipet.paper.runtime.PaperPetRuntimeCoordinator next) {
+        runtime = next;
+    }
+
     public void cast(Player player, UUID petId, String bindingId) {
         Objects.requireNonNull(player, "skill player");
         Objects.requireNonNull(petId, "skill pet ID");
@@ -78,9 +103,144 @@ public final class PaperActiveSkillController {
             player.sendMessage(Messages.line(MessageKey.SKILL_IN_FLIGHT));
             return;
         }
-        boolean accepted = tasks.submit(playerId, () -> prepare(playerId, petId, bindingId.trim()));
+        String binding = bindingId.trim();
+        boolean accepted = tasks.submit(playerId, () -> prepare(playerId, petId, binding, null, true));
         if (!accepted) finish(playerId, Messages.line(MessageKey.SKILL_NOT_SCHEDULED));
     }
+
+    /**
+     * Fires every binding on the owner's active pets whose trigger matches.
+     *
+     * <p>Called from the event listeners, on the main thread. One trigger can match several bindings across
+     * several pets; each becomes its own reservation, so one failing does not take the others with it.
+     *
+     * <p>The in-flight guard is skipped for a passive trigger. Passive triggers arrive at the rate the world
+     * generates them — a hit, a jump, a tick — and a guard meant to stop a player double-casting by hand
+     * would instead silently drop most passive casts and make them look unreliable. The per-binding cooldown
+     * is the real rate limit, and it is durable.
+     */
+    public void trigger(Player player, SkillTrigger trigger) {
+        Objects.requireNonNull(trigger, "skill trigger");
+        if (player == null || !player.isOnline()) return;
+        UUID playerId = player.getUniqueId();
+        boolean announce = trigger.announces();
+        if (announce && !inFlight.add(playerId)) return;
+        boolean accepted = tasks.submit(playerId, () -> prepareTrigger(playerId, trigger, announce));
+        if (!accepted && announce) inFlight.remove(playerId);
+    }
+
+    /**
+     * Finds this trigger's bindings from stored state, then prepares each.
+     *
+     * <p>Runs on the player's queue thread, so the registry and repository reads are off the main thread.
+     */
+    private void prepareTrigger(UUID playerId, SkillTrigger trigger, boolean announce) {
+        // Reads every binding and refreshes the index in the same pass, so the listener's cancel decision
+        // for the next press is informed by what this press found.
+        List<PetBinding> all = reindex(playerId);
+        if (all == null) {
+            if (announce) {
+                finish(playerId, Messages.line(MessageKey.SKILL_PREPARE_FAILED,
+                        Messages.of("detail", "player state could not be read")));
+            } else {
+                inFlight.remove(playerId);
+            }
+            return;
+        }
+        List<PetBinding> matches = all.stream()
+                .filter(match -> match.binding().trigger() == trigger)
+                .toList();
+        if (matches.isEmpty()) {
+            if (announce) inFlight.remove(playerId);
+            return;
+        }
+        for (PetBinding match : matches) {
+            prepare(playerId, match.petId(), match.binding().bindingId(), trigger, announce);
+        }
+    }
+
+    /** One matched binding, so a trigger's fan-out carries which pet each binding came from. */
+    private record PetBinding(UUID petId, SkillBinding binding) {}
+
+    /**
+     * What an owner's active pets react to.
+     *
+     * @param lowestHealthThreshold the loosest low-health threshold among their bindings, so the listener
+     *     can watch a single number rather than every binding's
+     */
+    private record OwnerTriggers(java.util.Set<SkillTrigger> triggers, Double lowestHealthThreshold) {
+        static final OwnerTriggers NONE = new OwnerTriggers(java.util.Set.of(), null);
+    }
+
+    /**
+     * Whether this owner has any pet skill on this trigger.
+     *
+     * <p>Main-thread-safe and allocation-free: a listener deciding whether to cancel a drop cannot wait on
+     * disk. Answers from the last-known index, and false when nothing is known yet — so the very first
+     * press after a login may pass the vanilla action through. That is the right way to be wrong: the
+     * alternative is eating a player's item because of a skill they might not have.
+     */
+    public boolean hasTrigger(UUID ownerId, SkillTrigger trigger) {
+        if (ownerId == null || trigger == null) return false;
+        return triggerIndex.getOrDefault(ownerId, OwnerTriggers.NONE).triggers().contains(trigger);
+    }
+
+    /** The loosest low-health threshold among an owner's bindings, or null when they have none. */
+    public Double lowHealthThreshold(UUID ownerId) {
+        if (ownerId == null) return null;
+        return triggerIndex.getOrDefault(ownerId, OwnerTriggers.NONE).lowestHealthThreshold();
+    }
+
+    /**
+     * Rebuilds an owner's trigger index from their stored pets.
+     *
+     * <p>Submitted to their queue, so it never blocks the caller. Called when their active pets change, and
+     * on join, since an index that is only refreshed by dispatch would never learn about a cancelling
+     * trigger the player has not successfully used yet.
+     */
+    public void refreshTriggers(UUID ownerId) {
+        if (ownerId == null) return;
+        tasks.submit(ownerId, () -> reindex(ownerId));
+    }
+
+    /** Drops an owner's index. Called on quit, so the map cannot grow for the server's lifetime. */
+    public void forget(UUID ownerId) {
+        if (ownerId != null) triggerIndex.remove(ownerId);
+    }
+
+    private List<PetBinding> reindex(UUID playerId) {
+        List<PetBinding> all;
+        try {
+            var state = players.snapshot(playerId);
+            var definitions = registry.current().definitions();
+            all = state.pets().stream()
+                    .filter(pet -> state.desiredActivePetIds().contains(pet.id()))
+                    .flatMap(pet -> {
+                        PetDefinition definition = definitions.get(pet.definitionId());
+                        if (definition == null) return java.util.stream.Stream.<PetBinding>empty();
+                        return SkillBindingProjection.read(definition).stream()
+                                .map(binding -> new PetBinding(pet.id(), binding));
+                    })
+                    .limit(SkillBindingProjection.MAX_BINDINGS)
+                    .toList();
+        } catch (IOException | RuntimeException failure) {
+            return null;
+        }
+        java.util.EnumSet<SkillTrigger> triggers = java.util.EnumSet.noneOf(SkillTrigger.class);
+        Double lowest = null;
+        for (PetBinding match : all) {
+            triggers.add(match.binding().trigger());
+            if (match.binding().trigger() == SkillTrigger.ON_LOW_HEALTH) {
+                double threshold = match.binding().healthThreshold();
+                // The loosest, so the listener notices the first crossing any binding cares about; the
+                // controller still applies each binding's own threshold before casting.
+                lowest = lowest == null ? threshold : Math.max(lowest, threshold);
+            }
+        }
+        triggerIndex.put(playerId, new OwnerTriggers(java.util.Set.copyOf(triggers), lowest));
+        return all;
+    }
+
 
     public void adminCommand(CommandSender sender, List<String> arguments) {
         Objects.requireNonNull(sender, "skill admin sender");
@@ -103,23 +263,32 @@ public final class PaperActiveSkillController {
                 + "/pet admin skill rollback <player> <pet-uuid> <action-uuid>.", NamedTextColor.YELLOW);
     }
 
-    private void prepare(UUID playerId, UUID petId, String bindingId) {
+    /**
+     * @param trigger which trigger asked for this, or null for a hand-cast {@code /pet skill}
+     * @param announce whether refusals reach the player, false for a passive trigger nobody asked for
+     */
+    private void prepare(UUID playerId, UUID petId, String bindingId, SkillTrigger trigger, boolean announce) {
         try {
             var state = players.snapshot(playerId);
             if (!state.desiredActivePetIds().contains(petId)) {
-                finish(playerId, Messages.line(MessageKey.SKILL_REQUIRES_ACTIVE_PET));
+                report(playerId, announce, Messages.line(MessageKey.SKILL_REQUIRES_ACTIVE_PET));
                 return;
             }
             var pet = state.pets().stream().filter(candidate -> candidate.id().equals(petId)).findFirst().orElse(null);
             if (pet == null) {
-                finish(playerId, Messages.line(MessageKey.SKILL_PET_NOT_OWNED));
+                report(playerId, announce, Messages.line(MessageKey.SKILL_PET_NOT_OWNED));
                 return;
             }
             PetDefinition definition = registry.current().definitions().get(pet.definitionId());
             SkillBinding binding = definition == null ? null : SkillBindingProjection.read(definition).stream()
                     .filter(candidate -> candidate.bindingId().equals(bindingId)).findFirst().orElse(null);
-            if (binding == null || binding.trigger() != SkillTrigger.ACTIVE) {
-                finish(playerId, Messages.line(MessageKey.SKILL_BINDING_NOT_FOUND));
+            // A trigger dispatch already matched the trigger; a hand cast has to be an ACTIVE binding, since
+            // /pet skill firing a passive one would let a player bypass the condition it exists for.
+            boolean triggerMatches = trigger == null
+                    ? binding != null && binding.trigger() == SkillTrigger.ACTIVE
+                    : binding != null && binding.trigger() == trigger;
+            if (!triggerMatches) {
+                report(playerId, announce, Messages.line(MessageKey.SKILL_BINDING_NOT_FOUND));
                 return;
             }
             SkillProvider provider = providers.provider();
@@ -128,13 +297,13 @@ public final class PaperActiveSkillController {
             // misspelled provider from a MythicMobs that had not loaded from a skill name that did not
             // exist — and the most common cause, a casing mismatch, is now not a refusal at all.
             if (!provider.providerId().equalsIgnoreCase(binding.provider())) {
-                finish(playerId, Messages.line(MessageKey.SKILL_PROVIDER_MISMATCH,
+                report(playerId, announce, Messages.line(MessageKey.SKILL_PROVIDER_MISMATCH,
                         Messages.of("provider", binding.provider()),
                         Messages.of("detail", provider.providerId())));
                 return;
             }
             if (!provider.catalog().health().available()) {
-                finish(playerId, Messages.line(MessageKey.SKILL_PROVIDER_UNAVAILABLE,
+                report(playerId, announce, Messages.line(MessageKey.SKILL_PROVIDER_UNAVAILABLE,
                         Messages.of("detail", providerDetail(provider))));
                 return;
             }
@@ -143,12 +312,12 @@ public final class PaperActiveSkillController {
             // translated before the cast rather than refused.
             String skillId = provider.catalog().canonical(binding.skillId());
             if (skillId == null) {
-                finish(playerId, Messages.line(MessageKey.SKILL_NOT_REGISTERED,
+                report(playerId, announce, Messages.line(MessageKey.SKILL_NOT_REGISTERED,
                         Messages.of("detail", binding.skillId())));
                 return;
             }
             if (Math.random() >= binding.chance()) {
-                finish(playerId, Messages.line(MessageKey.SKILL_CHANCE_MISSED),
+                report(playerId, announce, Messages.line(MessageKey.SKILL_CHANCE_MISSED),
                         FeedbackEvent.SKILL_CHANCE_MISSED);
                 return;
             }
@@ -157,17 +326,59 @@ public final class PaperActiveSkillController {
             ProgressionConfig config = progression;
             RepositorySkillActionResult prepared = actions.prepare(
                     playerId, state.revision(), petId, binding, actionId, now, config.maxStamina());
+            if (prepared.status() == RepositorySkillActionResult.Status.COOLDOWN) {
+                // The one refusal a player is owed even when they did not press anything: a passive skill
+                // that is cooling down looks identical to one that is broken.
+                cooldownNotice(playerId, prepared.cooldownRemainingMillis(), announce);
+                return;
+            }
             if (prepared.status() != RepositorySkillActionResult.Status.PREPARED
                     && prepared.status() != RepositorySkillActionResult.Status.ALREADY_PREPARED) {
-                finish(playerId, Messages.line(MessageKey.SKILL_REJECTED,
+                report(playerId, announce, Messages.line(MessageKey.SKILL_REJECTED,
                         Messages.of("status", words(prepared.status()))), FeedbackEvent.SKILL_REJECTED);
                 return;
             }
-            runMain(playerId, () -> castPrepared(playerId, petId, binding, skillId, actionId));
+            runMain(playerId, () -> castPrepared(playerId, petId, binding, skillId, actionId, announce));
         } catch (IOException | RuntimeException failure) {
-            finish(playerId, Messages.line(MessageKey.SKILL_PREPARE_FAILED,
+            report(playerId, announce, Messages.line(MessageKey.SKILL_PREPARE_FAILED,
                     Messages.of("detail", detail(failure))));
         }
+    }
+
+    /**
+     * Tells the player how long is left, on the action bar with a sound.
+     *
+     * <p>Always shown, whether the cast was asked for or not, because "nothing happened" and "not yet" are
+     * indistinguishable in the world and only one of them is a bug worth reporting.
+     */
+    private void cooldownNotice(UUID playerId, long remainingMillis, boolean announce) {
+        Component text = Messages.line(MessageKey.ACTION_BAR_SKILL_COOLDOWN,
+                Messages.of("remaining", Displays.remaining(remainingMillis)));
+        inFlight.remove(playerId);
+        runMain(playerId, () -> {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) return;
+            Feedback.emit(player, FeedbackEvent.SKILL_COOLING_DOWN, text);
+            // Chat as well, but only when they typed the command: they are reading chat already, and a
+            // keypress-triggered skill would otherwise fill the log.
+            if (announce) {
+                player.sendMessage(Messages.line(MessageKey.SKILL_COOLDOWN,
+                        Messages.of("remaining", Displays.remaining(remainingMillis))));
+            }
+        });
+    }
+
+    /** Reports an outcome, or drops it silently when nobody asked for the cast. */
+    private void report(UUID playerId, boolean announce, Component text) {
+        report(playerId, announce, text, null);
+    }
+
+    private void report(UUID playerId, boolean announce, Component text, FeedbackEvent event) {
+        if (announce) {
+            finish(playerId, text, event);
+            return;
+        }
+        inFlight.remove(playerId);
     }
 
     /** Why the provider says it is unusable, or a stand-in when it did not say. */
@@ -177,40 +388,72 @@ public final class PaperActiveSkillController {
     }
 
     private void castPrepared(
-            UUID playerId, UUID petId, SkillBinding binding, String skillId, UUID actionId) {
+            UUID playerId, UUID petId, SkillBinding binding, String skillId, UUID actionId, boolean announce) {
         Player player = Bukkit.getPlayer(playerId);
         if (player == null || !player.isOnline()) {
-            queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(MessageKey.SKILL_PLAYER_LEFT)));
+            queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(MessageKey.SKILL_PLAYER_LEFT)),
+                    announce);
             return;
         }
         SkillCastResult cast;
         try {
+            // Targets are chosen here, on the main thread, immediately before the cast — the shortest
+            // possible window between "what is nearby" and hitting it. Passing them explicitly is what makes
+            // the cast a *pet's* cast: without them MythicMobs targets from the caster, and the caster is the
+            // owning player, so the skill aimed wherever the player's own targeting rules pointed.
+            List<UUID> targets = targets(player, petId, binding);
             cast = providers.provider().cast(new SkillCastRequest(
                     actionId, playerId, playerId, petId, skillId, binding.targetPolicy(),
+                    targets, binding.power(),
                     Map.of("world", player.getWorld().getName())));
         } catch (RuntimeException | LinkageError failure) {
             queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(
-                    MessageKey.SKILL_PROVIDER_FAILED, Messages.of("detail", detail(failure)))));
+                    MessageKey.SKILL_PROVIDER_FAILED, Messages.of("detail", detail(failure)))), announce);
             return;
         }
         if (!cast.succeeded()) {
             queueRollback(playerId, petId, actionId, Messages.plain(Messages.line(
-                    MessageKey.SKILL_CAST_FAILED, Messages.of("detail", cast.detail()))));
+                    MessageKey.SKILL_CAST_FAILED, Messages.of("detail", cast.detail()))), announce);
             return;
         }
-        if (!tasks.submit(playerId, () -> complete(playerId, petId, actionId))) {
-            finish(playerId, Messages.line(MessageKey.SKILL_COMPLETION_NOT_SCHEDULED));
+        // The cast has already happened, so the player is told now rather than after the durable write:
+        // the write confirms bookkeeping, and waiting for it would put the cue behind the visible effect.
+        Feedback.emit(player, FeedbackEvent.SKILL_TRIGGERED);
+        if (!tasks.submit(playerId, () -> complete(playerId, petId, actionId, announce))) {
+            report(playerId, announce, Messages.line(MessageKey.SKILL_COMPLETION_NOT_SCHEDULED));
         }
     }
 
-    private void complete(UUID playerId, UUID petId, UUID actionId) {
+    /**
+     * The entities this cast should aim at, with the owner's own pets excluded from the search.
+     *
+     * <p>Empty when the pet is not rendered, since a policy relative to the pet has no anchor then, and for
+     * {@link io.github.salyvn.omnipet.core.skill.SkillTargetPolicy#PROVIDER_DEFAULT}, where empty is the
+     * point: the skill's own {@code @Target} clause decides.
+     */
+    private List<UUID> targets(Player player, UUID petId, SkillBinding binding) {
+        if (runtime == null) {
+            return PaperSkillTargetResolver.resolve(
+                    binding.targetPolicy(), player, null, binding.targetRange(), List.of());
+        }
+        List<UUID> ownPetEntities = runtime.petEntityIds(player.getUniqueId());
+        org.bukkit.entity.Entity petEntity = runtime.petEntity(player.getUniqueId(), petId);
+        return PaperSkillTargetResolver.resolve(
+                binding.targetPolicy(), player, petEntity, binding.targetRange(), ownPetEntities);
+    }
+
+    private void complete(UUID playerId, UUID petId, UUID actionId, boolean announce) {
         try {
             var current = players.snapshot(playerId);
             RepositorySkillActionResult result = actions.complete(
                     playerId, current.revision(), petId, actionId, System.currentTimeMillis(), progression.maxStamina());
             if (result.status() == RepositorySkillActionResult.Status.COMPLETED) {
-                finish(playerId, Messages.line(MessageKey.SKILL_SUCCEEDED), FeedbackEvent.SKILL_SUCCEEDED);
+                // The action bar already said it fired. A chat line as well is for the player who typed the
+                // command and is looking at chat for an answer.
+                report(playerId, announce, Messages.line(MessageKey.SKILL_SUCCEEDED));
             } else {
+                // Not silenced for a passive trigger: the cast happened and the bookkeeping did not, which
+                // an operator has to see whether or not the player asked for it.
                 finish(playerId, Messages.line(MessageKey.SKILL_COMPLETION_NEEDS_REVIEW,
                         Messages.of("status", words(result.status()))));
             }
@@ -220,7 +463,7 @@ public final class PaperActiveSkillController {
         }
     }
 
-    private void queueRollback(UUID playerId, UUID petId, UUID actionId, String detail) {
+    private void queueRollback(UUID playerId, UUID petId, UUID actionId, String detail, boolean announce) {
         boolean accepted = tasks.submit(playerId, () -> {
             try {
                 var current = players.snapshot(playerId);
@@ -230,7 +473,7 @@ public final class PaperActiveSkillController {
                         Messages.of("detail", detail), Messages.of("reason", detail(failure))));
                 return;
             }
-            finish(playerId, Messages.line(MessageKey.SKILL_ROLLED_BACK, Messages.of("detail", detail)));
+            report(playerId, announce, Messages.line(MessageKey.SKILL_ROLLED_BACK, Messages.of("detail", detail)));
         });
         if (!accepted) {
             finish(playerId, Messages.line(MessageKey.SKILL_ROLLBACK_NOT_SCHEDULED, Messages.of("detail", detail)));

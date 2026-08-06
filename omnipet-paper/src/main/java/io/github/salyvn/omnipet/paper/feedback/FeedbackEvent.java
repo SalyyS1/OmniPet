@@ -33,6 +33,16 @@ public enum FeedbackEvent {
 
     SKILL_SUCCEEDED(FeedbackCategory.SUCCESS),
     SKILL_REJECTED(FeedbackCategory.FAILURE),
+    /**
+     * A trigger fired and the pet cast. Narrated on the action bar rather than in chat, because a skill
+     * bound to a keypress would otherwise write a chat line every time the player presses that key.
+     */
+    SKILL_TRIGGERED(FeedbackCategory.SUCCESS, MessageKey.ACTION_BAR_SKILL_CAST),
+    /**
+     * A trigger fired while the skill was still cooling down. The action bar text is supplied by the caller
+     * rather than taken from the event, because the remaining time is only known at the refusal.
+     */
+    SKILL_COOLING_DOWN(FeedbackCategory.BLOCKED, MessageKey.ACTION_BAR_SKILL_COOLDOWN),
     /** A rolled-and-missed proc is a normal outcome, so it reads as progress rather than failure. */
     SKILL_CHANCE_MISSED(FeedbackCategory.PROGRESS);
 

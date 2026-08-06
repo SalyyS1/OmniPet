@@ -85,6 +85,7 @@ skill:
   provider-mismatch: "<yellow>OmniPet: Kỹ năng này cần nhà cung cấp <provider>, nhưng máy chủ đang có <detail>.</yellow>"
   not-registered: "<yellow>OmniPet: Nhà cung cấp không có kỹ năng nào tên <detail>.</yellow>"
   chance-missed: "<gray>OmniPet: Kỹ năng không kích hoạt lần này.</gray>"
+  cooldown: "<yellow>OmniPet: Kỹ năng đó sẵn sàng sau <remaining>.</yellow>"
   rejected: "<yellow>OmniPet: Kỹ năng bị từ chối: <status>.</yellow>"
   prepare-failed: "<red>OmniPet: Chuẩn bị kỹ năng thất bại: <detail>.</red>"
   succeeded: "<green>OmniPet: Đã thi triển kỹ năng thành công.</green>"
@@ -128,6 +129,8 @@ action-bar:
   hatch-queued: "<yellow>Bắt đầu ấp trứng</yellow>"
   hatch-claimed: "<green>Đã nở! Kiểm tra kho của bạn</green>"
   slot-unlocked: "<green>Đã mở ô hoạt động</green>"
+  skill-cast: "<green>◆ Thú cưng thi triển kỹ năng</green>"
+  skill-cooldown: "<yellow>◆ Sẵn sàng sau <remaining></yellow>"
 
 status:
   rejected: "Thay đổi đó bị từ chối."
