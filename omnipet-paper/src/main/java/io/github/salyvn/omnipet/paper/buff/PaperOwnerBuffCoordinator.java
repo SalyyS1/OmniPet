@@ -52,13 +52,37 @@ public final class PaperOwnerBuffCoordinator implements Consumer<PetStorageSnaps
             if (closed) return;
             Desired current = desiredByOwner.get(snapshot.playerId());
             if (current != null && current.revision() > snapshot.revision()) return;
-            desiredByOwner.put(snapshot.playerId(), new Desired(snapshot.revision(), buffs));
+            desiredByOwner.put(snapshot.playerId(),
+                    new Desired(snapshot.revision(), buffs, snapshot.desiredActivePetIds().size()));
         }
         runMain(() -> applyRevision(snapshot.playerId(), snapshot.revision()));
     }
 
-    public void ownerQuit(UUID ownerId) {
+    /**
+     * Explains, for one owner, whether their pets' stats are reaching them.
+     *
+     * <p>Reads the same state {@link #apply} does, so it cannot describe a different world from the one the
+     * plugin is acting on — a diagnostic that recomputed the answer its own way would be able to disagree
+     * with the code it is diagnosing, which is the opposite of useful.
+     */
+    public List<String> diagnose(UUID ownerId) {
         Objects.requireNonNull(ownerId, "buff owner ID");
+        requireMainThread();
+        ReflectiveMythicLibBuffPort current = port;
+        Desired desired;
+        synchronized (this) {
+            desired = desiredByOwner.get(ownerId);
+        }
+        List<PetStatBuff> buffs = desired == null ? List.of() : desired.buffs();
+        return OwnerBuffDiagnostics.describe(
+                current != null,
+                current == null ? null : current.unavailableDetail(),
+                desired == null ? 0 : desired.activePets(),
+                buffs,
+                current == null ? null : current.registeredStats());
+    }
+
+    public void ownerQuit(UUID ownerId) {        Objects.requireNonNull(ownerId, "buff owner ID");
         synchronized (this) {
             desiredByOwner.remove(ownerId);
             // Forgotten with the owner, so a condition they fix and re-log in on is reported again rather
@@ -162,9 +186,20 @@ public final class PaperOwnerBuffCoordinator implements Consumer<PetStorageSnaps
         if (!Bukkit.isPrimaryThread()) throw new IllegalStateException("buff lifecycle requires the Paper main thread");
     }
 
-    private record Desired(long revision, List<PetStatBuff> buffs) {
+    private record Desired(long revision, List<PetStatBuff> buffs, int activePets) {
         private Desired {
             buffs = List.copyOf(buffs);
+        }
+
+        /**
+         * How many pets the owner had out, recorded separately from the buffs.
+         *
+         * <p>Counting distinct pets in the buff list would report zero for an owner whose pets grant no
+         * stats — which is a completely different problem from having no pet out, and the diagnostic exists
+         * precisely to tell those two apart.
+         */
+        private Desired(long revision, List<PetStatBuff> buffs) {
+            this(revision, buffs, 0);
         }
     }
 }

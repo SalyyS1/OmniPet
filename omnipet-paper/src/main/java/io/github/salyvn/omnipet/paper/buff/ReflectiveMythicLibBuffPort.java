@@ -110,6 +110,22 @@ public final class ReflectiveMythicLibBuffPort {
         return reconcile(ownerId, List.of());
     }
 
+    /** Why the adapter cannot be used, or null when it can. For the diagnostic command. */
+    public String unavailableDetail() {
+        return bindings == null && unavailableReason == null ? "MythicLib is unavailable" : unavailableReason;
+    }
+
+    /**
+     * The stat IDs MythicLib has registered, or null when the registry could not be read.
+     *
+     * <p>For the diagnostic command, so an operator can compare the IDs in their pet definition against the
+     * names the provider actually answers to. That comparison is the one thing no amount of reasoning about
+     * this code could settle, because the answer lives on the running server.
+     */
+    public java.util.Set<String> registeredStats() {
+        return bindings == null ? null : bindings.registeredStats();
+    }
+
     private static Set<Installed> difference(Set<Installed> existing, Set<Installed> next) {
         LinkedHashSet<Installed> stale = new LinkedHashSet<>(existing);
         stale.removeAll(next);
@@ -227,6 +243,32 @@ public final class ReflectiveMythicLibBuffPort {
 
         Object statInstance(Object map, String stat) throws ReflectiveOperationException {
             return getInstance.invoke(map, stat);
+        }
+
+        /**
+         * Every stat name MythicLib has registered, or null when the registry cannot be read.
+         *
+         * <p>Bound lazily here rather than in {@code load}, because it is only ever asked for by the
+         * diagnostic command: a missing {@code getRegisteredStats} must cost that command its stat list and
+         * nothing else.
+         */
+        java.util.Set<String> registeredStats() {
+            if (mythicLibInstance == null || statsOf == null) return null;
+            try {
+                Object instance = mythicLibInstance.invoke(null);
+                if (instance == null) return null;
+                Object manager = statsOf.invoke(instance);
+                if (manager == null) return null;
+                Object stats = manager.getClass().getMethod("getRegisteredStats").invoke(manager);
+                if (!(stats instanceof Iterable<?> values)) return null;
+                java.util.Set<String> result = new LinkedHashSet<>();
+                for (Object value : values) {
+                    if (value instanceof String name && !name.isBlank()) result.add(name);
+                }
+                return java.util.Set.copyOf(result);
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                return null;
+            }
         }
 
         Object modifier(Object instance, UUID id) throws ReflectiveOperationException {

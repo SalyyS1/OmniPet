@@ -430,6 +430,25 @@ public final class OmniPetCommand implements BasicCommand {
     }
 
     /**
+     * Explains why an owner's pet stats are or are not reaching them.
+     *
+     * <p>Set after construction like the transaction menu, and absent in the narrower constructors the
+     * tests use, where the area reports itself unavailable rather than throwing.
+     */
+    private volatile StatDiagnosticTarget statDiagnostics;
+
+    /** Wires the stat diagnostic. Called once from {@code onEnable}. */
+    public void bindStatDiagnostics(StatDiagnosticTarget target) {
+        this.statDiagnostics = target;
+    }
+
+    /** Produces the diagnostic lines for one owner. */
+    @FunctionalInterface
+    public interface StatDiagnosticTarget {
+        java.util.List<String> describe(java.util.UUID ownerId);
+    }
+
+    /**
      * The simple {@code admin <area>} branches.
      *
      * <p>Items are one area with an internal fork: a cultivation item additionally requires the
@@ -460,7 +479,37 @@ public final class OmniPetCommand implements BasicCommand {
                 new AdminArea("release", "omnipet.admin.release",
                         "OmniPet: you do not have permission to reconcile pet releases.",
                         "OmniPet: release administration is not available yet.",
-                        releaseAdmin == null ? null : releaseAdmin::command));
+                        releaseAdmin == null ? null : releaseAdmin::command),
+                new AdminArea("stats", "omnipet.admin.reload",
+                        "OmniPet: you do not have permission to inspect pet stats.",
+                        "OmniPet: stat diagnostics are not available yet.",
+                        statDiagnostics == null ? null : this::dispatchStatDiagnostics));
+    }
+
+    /**
+     * Reports whether a player's pet stats are reaching them, and why not when they are not.
+     *
+     * <p>Shares the reload permission rather than minting a node for one read-only command: an operator who
+     * can reload definitions is exactly the person who needs this, and a new node would be one more thing to
+     * grant before the diagnostic could be used — at the moment it is most needed.
+     */
+    private void dispatchStatDiagnostics(CommandSender sender, List<String> arguments) {
+        StatDiagnosticTarget target = statDiagnostics;
+        if (target == null) {
+            sender.sendMessage("OmniPet: stat diagnostics are not available yet.");
+            return;
+        }
+        Player subject = arguments.isEmpty()
+                ? (sender instanceof Player self ? self : null)
+                : org.bukkit.Bukkit.getPlayerExact(arguments.getFirst());
+        if (subject == null) {
+            sender.sendMessage(arguments.isEmpty()
+                    ? "OmniPet: name a player — /pet admin stats <online-player>"
+                    : "OmniPet: no online player named " + arguments.getFirst() + ".");
+            return;
+        }
+        sender.sendMessage("OmniPet stat check for " + subject.getName() + ":");
+        target.describe(subject.getUniqueId()).forEach(sender::sendMessage);
     }
 
     /**

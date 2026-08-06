@@ -79,6 +79,9 @@ public final class OmniPetCommandTree {
                         adminSkill(),
                         adminCultivation(),
                         adminRelease(),
+                        CommandSpec.of("stats", "Explain why a player's pet stats are or are not applied")
+                                .args("[online-player]")
+                                .permission("omnipet.admin.reload"),
                         CommandSpec.of("transactions", "List pending slot transactions")
                                 .args("[limit|menu]", "[cursor]")
                                 .permission(SlotTransactionAdminCommandParser.PERMISSION)

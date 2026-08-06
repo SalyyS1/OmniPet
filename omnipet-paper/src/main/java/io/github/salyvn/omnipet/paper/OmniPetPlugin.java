@@ -381,6 +381,7 @@ public final class OmniPetPlugin extends JavaPlugin {
             command.bindTransactionMenu(viewer -> transactionAdmin.openMenu(viewer, null,
                     () -> viewer.sendMessage(io.github.salyvn.omnipet.paper.text.Messages.line(
                             io.github.salyvn.omnipet.paper.text.MessageKey.GUI_ADMIN_TX_LOAD_FAILED))));
+            command.bindStatDiagnostics(ownerId -> ownerBuffs.diagnose(ownerId));
             event.registrar().register(
                     FoundationCommandContract.NAME, FoundationCommandContract.ALIASES, command);
             // The same administration without the second word. Routes into the router /pet already
