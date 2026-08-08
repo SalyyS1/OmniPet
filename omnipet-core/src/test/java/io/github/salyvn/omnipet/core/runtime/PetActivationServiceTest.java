@@ -84,6 +84,34 @@ class PetActivationServiceTest {
     }
 
     @Test
+    void removalThatFinishesBeforeThrowingSpawnsAFreshGeneration() {
+        InteractionIndex interactions = new InteractionIndex();
+        PetActivationService activation = new PetActivationService(interactions);
+        FakeRenderer renderer = new FakeRenderer();
+        UUID owner = UUID.randomUUID();
+        UUID pet = UUID.randomUUID();
+        RendererSpawnRequest first = request(owner, pet, 1);
+        RendererSpawnRequest replacement = request(owner, pet, 2);
+        activation.reconcile(owner, java.util.List.of(first), ignored -> renderer);
+        UUID originalEntity = renderer.handles.get(pet).entity;
+        renderer.failAfterRemove = true;
+
+        PetActivationResult recovered = activation.reconcile(
+                owner, java.util.List.of(replacement), ignored -> renderer);
+        UUID replacementEntity = renderer.handles.get(pet).entity;
+
+        assertFalse(recovered.converged());
+        assertEquals("destroy failed after removal", recovered.failures().get(pet));
+        assertEquals(java.util.List.of(pet), recovered.removedPetIds());
+        assertEquals(java.util.List.of(pet), recovered.spawnedPetIds());
+        assertEquals(java.util.List.of(pet), recovered.activePetIds());
+        assertTrue(interactions.resolve(originalEntity).isEmpty());
+        assertTrue(interactions.resolve(replacementEntity).isPresent());
+        assertTrue(activation.reconcile(owner, java.util.List.of(replacement), ignored -> renderer).converged());
+        assertEquals(1, renderer.removeCalls);
+    }
+
+    @Test
     void rendererInvalidationIsReconciledWithFreshHandle() {
         InteractionIndex interactions = new InteractionIndex();
         PetActivationService activation = new PetActivationService(interactions);
@@ -118,7 +146,9 @@ class PetActivationServiceTest {
         private final Set<UUID> removed = new LinkedHashSet<>();
         private boolean failSpawn;
         private boolean failRemove;
+        private boolean failAfterRemove;
         private boolean invalidateOnUpdate;
+        private int removeCalls;
         private UUID sharedEntity;
 
         @Override public RendererHealth health() {
@@ -145,11 +175,13 @@ class PetActivationServiceTest {
         @Override public void updateAppearance(RendererHandle handle, RendererAppearance appearance) {}
 
         @Override public void remove(RendererHandle handle) {
+            removeCalls++;
             if (failRemove) throw new IllegalStateException("remove failed");
             FakeHandle fake = (FakeHandle) handle;
             fake.removed = true;
             removed.add(handle.petInstanceId());
             handles.remove(handle.petInstanceId());
+            if (failAfterRemove) throw new IllegalStateException("destroy failed after removal");
         }
     }
 

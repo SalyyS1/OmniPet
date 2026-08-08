@@ -113,14 +113,17 @@ public final class ReflectiveMythicMobsSkillProvider implements SkillProvider {
                 Method targeted = findTargetedCast(helper.getClass());
                 if (targeted != null) {
                     Object origin = caster instanceof Entity entity ? entity.getLocation() : null;
-                    Object result = targeted.invoke(helper, caster, request.skillId(), caster, origin,
-                            targets, List.of(), (float) request.power());
-                    return outcome(result);
+                    return outcome(invoke(targeted, helper, caster, request.skillId(), caster, origin,
+                            targets, List.of(), (float) request.power()));
                 }
             }
             Method cast = findSimpleCast(helper.getClass(), caster.getClass());
-            Object result = cast.invoke(helper, caster, request.skillId());
-            return outcome(result);
+            return outcome(invoke(cast, helper, caster, request.skillId()));
+        } catch (VendorCastFailure failure) {
+            // The skill threw inside MythicMobs, which says this skill is wrong, not that the bridge is.
+            // Quarantining here used to take every other skill down with it and stay down until something
+            // reloaded the plugin, so one bad mechanic silently ended pet skills for the rest of the uptime.
+            return castResult(SkillCastResult.Status.FAILED, detail(failure.getCause()));
         } catch (ReflectiveOperationException | RuntimeException | LinkageError failure) {
             quarantine(observed.catalog().epoch(), failure);
             return castResult(SkillCastResult.Status.FAILED, detail(failure));
@@ -142,6 +145,35 @@ public final class ReflectiveMythicMobsSkillProvider implements SkillProvider {
             if (entity != null) targets.add(entity);
         }
         return targets;
+    }
+
+    /**
+     * Calls a vendor method, keeping "the skill failed" apart from "the bridge is broken".
+     *
+     * <p>Only the second is a reason to quarantine the adapter. A throw from inside {@code castSkill} is
+     * reported as {@link InvocationTargetException}, and it means this one skill's own mechanics failed —
+     * a missing entity, a bad {@code @Target}, an arithmetic error in a config value. Treating that as an
+     * adapter fault disabled every other skill on the server until a plugin reload, which is what made one
+     * misconfigured skill look like "pet skills do not work at all".
+     */
+    private static Object invoke(Method method, Object owner, Object... arguments)
+            throws ReflectiveOperationException, VendorCastFailure {
+        try {
+            return method.invoke(owner, arguments);
+        } catch (InvocationTargetException thrown) {
+            Throwable cause = thrown.getCause();
+            // A linkage error is the bridge's problem: the vendor's own shape is not what was compiled
+            // against, and every later cast would fail the same way.
+            if (cause == null || cause instanceof LinkageError) throw thrown;
+            throw new VendorCastFailure(cause);
+        }
+    }
+
+    /** A skill that threw inside MythicMobs. Scoped to this cast, never to the adapter. */
+    private static final class VendorCastFailure extends Exception {
+        private VendorCastFailure(Throwable cause) {
+            super(cause.getMessage(), cause, false, false);
+        }
     }
 
     private Object instance() throws ReflectiveOperationException {

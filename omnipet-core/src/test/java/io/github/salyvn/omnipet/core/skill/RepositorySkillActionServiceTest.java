@@ -140,6 +140,78 @@ class RepositorySkillActionServiceTest {
         assertEquals(2_500L, blocked.cooldownRemainingMillis());
     }
 
+    /**
+     * Stamina spent on skills has to come back, or a pet stops casting for good.
+     *
+     * <p>`staminaRegenPerSecond` is configured and `ProgressionService.regenerateStamina` implements it, but
+     * nothing on the skill path ever applied it: `prepare` read the stored stamina as-is, so the number only
+     * ever went down. A pet with a stamina cost therefore worked for its first few casts and then refused
+     * every one after that, forever, however long its owner waited — and the refusal is a passive-trigger
+     * refusal, so most of the time it is not even reported. That is "my pet stopped casting" with no cause
+     * an operator can see.
+     */
+    @Test
+    void staminaSpentOnSkillsComesBackOverTime() throws Exception {
+        Fixture fixture = fixture();
+        long revision = fixture.revision();
+        long now = 1_000;
+        // Ten casts at ten stamina each, from a hundred: the last one leaves nothing.
+        for (int cast = 0; cast < 10; cast++) {
+            UUID action = UUID.randomUUID();
+            var prepared = fixture.service.prepare(
+                    fixture.playerId, revision, fixture.petId, drain(cast), action, now, 100, 1);
+            assertEquals(RepositorySkillActionResult.Status.PREPARED, prepared.status(),
+                    "cast " + cast + " should have been affordable");
+            var completed = fixture.service.complete(
+                    fixture.playerId, prepared.state().revision(), fixture.petId, action, now, 100, 1);
+            revision = completed.state().revision();
+        }
+
+        var exhausted = fixture.service.prepare(
+                fixture.playerId, revision, fixture.petId, drain(10), UUID.randomUUID(), now, 100, 1);
+        assertEquals(RepositorySkillActionResult.Status.INSUFFICIENT_STAMINA, exhausted.status());
+
+        // A minute later, at one stamina per second, the pet can cast again.
+        var recovered = fixture.service.prepare(
+                fixture.playerId, revision, fixture.petId, drain(11), UUID.randomUUID(), now + 60_000, 100, 1);
+        assertEquals(RepositorySkillActionResult.Status.PREPARED, recovered.status(),
+                "stamina must regenerate, or a pet with a stamina cost stops casting permanently");
+    }
+
+    /** Regeneration must not mint stamina above the configured maximum. */
+    @Test
+    void staminaRegenerationStopsAtTheConfiguredMaximum() throws Exception {
+        Fixture fixture = fixture();
+        UUID action = UUID.randomUUID();
+        var prepared = fixture.service.prepare(
+                fixture.playerId, fixture.revision(), fixture.petId, binding(), action, 1_000, 100, 1);
+        var completed = fixture.service.complete(
+                fixture.playerId, prepared.state().revision(), fixture.petId, action, 1_000, 100, 1);
+        assertEquals(90.0, PetProgressionProjection.read(completed.pet(), 100, 1_000).stamina());
+
+        // An hour of regeneration at one per second is far more than the ninety missing.
+        var later = fixture.service.prepare(
+                fixture.playerId, completed.state().revision(), fixture.petId,
+                new SkillBinding("other_one", "MYTHICMOBS", "ember_burst", SkillTrigger.ACTIVE,
+                        Duration.ZERO, 1.0, 10.0, SkillTargetPolicy.OWNER, true),
+                UUID.randomUUID(), 3_601_000, 100, 1);
+
+        assertEquals(RepositorySkillActionResult.Status.PREPARED, later.status());
+        // Capped at the configured hundred, not the hundred-and-ninety an hour of regeneration would add.
+        // Still a full hundred rather than ninety: preparing only *reserves* the cost, and the reservation is
+        // what stops it being spent twice. The charge lands at complete.
+        assertEquals(100.0, PetProgressionProjection.read(later.pet(), 100, 3_601_000).stamina());
+        assertEquals(10.0, PetSkillStateProjection.read(later.pet()).pendingActions().values().stream()
+                .mapToDouble(SkillActionReservation::staminaCost).sum());
+    }
+
+    /** A distinct binding per cast, so the one-pending-cast-per-binding rule is not what is being tested. */
+    private static SkillBinding drain(int index) {
+        return new SkillBinding(
+                "drain_" + index, "MYTHICMOBS", "ember_burst", SkillTrigger.ACTIVE,
+                Duration.ZERO, 1.0, 10.0, SkillTargetPolicy.OWNER, true);
+    }
+
     /** An outcome that is not a cooldown refusal has no wait to report, and must not invent one. */
     @Test
     void anAcceptedPrepareReportsNoCooldownRemaining() throws Exception {

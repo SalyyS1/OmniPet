@@ -325,7 +325,8 @@ public final class PaperActiveSkillController {
             long now = System.currentTimeMillis();
             ProgressionConfig config = progression;
             RepositorySkillActionResult prepared = actions.prepare(
-                    playerId, state.revision(), petId, binding, actionId, now, config.maxStamina());
+                    playerId, state.revision(), petId, binding, actionId, now,
+                    config.maxStamina(), config.staminaRegenPerSecond());
             if (prepared.status() == RepositorySkillActionResult.Status.COOLDOWN) {
                 // The one refusal a player is owed even when they did not press anything: a passive skill
                 // that is cooling down looks identical to one that is broken.
@@ -445,8 +446,10 @@ public final class PaperActiveSkillController {
     private void complete(UUID playerId, UUID petId, UUID actionId, boolean announce) {
         try {
             var current = players.snapshot(playerId);
+            ProgressionConfig config = progression;
             RepositorySkillActionResult result = actions.complete(
-                    playerId, current.revision(), petId, actionId, System.currentTimeMillis(), progression.maxStamina());
+                    playerId, current.revision(), petId, actionId, System.currentTimeMillis(),
+                    config.maxStamina(), config.staminaRegenPerSecond());
             if (result.status() == RepositorySkillActionResult.Status.COMPLETED) {
                 // The action bar already said it fired. A chat line as well is for the player who typed the
                 // command and is looking at chat for an answer.

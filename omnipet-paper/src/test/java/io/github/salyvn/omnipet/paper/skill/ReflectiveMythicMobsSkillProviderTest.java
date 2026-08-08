@@ -40,17 +40,24 @@ class ReflectiveMythicMobsSkillProviderTest {
         assertFalse(offThread.cast(request("ember_burst")).succeeded());
     }
 
+    /**
+     * An adapter fault does still quarantine, and only a refresh clears it.
+     *
+     * <p>The fault here is reaching the vendor at all rather than a skill misbehaving: if
+     * {@code getAPIHelper} throws, the shape the bridge was built against is not the shape that is installed,
+     * and every later cast would fail the same way. Retrying that per cast would log once per keypress.
+     */
     @Test
-    void providerFailureQuarantinesCurrentEpochUntilRefresh() {
+    void adapterFailureQuarantinesCurrentEpochUntilRefresh() {
         MythicBukkit.reset();
-        MythicBukkit.inst().getAPIHelper().fail = true;
+        MythicBukkit.inst().failHelper = true;
         ReflectiveMythicMobsSkillProvider provider = provider(true, true, new Object());
         provider.refresh(7);
 
         assertFalse(provider.cast(request("ember_burst")).succeeded());
         assertFalse(provider.catalog().health().available());
 
-        MythicBukkit.inst().getAPIHelper().fail = false;
+        MythicBukkit.inst().failHelper = false;
         assertTrue(provider.refresh(8).health().available());
     }
 
@@ -106,6 +113,30 @@ class ReflectiveMythicMobsSkillProviderTest {
 
         assertTrue(result.succeeded());
         assertFalse(MythicBukkit.inst().getAPIHelper().usedTargetedOverload);
+    }
+
+    /**
+     * A skill that throws inside MythicMobs must not disable every other skill.
+     *
+     * <p>This is the second half of "pet skills do not work". A throw from inside {@code castSkill} means
+     * that skill's own mechanics failed; it used to quarantine the whole adapter, which cleared the catalog
+     * and made every later cast refuse before MythicMobs was asked. Nothing but a plugin reload brought it
+     * back, so one misconfigured skill silently ended pet skills for the rest of the uptime.
+     */
+    @Test
+    void aSkillThatThrowsInsideMythicMobsDoesNotDisableTheOthers() {
+        MythicBukkit.reset();
+        MythicBukkit.inst().getAPIHelper().fail = true;
+        ReflectiveMythicMobsSkillProvider provider = provider(true, true, new Object());
+        provider.refresh(3);
+
+        assertFalse(provider.cast(request("ember_burst")).succeeded());
+
+        assertTrue(provider.catalog().health().available(),
+                "one failing skill must not quarantine the adapter");
+        MythicBukkit.inst().getAPIHelper().fail = false;
+        assertTrue(provider.cast(request("healing_wave")).succeeded(),
+                "a later skill must still cast without waiting for a plugin reload");
     }
 
     private static ReflectiveMythicMobsSkillProvider provider(

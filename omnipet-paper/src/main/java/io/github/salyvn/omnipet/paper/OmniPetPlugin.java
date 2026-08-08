@@ -268,7 +268,12 @@ public final class OmniPetPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new StatCatalogLifecycleListener(statCatalog), this);
             getServer().getPluginManager().registerEvents(new MythicLibBuffLifecycleListener(ownerBuffs), this);
             getServer().getPluginManager().registerEvents(new RendererProviderLifecycleListener(petRuntime), this);
-            getServer().getPluginManager().registerEvents(new MythicMobsSkillLifecycleListener(skillProviders), this);
+            MythicMobsSkillLifecycleListener skillLifecycle = new MythicMobsSkillLifecycleListener(
+                    skillProviders, this, warning -> getLogger().warning("OmniPet: " + warning));
+            getServer().getPluginManager().registerEvents(skillLifecycle, this);
+            // MythicMobs loads before OmniPet, so its reload event is usually attachable right now; the
+            // enable handler covers the case where it is not.
+            skillLifecycle.hookVendorReloads();
             registerKillExperience();
             getServer().getPluginManager().registerEvents(
                     new PlayerPetMenuListener(playerPets, slotPurchases, managementServices.menu()), this);

@@ -13,7 +13,11 @@ public final class MythicBukkit {
         return INSTANCE;
     }
 
+    /** Set to fail {@link #getAPIHelper()} itself, which is an adapter fault rather than a skill's. */
+    public boolean failHelper;
+
     public static void reset() {
+        INSTANCE.failHelper = false;
         INSTANCE.helper.fail = false;
         INSTANCE.helper.caster = null;
         INSTANCE.helper.entityTargets = null;
@@ -26,6 +30,7 @@ public final class MythicBukkit {
     }
 
     public APIHelper getAPIHelper() {
+        if (failHelper) throw new IllegalStateException("simulated adapter failure");
         return helper;
     }
 

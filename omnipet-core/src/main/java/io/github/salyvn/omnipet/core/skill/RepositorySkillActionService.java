@@ -27,6 +27,7 @@ public final class RepositorySkillActionService {
         this.players = Objects.requireNonNull(players, "player state repository");
     }
 
+    /** Prepares with no stamina regeneration, for callers with no progression configuration to hand. */
     public RepositorySkillActionResult prepare(
             UUID playerId,
             long expectedRevision,
@@ -34,7 +35,24 @@ public final class RepositorySkillActionService {
             SkillBinding binding,
             UUID actionId,
             long nowEpochMillis,
-            double initialStamina) throws IOException {
+            double maxStamina) throws IOException {
+        return prepare(playerId, expectedRevision, petId, binding, actionId, nowEpochMillis, maxStamina, 0);
+    }
+
+    /**
+     * @param maxStamina the ceiling regeneration restores towards, and the value a pet starts at
+     * @param staminaRegenPerSecond how fast spent stamina comes back; zero freezes it, which is what the
+     *     skill path effectively did before this parameter existed
+     */
+    public RepositorySkillActionResult prepare(
+            UUID playerId,
+            long expectedRevision,
+            UUID petId,
+            SkillBinding binding,
+            UUID actionId,
+            long nowEpochMillis,
+            double maxStamina,
+            double staminaRegenPerSecond) throws IOException {
         Objects.requireNonNull(binding, "skill binding");
         Objects.requireNonNull(actionId, "skill action ID");
         return mutate(playerId, expectedRevision, petId, (current, pet) -> {
@@ -58,10 +76,19 @@ public final class RepositorySkillActionService {
             if (deadlineNow > nowEpochMillis) {
                 return cooling(current, pet, deadlineNow - nowEpochMillis);
             }
-            ProgressionState progression = PetProgressionProjection.read(pet, initialStamina, nowEpochMillis);
+            // Regenerated before it is judged. Stamina is stored as a number plus the instant it was last
+            // touched, so the stored value is only correct at that instant; reading it as-is meant a pet's
+            // stamina could only ever fall, and a pet whose skills cost stamina stopped casting for good
+            // once it hit zero, however long its owner waited.
+            ProgressionState progression = regenerated(
+                    PetProgressionProjection.read(pet, maxStamina, nowEpochMillis),
+                    nowEpochMillis, maxStamina, staminaRegenPerSecond);
             double reserved = skill.pendingActions().values().stream()
                     .mapToDouble(SkillActionReservation::staminaCost).sum();
             if (progression.stamina() - reserved < binding.staminaCost()) {
+                // A refusal writes nothing at all — the whole mutation is abandoned. That costs nothing:
+                // regeneration is derived from the stored instant, so the next attempt recomputes the same
+                // value rather than losing the time that passed.
                 return rejected(RepositorySkillActionResult.Status.INSUFFICIENT_STAMINA, current, pet, null,
                         "not enough unreserved stamina");
             }
@@ -71,11 +98,23 @@ public final class RepositorySkillActionService {
                     binding.persistCooldown());
             Map<UUID, SkillActionReservation> pending = new LinkedHashMap<>(skill.pendingActions());
             pending.put(actionId, reservation);
-            PetInstance updated = PetSkillStateProjection.write(pet,
+            PetInstance updated = PetSkillStateProjection.write(
+                    PetProgressionProjection.write(pet, progression),
                     new PetSkillState(skill.cooldownDeadlines(), pending, skill.extensions()));
             return accepted(RepositorySkillActionResult.Status.PREPARED, current, updated, reservation,
                     "skill action prepared");
         });
+    }
+
+    /** Completes with no stamina regeneration, for callers with no progression configuration to hand. */
+    public RepositorySkillActionResult complete(
+            UUID playerId,
+            long expectedRevision,
+            UUID petId,
+            UUID actionId,
+            long nowEpochMillis,
+            double maxStamina) throws IOException {
+        return complete(playerId, expectedRevision, petId, actionId, nowEpochMillis, maxStamina, 0);
     }
 
     public RepositorySkillActionResult complete(
@@ -84,13 +123,18 @@ public final class RepositorySkillActionService {
             UUID petId,
             UUID actionId,
             long nowEpochMillis,
-            double initialStamina) throws IOException {
+            double maxStamina,
+            double staminaRegenPerSecond) throws IOException {
         RepositorySkillActionResult result = mutate(playerId, expectedRevision, petId, (current, pet) -> {
             PetSkillState skill = PetSkillStateProjection.read(pet);
             SkillActionReservation reservation = skill.pendingActions().get(actionId);
             if (reservation == null) return rejected(RepositorySkillActionResult.Status.ACTION_NOT_FOUND, current, pet,
                     null, "pending skill action is absent");
-            ProgressionState progression = PetProgressionProjection.read(pet, initialStamina, nowEpochMillis);
+            // Regenerated here too, or the time between reserving a cast and committing it would be the one
+            // stretch of a pet's life where stamina stands still.
+            ProgressionState progression = regenerated(
+                    PetProgressionProjection.read(pet, maxStamina, nowEpochMillis),
+                    nowEpochMillis, maxStamina, staminaRegenPerSecond);
             if (progression.stamina() < reservation.staminaCost()) {
                 return rejected(RepositorySkillActionResult.Status.CONFLICT, current, pet, reservation,
                         "reserved stamina was consumed by another workflow");
@@ -163,6 +207,29 @@ public final class RepositorySkillActionService {
         } catch (Rejected rejected) {
             return rejected.result;
         }
+    }
+
+    /**
+     * Stamina brought up to date before it is judged or spent.
+     *
+     * <p>Deliberately duplicated rather than reached for through `ProgressionService`: that class is the
+     * cultivation workflow's, it carries a formula cache and a `ProgressionConfig`, and the skill path has
+     * neither. What it needs is the two numbers the config already hands it. The rule is the same one
+     * `ProgressionService.regenerateStamina` applies, and a clock that has gone backwards — a server whose
+     * time was corrected — leaves the value alone rather than inventing a debt.
+     *
+     * @param regenPerSecond zero leaves stamina exactly as stored, which is what an operator gets by setting
+     *     `staminaRegenPerSecond: 0`
+     */
+    private static ProgressionState regenerated(
+            ProgressionState state, long nowEpochMillis, double maxStamina, double regenPerSecond) {
+        if (regenPerSecond <= 0 || nowEpochMillis <= state.lastStaminaEpochMillis()) return state;
+        double seconds = (nowEpochMillis - state.lastStaminaEpochMillis()) / 1000.0;
+        double next = Math.min(maxStamina, state.stamina() + seconds * regenPerSecond);
+        // Already at or above the ceiling: nothing to add, and the instant is still advanced so the next
+        // call measures from here rather than re-deriving the same elapsed time.
+        return state.withValues(state.level(), state.experience(), state.evolution(),
+                Math.max(state.stamina(), next), nowEpochMillis);
     }
 
     private static int index(List<PetInstance> pets, UUID id) {

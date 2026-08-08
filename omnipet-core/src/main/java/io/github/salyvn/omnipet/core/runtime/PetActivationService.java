@@ -142,6 +142,10 @@ public final class PetActivationService {
             return true;
         } catch (RuntimeException | LinkageError failure) {
             failures.put(petId, detail(failure));
+            if (current.handle().removed()) {
+                interactions.unregister(current.handle());
+                return true;
+            }
             return false;
         }
     }

@@ -104,6 +104,35 @@ class SkillTriggerListenerContractTest {
                 "reading definitions per event belongs on the controller's queue, not in a handler");
     }
 
+    /**
+     * The catalog must follow {@code /mm reload}, not just plugin enable and disable.
+     *
+     * <p>A reload re-reads every skill file without disabling MythicMobs, so no {@code PluginEnableEvent}
+     * arrives. A catalog probed only at startup then stays frozen for the whole uptime, and a skill missing
+     * from the catalog is refused before MythicMobs is ever asked — which from a player's seat is a skill
+     * that does nothing. Only a running server with MythicMobs installed shows this, so it is asserted here.
+     */
+    @Test
+    void theSkillCatalogFollowsAMythicMobsReload() throws IOException {
+        String source = read(Path.of(
+                "src/main/java/io/github/salyvn/omnipet/paper/skill/MythicMobsSkillLifecycleListener.java"));
+        assertTrue(source.contains("MythicReloadedEvent"),
+                "a /mm reload leaves the catalog stale unless the vendor's own reload event is observed");
+        assertTrue(source.contains("MythicLoadedEvent"),
+                "the first vendor load must refresh the catalog as well");
+        // Registered by name against the vendor loader: a typed handler would link MythicMobs classes into
+        // OmniPet's bytecode, and the plugin is built to run with MythicMobs absent.
+        assertTrue(source.contains("Class.forName"),
+                "the vendor event must be resolved reflectively, not linked");
+        assertTrue(read(Path.of("src/main/java/io/github/salyvn/omnipet/paper/OmniPetPlugin.java"))
+                        .contains("hookVendorReloads()"),
+                "the reload hook is inert unless the plugin attaches it at startup");
+        // A disable and re-enable hands MythicMobs a new class loader, so its reload event becomes a
+        // different Class and the old registration can never fire. Re-attaching needs the latch cleared.
+        assertTrue(source.contains("vendorHooked = false"),
+                "a re-enabled MythicMobs must be re-hooked, or reloads stop being observed for the uptime");
+    }
+
     private static String source() throws IOException {
         return read(LISTENER);
     }
