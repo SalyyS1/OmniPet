@@ -172,13 +172,13 @@ public final class EggAdminController {
         }
     }
 
-    /** {@code /pet admin pet give <online-player> <definition-id>} */
+    /** {@code /pet admin pet give <player_name> <ID>} */
     public void petCommand(CommandSender sender, List<String> arguments) {
         Objects.requireNonNull(sender, "sender");
         requireMainThread();
         List<String> values = List.copyOf(arguments == null ? List.of() : arguments);
         if (values.size() != 3 || !values.getFirst().equalsIgnoreCase("give")) {
-            sender.sendMessage("OmniPet: use /pet admin pet give <online-player> <definition-id>.");
+            sender.sendMessage("OmniPet: use /pet admin pet give <player_name> <ID>.");
             return;
         }
         Player target;
@@ -306,7 +306,7 @@ public final class EggAdminController {
         eggs.save(envelope(eggId, definition, millis));
         sender.sendMessage("OmniPet: " + (replacing ? "replaced" : "created") + " egg " + eggId
                 + " hatching " + definition.id() + " in " + IncubationDurationParser.formatMillis(millis)
-                + ". Give it with /pet admin egg give <player> " + eggId + ".");
+                + ". Give it with /pet admin egg give <player_name> " + eggId + ".");
     }
 
     /**
@@ -512,8 +512,8 @@ public final class EggAdminController {
     }
 
     private static void eggUsage(CommandSender sender) {
-        sender.sendMessage("OmniPet: use /pet admin egg give <online-player> <egg-id> [amount] "
-                + "or /pet admin egg create <egg-id> <definition-id> [duration].");
+        sender.sendMessage("OmniPet: use /pet admin egg give <player_name> <egg-id> [amount] "
+                + "or /pet admin egg create <egg-id> <ID> [duration].");
     }
 
     private static void requireMainThread() {

@@ -37,8 +37,8 @@ enum StudioFieldPrompt {
             "<maxLevel>;<experienceFormula> or none",
             "50;100 * level"),
     SKILLS("skills", "Skills",
-            "<provider:id>|<trigger>|<cooldown>|<chance>|<stamina>|<target>; repeat with ; or type none",
-            "mythicmobs:Fireball|ACTIVE|30s|1.0|10|SELF"),
+            "MythicMobs ID; repeat with ;, type none, or use <provider:id>|<trigger>|<cooldown>|<chance>|<stamina>|<target>",
+            "Fireball; Heal"),
     // The example names keys the runtime actually reads. It used to suggest `glow=true;particle=flame`,
     // neither of which exists, so an operator following the prompt got a pet that moved exactly as before.
     BEHAVIOR("behavior", "Movement",

@@ -212,6 +212,105 @@ class IdleBehaviourTest {
         assertEquals(0.0, broken.laziness());
     }
 
+    @Test
+    void aSteeredPetHasNoPlayTarget() {
+        // ACTIVE means the owner is moving and the steering controller owns the pet; play must not fight it.
+        assertEquals(null, IdleBehaviour.playTarget(
+                RuntimeVector.ZERO, FORWARD, SIDE, 1.0,
+                IdleBehaviour.State.ACTIVE, IdleBehaviour.temperament(PET), MovementProfile.defaults()));
+    }
+
+    @Test
+    void aPlayingPetCirclesItsOwnerWithinReach() {
+        MovementProfile profile = MovementProfile.defaults();
+        IdleBehaviour.Temperament temperament = IdleBehaviour.temperament(PET);
+        RuntimeVector owner = new RuntimeVector(10, 64, 10);
+
+        // Sampled around a full orbit: the pet must stay a plausible pet-distance from its owner, never
+        // snapping across the map, and always at a finite point.
+        double maxHorizontal = 0;
+        for (double phase = 0; phase < Math.PI * 4; phase += 0.2) {
+            RuntimeVector target = IdleBehaviour.playTarget(
+                    owner, FORWARD, SIDE, phase, IdleBehaviour.State.ATTENTIVE, temperament, profile);
+            assertTrue(Double.isFinite(target.length()), "play target must be finite");
+            double dx = target.x() - owner.x();
+            double dz = target.z() - owner.z();
+            maxHorizontal = Math.max(maxHorizontal, Math.sqrt(dx * dx + dz * dz));
+        }
+        // The orbit breathes out to at most radius*(1+dart); nowhere near the safety snap distance.
+        assertTrue(maxHorizontal > 0.2, "a playing pet has to actually leave its follow spot");
+        assertTrue(maxHorizontal < profile.safetySnapDistance(),
+                "a playing pet must never wander far enough to trip the safety snap: " + maxHorizontal);
+    }
+
+    @Test
+    void playIsDeterministicForAGivenPhase() {
+        MovementProfile profile = MovementProfile.defaults();
+        IdleBehaviour.Temperament temperament = IdleBehaviour.temperament(PET);
+
+        assertEquals(
+                IdleBehaviour.playTarget(RuntimeVector.ZERO, FORWARD, SIDE, 2.4,
+                        IdleBehaviour.State.RESTING, temperament, profile),
+                IdleBehaviour.playTarget(RuntimeVector.ZERO, FORWARD, SIDE, 2.4,
+                        IdleBehaviour.State.RESTING, temperament, profile));
+    }
+
+    @Test
+    void aRestingPetPlaysMoreGentlyThanAnAttentiveOne() {
+        MovementProfile profile = MovementProfile.defaults();
+        IdleBehaviour.Temperament temperament = IdleBehaviour.temperament(PET);
+        RuntimeVector owner = RuntimeVector.ZERO;
+
+        double restingReach = reach(owner, profile, IdleBehaviour.State.RESTING, temperament);
+        double attentiveReach = reach(owner, profile, IdleBehaviour.State.ATTENTIVE, temperament);
+
+        assertTrue(restingReach < attentiveReach,
+                "a curled-up pet should orbit tighter than an alert one: "
+                        + restingReach + " vs " + attentiveReach);
+    }
+
+    @Test
+    void aPlayfulPetRangesWiderThanAPlacidOne() {
+        MovementProfile profile = MovementProfile.defaults();
+        RuntimeVector owner = RuntimeVector.ZERO;
+
+        double playful = reach(owner, profile, IdleBehaviour.State.ATTENTIVE,
+                new IdleBehaviour.Temperament(1.0, 0.5, 0.5));
+        double placid = reach(owner, profile, IdleBehaviour.State.ATTENTIVE,
+                new IdleBehaviour.Temperament(0.0, 0.5, 0.5));
+
+        assertTrue(playful > placid, "playfulness has to widen the orbit: " + playful + " vs " + placid);
+    }
+
+    @Test
+    void unusablePlayInputDegradesToNoTarget() {
+        MovementProfile profile = MovementProfile.defaults();
+        IdleBehaviour.Temperament temperament = IdleBehaviour.temperament(PET);
+        assertEquals(null, IdleBehaviour.playTarget(
+                null, FORWARD, SIDE, 1.0, IdleBehaviour.State.ATTENTIVE, temperament, profile));
+        assertEquals(null, IdleBehaviour.playTarget(
+                RuntimeVector.ZERO, FORWARD, SIDE, Double.NaN, IdleBehaviour.State.ATTENTIVE, temperament, profile));
+        assertEquals(null, IdleBehaviour.playTarget(
+                RuntimeVector.ZERO, FORWARD, SIDE, 1.0, null, temperament, profile));
+    }
+
+    /** The widest horizontal distance from owner over a full orbit, as a proxy for how far it ranges. */
+    private static double reach(
+            RuntimeVector owner, MovementProfile profile, IdleBehaviour.State state,
+            IdleBehaviour.Temperament temperament) {
+        double max = 0;
+        for (double phase = 0; phase < Math.PI * 4; phase += 0.15) {
+            RuntimeVector target = IdleBehaviour.playTarget(owner, FORWARD, SIDE, phase, state, temperament, profile);
+            double dx = target.x() - owner.x();
+            double dz = target.z() - owner.z();
+            max = Math.max(max, Math.sqrt(dx * dx + dz * dz));
+        }
+        return max;
+    }
+
+    private static final RuntimeVector FORWARD = new RuntimeVector(0, 0, 1);
+    private static final RuntimeVector SIDE = new RuntimeVector(-1, 0, 0);
+
     private static int lookArounds(double curiosity) {
         IdleBehaviour.Temperament temperament = new IdleBehaviour.Temperament(0.5, curiosity, 0.5);
         int count = 0;

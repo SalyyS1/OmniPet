@@ -34,6 +34,11 @@ final class PaperRuntimePetState {
     private double flourishRemainingSeconds;
     private IdleBehaviour.OneShot flourish;
     private long lastUpdateNanos;
+    private int particleCounter;
+    private boolean particleDue;
+
+    /** Fallback owner-forward when the pose has none, matching the movement controller's own default. */
+    private static final RuntimeVector FORWARD = new RuntimeVector(0, 0, 1);
 
     private PaperRuntimePetState(
             long rendererGeneration,
@@ -84,11 +89,40 @@ final class PaperRuntimePetState {
     }
 
     void advance(DesiredPet pet, PaperRuntimeOwnerPose owner, long nowNanos, MovementController movement) {
+        advance(pet, owner, nowNanos, movement, false, 0);
+    }
+
+    /**
+     * @param idlePlayEnabled when true, a pet whose owner has stopped plays around them instead of merely
+     *     holding its follow spot; the movement still runs through the same steering, so this only swaps
+     *     the target the pet aims at
+     * @param particleEveryTicks how many advances between vanity-particle bursts while playing; zero or a
+     *     disabled play both leave {@link #particleDue()} false
+     */
+    void advance(
+            DesiredPet pet,
+            PaperRuntimeOwnerPose owner,
+            long nowNanos,
+            MovementController movement,
+            boolean idlePlayEnabled,
+            int particleEveryTicks) {
         double deltaSeconds = elapsedSeconds(nowNanos, lastUpdateNanos);
         double phaseSeconds = elapsedSeconds(nowNanos, phaseStartedNanos);
-        MovementStep step = movement.step(pet.movement(), new MovementInput(
+        // Idle state decided first, because whether the pet plays this tick decides which target it steers
+        // towards. Owner speed comes from the position history advanceIdle keeps, not from this step.
+        advanceIdle(owner, deltaSeconds);
+        RuntimeVector forward = horizontal(owner.forward()).normalizedOr(FORWARD);
+        RuntimeVector side = new RuntimeVector(-forward.z(), 0, forward.x());
+        RuntimeVector playTarget = idlePlayEnabled
+                ? IdleBehaviour.playTarget(owner.position(), forward, side,
+                        phaseSeconds + phaseOffsetRadians, idleState, temperament, pet.movement())
+                : null;
+        MovementInput input = new MovementInput(
                 owner.position(), owner.forward(), position, velocity,
-                deltaSeconds, phaseSeconds, phaseOffsetRadians));
+                deltaSeconds, phaseSeconds, phaseOffsetRadians);
+        MovementStep step = playTarget != null
+                ? movement.stepToward(pet.movement(), input, playTarget)
+                : movement.step(pet.movement(), input);
         position = step.position();
         velocity = step.velocity();
         dashing = step.dashing();
@@ -96,13 +130,41 @@ final class PaperRuntimePetState {
         yaw = step.safetySnap()
                 ? MovementFacing.normalize(owner.yaw())
                 : MovementFacing.yaw(yaw, velocity, deltaSeconds);
-        advanceIdle(owner, deltaSeconds);
         // An idle pet has no motion to derive facing from, so it would keep whatever heading it stopped
-        // on and stare off past its owner. Only once settling has begun, and never during a snap.
+        // on and stare off past its owner. Only once settling has begun, and never during a snap. A
+        // playing pet is moving, but still turns to watch its owner rather than face its orbit tangent.
         if (!step.safetySnap() && idleState != IdleBehaviour.State.ACTIVE) {
             yaw = IdleBehaviour.faceOwner(yaw, owner.position().subtract(position), deltaSeconds);
         }
+        advanceParticle(playTarget != null, particleEveryTicks);
         lastUpdateNanos = nowNanos;
+    }
+
+    /**
+     * Counts advances between vanity-particle bursts while the pet is playing.
+     *
+     * <p>Per-pet rather than a single global beat, so a crowd of pets does not spit every particle on the
+     * same tick. The counter resets the moment the pet stops playing, so it does not bank a burst to fire
+     * the instant it settles.
+     */
+    private void advanceParticle(boolean playing, int everyTicks) {
+        if (!playing || everyTicks <= 0) {
+            particleDue = false;
+            particleCounter = 0;
+            return;
+        }
+        particleCounter++;
+        particleDue = particleCounter >= everyTicks;
+        if (particleDue) particleCounter = 0;
+    }
+
+    /** Whether a vanity particle should be emitted at {@link #position()} this tick. */
+    boolean particleDue() {
+        return particleDue;
+    }
+
+    RuntimeVector position() {
+        return position;
     }
 
     /**
@@ -180,6 +242,10 @@ final class PaperRuntimePetState {
         long elapsed = now - previous;
         if (elapsed < 0) return 0;
         return elapsed / 1_000_000_000.0;
+    }
+
+    private static RuntimeVector horizontal(RuntimeVector vector) {
+        return new RuntimeVector(vector.x(), 0, vector.z());
     }
 
     private static double phaseOffset(UUID petId) {

@@ -2,8 +2,11 @@ package io.github.salyvn.omnipet.paper.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -63,5 +66,35 @@ class OmniPetConfigLoaderTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new OmniPetConfigLoader().parse(shipped.replace(
                         "100 + level * 25 + evolution * 100", "0")));
+    }
+
+    @Test
+    void idlePlayParticleNeedingDataFallsBackWithWarning() {
+        List<String> warnings = new ArrayList<>();
+
+        OmniPetConfig config = new OmniPetConfigLoader().parse("""
+                storage:
+                  vault:
+                    baseCapacity: 30
+                    maxCapacity: 200
+                    legacyPermission: { enabled: true, template: "petstorage.slot.%s", maxScan: 200 }
+                  activeSlots:
+                    multiPetEnabled: true
+                    base: 1
+                    max: 5
+                    entitlement:
+                      mode: OMNIPET
+                      precedence: OMNIPET_AUTHORITATIVE
+                      luckPermsPermissionTemplate: "omnipet.slot.unlocked.%s"
+                    unlocks:
+                      "2": { permission: "", costs: { VAULT: 100 } }
+                idle-play:
+                  particle: DUST
+                """, warnings::add).config();
+
+        assertEquals(org.bukkit.Particle.HEART, config.idlePlay().particle());
+        assertTrue(warnings.stream().anyMatch(
+                warning -> warning.contains("idle-play.particle") && warning.contains("DUST")),
+                "expected a warning naming the rejected particle, got: " + warnings);
     }
 }

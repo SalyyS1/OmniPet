@@ -18,8 +18,9 @@ import java.util.function.Supplier;
  * UUID would need. Every other argument position returns nothing rather than guessing.
  */
 public final class CommandSuggestions {
-    /** The argument hint a node uses for a player, and the only hint that gets value suggestions. */
-    private static final String PLAYER_HINT = "<player>";
+    /** Required and optional player-name hints are the only arguments that get value suggestions. */
+    private static final String REQUIRED_PLAYER_HINT = "<player_name>";
+    private static final String OPTIONAL_PLAYER_HINT = "[player_name]";
 
     private CommandSuggestions() {}
 
@@ -87,7 +88,9 @@ public final class CommandSuggestions {
 
     private static boolean takesPlayerFirst(CommandSpec node) {
         List<String> arguments = node.arguments();
-        return !arguments.isEmpty() && arguments.getFirst().equals(PLAYER_HINT);
+        if (arguments.isEmpty()) return false;
+        String hint = arguments.getFirst();
+        return REQUIRED_PLAYER_HINT.equals(hint) || OPTIONAL_PLAYER_HINT.equals(hint);
     }
 
     private static List<String> prefixed(List<String> values, String partial) {

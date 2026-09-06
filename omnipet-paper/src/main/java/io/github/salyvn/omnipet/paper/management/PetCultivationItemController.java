@@ -63,7 +63,7 @@ public final class PetCultivationItemController {
     }
 
     private static void usage(CommandSender sender) {
-        sender.sendMessage("OmniPet: use /pet admin item candy <online-player> [amount] or "
-                + "/pet admin item breakthrough <online-player> [amount].");
+        sender.sendMessage("OmniPet: use /pet admin item candy <player_name> [amount] or "
+                + "/pet admin item breakthrough <player_name> [amount].");
     }
 }

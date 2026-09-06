@@ -495,6 +495,9 @@ class PaperPetRuntimeCoordinatorTest {
         private final PaperPetRuntimeCoordinator coordinator;
 
         private Fixture(PaperRuntimeSettings settings) {
+            // Idle play pinned off: these tests characterise the base idle layer an operator still gets
+            // with idle-play.enabled false — settling, waking, facing, and flourishes without the orbit.
+            // Play-on movement and its particles live in PaperRuntimeIdlePlayTest.
             coordinator = new PaperPetRuntimeCoordinator(
                     scheduler,
                     settings,
@@ -506,7 +509,10 @@ class PaperPetRuntimeCoordinatorTest {
                                     ownerPosition, new RuntimeVector(0, 0, 1), 0, 0, true))
                             : Optional.empty(),
                     this::readClock,
-                    failures::add);
+                    failures::add,
+                    null,
+                    new IdlePlaySettings(false, org.bukkit.Particle.HEART, 1, 0.3, 10),
+                    PetVanityParticleSink.NONE);
         }
 
         private long readClock() {

@@ -505,14 +505,14 @@ public final class OmniPetCommand implements BasicCommand {
         }
         List<String> named = new java.util.ArrayList<>(arguments);
         // Accepted in either position, because "stats all" for yourself reads as naturally as
-        // "stats <player> all" and refusing one of the two would be a rule to remember for no reason.
+        // "stats <player_name> all" and refusing one of the two would be a rule to remember for no reason.
         boolean verbose = named.removeIf(argument -> argument.equalsIgnoreCase("all"));
         Player subject = named.isEmpty()
                 ? (sender instanceof Player self ? self : null)
                 : org.bukkit.Bukkit.getPlayerExact(named.getFirst());
         if (subject == null) {
             sender.sendMessage(named.isEmpty()
-                    ? "OmniPet: name a player — /pet admin stats <online-player> [all]"
+                    ? "OmniPet: name a player — /pet admin stats <player_name> [all]"
                     : "OmniPet: no online player named " + named.getFirst() + ".");
             return;
         }

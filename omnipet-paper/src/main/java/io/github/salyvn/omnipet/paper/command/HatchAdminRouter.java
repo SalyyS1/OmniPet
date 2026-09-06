@@ -34,9 +34,9 @@ public final class HatchAdminRouter {
 
     private void dispatch(CommandSender sender, HatchAdminCommandParser.Result result) {
         if (result instanceof HatchAdminCommandParser.Invalid) {
-            sender.sendMessage("OmniPet: use /pet admin hatch inspect <player>, "
-                    + "/pet admin hatch reduce|set <player> <incubation-uuid> <millis> [action-uuid], "
-                    + "or /pet admin hatch complete|cancel <player> <incubation-uuid> [action-uuid].");
+            sender.sendMessage("OmniPet: use /pet admin hatch inspect <player_name>, "
+                    + "/pet admin hatch reduce|set <player_name> <incubation-uuid> <millis> [action-uuid], "
+                    + "or /pet admin hatch complete|cancel <player_name> <incubation-uuid> [action-uuid].");
             return;
         }
         if (result instanceof HatchAdminCommandParser.Inspect inspect) {

@@ -88,7 +88,7 @@ public final class OwnerBuffDiagnostics {
     }
 
     /**
-     * The same report with every stat listed, for {@code /pet admin stats <player> all}.
+     * The same report with every stat listed, for {@code /pet admin stats <player_name> all}.
      *
      * <p>Kept as a separate entry point rather than as a flag threaded through the summary, so the default
      * cannot drift back into the wall of text it was. An operator who wants the full list asks for it.

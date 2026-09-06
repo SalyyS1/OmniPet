@@ -182,8 +182,8 @@ public final class IncubationActionItemController {
     }
 
     private static void usage(CommandSender sender) {
-        sender.sendMessage("OmniPet: use /pet admin item reducer <online-player> <seconds> [amount] "
-                + "or /pet admin item instant <online-player> [amount].");
+        sender.sendMessage("OmniPet: use /pet admin item reducer <player_name> <seconds> [amount] "
+                + "or /pet admin item instant <player_name> [amount].");
     }
 
     private static void requireMainThread() {

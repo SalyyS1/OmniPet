@@ -106,7 +106,7 @@ public final class PaperCultivationAdminCommandTarget {
     }
 
     private static void usage(CommandSender sender) {
-        sender.sendMessage("OmniPet: use /pet admin cultivation pending|review <player-uuid> [limit] "
-                + "or /pet admin cultivation recover <player-uuid> <action-uuid>.");
+        sender.sendMessage("OmniPet: use /pet admin cultivation pending|review <player_name> [limit] "
+                + "or /pet admin cultivation recover <player_name> <action-uuid>.");
     }
 }

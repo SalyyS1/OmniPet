@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import io.github.salyvn.omnipet.core.catalog.CatalogHealth;
 import io.github.salyvn.omnipet.core.catalog.StatCatalogEntry;
 import io.github.salyvn.omnipet.core.domain.HeadIcon;
+import io.github.salyvn.omnipet.core.studio.SkillReference;
 import io.github.salyvn.omnipet.core.studio.StatModifierType;
 import io.github.salyvn.omnipet.core.studio.StatRange;
 import io.github.salyvn.omnipet.core.studio.StudioStat;
@@ -30,12 +31,39 @@ class StudioDraftInputParsersTest {
     }
 
     @Test
+    void parsesShortMythicMobsSkillsWithRuntimeDefaults() {
+        List<SkillReference> skills = StudioDraftInputParsers.skills("Fireball; Heal");
+
+        assertEquals(2, skills.size());
+        assertEquals(new SkillReference("MYTHICMOBS", "Fireball"), skills.getFirst());
+        assertEquals(new SkillReference("MYTHICMOBS", "Heal"), skills.get(1));
+    }
+
+    @Test
+    void keepsExplicitProvidersNamespacedIdsAndAdvancedSkills() {
+        List<SkillReference> simple = StudioDraftInputParsers.skills("mythicmobs:omnipet:dash");
+        SkillReference advanced = StudioDraftInputParsers.skills(
+                "MYTHICMOBS:omnipet:dash|ACTIVE|5s|0.5|2|OWNER").getFirst();
+
+        assertEquals("mythicmobs", simple.getFirst().provider());
+        assertEquals("omnipet:dash", simple.getFirst().id());
+        assertEquals("ACTIVE", advanced.trigger());
+        assertEquals(java.time.Duration.ofSeconds(5), advanced.cooldown());
+        assertEquals(0.5, advanced.chance());
+        assertEquals(2.0, advanced.staminaCost());
+        assertEquals("OWNER", advanced.targetPolicy());
+    }
+
+    @Test
     void rejectsMalformedEditorInput() {
         assertThrows(IllegalArgumentException.class, () -> StudioDraftInputParsers.icon("HEAD nope"));
         assertThrows(IllegalArgumentException.class, () -> StudioDraftInputParsers.stats("ATTACK_DAMAGE FLAT 50 10"));
         assertThrows(IllegalArgumentException.class, () -> StudioDraftInputParsers.rarity("COMMON 100 0 1 1"));
         assertThrows(IllegalArgumentException.class, () -> StudioDraftInputParsers.progression("50;level + unknown"));
         assertThrows(IllegalArgumentException.class, () -> StudioDraftInputParsers.skills("MYTHICMOBS:dash|ACTIVE|bad|1|0|OWNER"));
+        assertThrows(IllegalArgumentException.class, () -> StudioDraftInputParsers.skills("Fire Ball"));
+        assertThrows(IllegalArgumentException.class, () -> StudioDraftInputParsers.skills("Fireball;"));
+        assertThrows(IllegalArgumentException.class, () -> StudioDraftInputParsers.skills("MYTHICMOBS:dash|ACTIVE"));
     }
 
     @Test

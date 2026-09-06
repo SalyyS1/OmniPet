@@ -80,7 +80,7 @@ public final class OmniPetCommandTree {
                         adminCultivation(),
                         adminRelease(),
                         CommandSpec.of("stats", "Explain why a player's pet stats are or are not applied")
-                                .args("[online-player]")
+                                .args("[player_name]")
                                 .permission("omnipet.admin.reload"),
                         CommandSpec.of("transactions", "List pending slot transactions")
                                 .args("[limit|menu]", "[cursor]")
@@ -100,16 +100,16 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("reducer", "Give incubation time-reducer items")
-                                .args("<online-player>", "<seconds>", "[amount]")
+                                .args("<player_name>", "<seconds>", "[amount]")
                                 .permission("omnipet.admin.item"),
                         CommandSpec.of("instant", "Give instant-hatch items")
-                                .args("<online-player>", "[amount]")
+                                .args("<player_name>", "[amount]")
                                 .permission("omnipet.admin.item"),
                         CommandSpec.of("candy", "Give EXP candy")
-                                .args("<online-player>", "[amount]")
+                                .args("<player_name>", "[amount]")
                                 .permission("omnipet.admin.item", "omnipet.admin.cultivation"),
                         CommandSpec.of("breakthrough", "Give breakthrough stones")
-                                .args("<online-player>", "[amount]")
+                                .args("<player_name>", "[amount]")
                                 .permission("omnipet.admin.item", "omnipet.admin.cultivation"));
     }
 
@@ -118,10 +118,10 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("give", "Give a hatchable egg to an online player")
-                                .args("<online-player>", "<egg-id>", "[amount]")
+                                .args("<player_name>", "<egg-id>", "[amount]")
                                 .permission("omnipet.admin.egg"),
                         CommandSpec.of("create", "Define an egg that hatches one pet definition")
-                                .args("<egg-id>", "<definition-id>", "[duration]")
+                                .args("<egg-id>", "<ID>", "[duration]")
                                 .permission("omnipet.admin.egg"));
     }
 
@@ -132,7 +132,7 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("give", "Grant a pet, bypassing incubation")
-                                .args("<online-player>", "<definition-id>")
+                                .args("<player_name>", "<ID>")
                                 .permission("omnipet.admin.petgive"));
     }
 
@@ -141,19 +141,19 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("inspect", "Show durable incubation state for a player")
-                                .args("<player>")
+                                .args("<player_name>")
                                 .permission(HatchAdminCommandParser.INSPECT_PERMISSION),
                         CommandSpec.of("reduce", "Reduce remaining incubation time")
-                                .args("<player>", "<incubation-uuid>", "<millis>", "[action-uuid]")
+                                .args("<player_name>", "<incubation-uuid>", "<millis>", "[action-uuid]")
                                 .permission(HatchAdminCommandParser.MANAGE_PERMISSION),
                         CommandSpec.of("set", "Set remaining incubation time")
-                                .args("<player>", "<incubation-uuid>", "<millis>", "[action-uuid]")
+                                .args("<player_name>", "<incubation-uuid>", "<millis>", "[action-uuid]")
                                 .permission(HatchAdminCommandParser.MANAGE_PERMISSION),
                         CommandSpec.of("complete", "Complete an incubation")
-                                .args("<player>", "<incubation-uuid>", "[action-uuid]")
+                                .args("<player_name>", "<incubation-uuid>", "[action-uuid]")
                                 .permission(HatchAdminCommandParser.MANAGE_PERMISSION),
                         CommandSpec.of("cancel", "Cancel an incubation")
-                                .args("<player>", "<incubation-uuid>", "[action-uuid]")
+                                .args("<player_name>", "<incubation-uuid>", "[action-uuid]")
                                 .permission(HatchAdminCommandParser.MANAGE_PERMISSION));
     }
 
@@ -162,10 +162,10 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("pending", "List pending skill reservations")
-                                .args("<player>")
+                                .args("<player_name>")
                                 .permission("omnipet.admin.skill"),
                         CommandSpec.of("rollback", "Roll back one pending reservation")
-                                .args("<player>", "<pet-uuid>", "<action-uuid>")
+                                .args("<player_name>", "<pet-uuid>", "<action-uuid>")
                                 .permission("omnipet.admin.skill"));
     }
 
@@ -174,13 +174,13 @@ public final class OmniPetCommandTree {
                 .group()
                 .child(
                         CommandSpec.of("pending", "List pending cultivation actions")
-                                .args("<player>", "[limit]")
+                                .args("<player_name>", "[limit]")
                                 .permission("omnipet.admin.cultivation"),
                         CommandSpec.of("review", "List cultivation actions needing operator review")
-                                .args("<player>", "[limit]")
+                                .args("<player_name>", "[limit]")
                                 .permission("omnipet.admin.cultivation"),
                         CommandSpec.of("recover", "Recover one cultivation action")
-                                .args("<player>", "<action-uuid>")
+                                .args("<player_name>", "<action-uuid>")
                                 .permission("omnipet.admin.cultivation"));
     }
 
@@ -192,10 +192,10 @@ public final class OmniPetCommandTree {
                                 .args("[limit]")
                                 .permission("omnipet.admin.release"),
                         CommandSpec.of("recover", "Recover one release reward outbox")
-                                .args("<player>", "<transaction-uuid>", "<internal|external>")
+                                .args("<player_name>", "<transaction-uuid>", "<internal|external>")
                                 .permission("omnipet.admin.release"),
                         CommandSpec.of("reconcile", "Reconcile one external release reward")
-                                .args("<transaction-uuid>", "<decision>")
+                                .args("<player_name>", "<transaction-uuid>", "<decision>")
                                 .permission("omnipet.admin.release"));
     }
 }

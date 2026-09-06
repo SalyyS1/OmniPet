@@ -12,7 +12,20 @@ public final class MovementController {
         RuntimeVector forward = horizontal(input.ownerForward()).normalizedOr(DEFAULT_FORWARD);
         RuntimeVector side = new RuntimeVector(-forward.z(), 0, forward.x());
         double phase = input.phaseSeconds() + input.phaseOffsetRadians();
-        RuntimeVector target = baseTarget(profile, input.ownerPosition(), forward, side, phase);
+        return stepToward(profile, input, baseTarget(profile, input.ownerPosition(), forward, side, phase));
+    }
+
+    /**
+     * Steers the pet towards an arbitrary target with the same spring-damper the pattern targets use.
+     *
+     * <p>Split out so idle play can hand in a target of its own — an orbit, a dart, a hop — and get the
+     * identical motion physics rather than a second copy that could drift from this one. {@link #step} is
+     * now just this with the pattern's own target.
+     */
+    public MovementStep stepToward(MovementProfile profile, MovementInput input, RuntimeVector target) {
+        Objects.requireNonNull(profile, "movement profile");
+        Objects.requireNonNull(input, "movement input");
+        Objects.requireNonNull(target, "movement target");
         RuntimeVector error = target.subtract(input.currentPosition());
         double distance = error.length();
         if (!Double.isFinite(distance) || distance >= profile.safetySnapDistance()) {

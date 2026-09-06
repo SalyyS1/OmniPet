@@ -259,8 +259,8 @@ public final class PaperActiveSkillController {
             }
             return;
         }
-        message(sender, "Use /pet admin skill pending <player> or "
-                + "/pet admin skill rollback <player> <pet-uuid> <action-uuid>.", NamedTextColor.YELLOW);
+        message(sender, "Use /pet admin skill pending <player_name> or "
+                + "/pet admin skill rollback <player_name> <pet-uuid> <action-uuid>.", NamedTextColor.YELLOW);
     }
 
     /**

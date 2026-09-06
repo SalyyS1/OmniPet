@@ -50,7 +50,7 @@ public final class ReleaseAdminCommandParser {
     }
 
     private ReleaseAdminParseResult parseRecover(List<String> arguments) {
-        if (arguments.size() != 4) return invalid("usage: recover <player> <transaction-uuid> <internal|external>");
+        if (arguments.size() != 4) return invalid("usage: recover <player_name> <transaction-uuid> <internal|external>");
         ReleaseAdminCommand.Channel channel = ReleaseAdminCommand.Channel.valueOf(
                 arguments.get(3).toUpperCase(Locale.ROOT));
         return accepted(new ReleaseAdminCommand.Recover(
@@ -59,7 +59,7 @@ public final class ReleaseAdminCommandParser {
 
     private ReleaseAdminParseResult parseReconcile(List<String> arguments) {
         if (arguments.size() != 4) {
-            return invalid("usage: reconcile <player> <transaction-uuid> <decision>");
+            return invalid("usage: reconcile <player_name> <transaction-uuid> <decision>");
         }
         String decision = arguments.get(3).replace('-', '_').toUpperCase(Locale.ROOT);
         return accepted(new ReleaseAdminCommand.Reconcile(
@@ -76,7 +76,7 @@ public final class ReleaseAdminCommandParser {
     }
 
     private static String usage() {
-        return "usage: list [limit] | recover <player> <transaction> <internal|external>"
-                + " | reconcile <player> <transaction> <decision>";
+        return "usage: list [limit] | recover <player_name> <transaction> <internal|external>"
+                + " | reconcile <player_name> <transaction> <decision>";
     }
 }

@@ -180,6 +180,58 @@ public final class IdleBehaviour {
     /** How long one flourish runs. Short: it is punctuation between idle loops, not a state. */
     public static final double ONE_SHOT_SECONDS = 1.5;
 
+    /** How far the play orbit breathes in and out, as a fraction of its radius. */
+    public static final double PLAY_DART_FRACTION = 0.45;
+
+    /** How fast the orbit darts out and back, in radians per second — slower than the orbit itself. */
+    public static final double PLAY_DART_RADIANS_PER_SECOND = 0.9;
+
+    /**
+     * Where a playing pet wants to be this instant, or null when nothing is playing.
+     *
+     * <p>This is the offset that makes idle read as a companion rather than a prop. A head pet is an item
+     * display with no animation clips, so the flourish enum never moved it — the only thing that moves any
+     * renderer is its target position, and this is that target. It circles the owner, breathes in and out
+     * as if darting round them, and hops, all layered on the same orbit and bob numbers the steering
+     * profile already carries so nothing new has to be tuned.
+     *
+     * <p>Purely a function of the phase, like every other idle value, so two ticks with the same phase
+     * agree and a test can reproduce a point on the path exactly.
+     *
+     * @param owner       the owner's position, which the pet plays around
+     * @param forward     owner-forward, already horizontal and normalised by the caller
+     * @param side        the owner's right, perpendicular to {@code forward}
+     * @param phase       seconds plus this pet's phase offset, so neighbours are not in lockstep
+     * @param state       {@link State#ACTIVE} yields null; a resting pet plays more gently than an attentive one
+     * @param temperament a playful pet ranges wider; may be null, which reads as middling
+     * @return the world-space target, or null when the pet is being steered and should follow instead
+     */
+    public static RuntimeVector playTarget(
+            RuntimeVector owner,
+            RuntimeVector forward,
+            RuntimeVector side,
+            double phase,
+            State state,
+            Temperament temperament,
+            MovementProfile profile) {
+        if (state == null || state == State.ACTIVE) return null;
+        if (owner == null || forward == null || side == null || profile == null) return null;
+        if (!Double.isFinite(phase)) return null;
+        double playfulness = temperament == null ? 0.5 : temperament.playfulness();
+        // A resting pet still circles, but lower and closer; an attentive one plays at full range.
+        double stateEnergy = state == State.RESTING ? 0.4 : 1.0;
+        double energy = stateEnergy * (0.5 + 0.5 * playfulness);
+        double orbitAngle = phase * profile.orbitRadiansPerSecond();
+        double dart = 1 + PLAY_DART_FRACTION * Math.sin(phase * PLAY_DART_RADIANS_PER_SECOND);
+        // A visible orbit even for a calm pet, widening with energy and breathing with the dart.
+        double radius = profile.orbitRadius() * (0.6 + 0.4 * energy) * dart;
+        double hop = profile.bobAmplitude() * (1 + energy) * Math.abs(Math.sin(phase * profile.bobRadiansPerSecond()));
+        return owner
+                .add(side.multiply(Math.cos(orbitAngle) * radius))
+                .add(forward.multiply(Math.sin(orbitAngle) * radius))
+                .add(new RuntimeVector(0, profile.heightOffset() + hop, 0));
+    }
+
     /**
      * The yaw a pet shows while idle: turned towards its owner.
      *

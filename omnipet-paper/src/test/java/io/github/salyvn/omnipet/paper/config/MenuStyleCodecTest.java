@@ -114,6 +114,13 @@ class MenuStyleCodecTest {
     void everyDocumentedButtonNameIsAcceptedByItsMenu() {
         // config.yml lists the buttons per menu. If that list and knownMenus() disagree, an operator
         // following the documentation gets an unknown-button warning for a name that should work.
+        assertTrue(MenuStyle.knownMenus().get("vault").containsAll(
+                List.of("lockedSlot", "lockedSlotIdle")));
+        assertTrue(MenuStyle.knownMenus().get("hatch").containsAll(
+                List.of("redeemMain", "redeemOff")));
+        assertEquals(java.util.Set.of("status", "reducer", "instant", "handIdle", "refresh", "hub"),
+                MenuStyle.knownMenus().get("placedEgg"));
+
         MenuStyle.knownMenus().forEach((menu, buttons) -> buttons.forEach(button -> {
             List<String> perButton = new ArrayList<>();
             Map<String, MenuStyle> parsed = codec.parse(Map.of(

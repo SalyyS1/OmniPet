@@ -53,7 +53,18 @@ class CommandHelpTest {
 
         assertFalse(usages.contains("/pet admin"), "admin only groups children");
         assertFalse(usages.contains("/pet admin item"), "item only groups children");
-        assertTrue(usages.contains("/pet admin item candy <online-player> [amount]"));
+        assertTrue(usages.contains("/pet admin item candy <player_name> [amount]"));
+    }
+
+    @Test
+    void definitionArgumentsUseTheShortIdHint() {
+        List<String> usages = usages(EVERYTHING, true);
+
+        assertTrue(usages.contains("/pet admin egg create <egg-id> <ID> [duration]"));
+        assertTrue(usages.contains("/pet admin pet give <player_name> <ID>"));
+        assertTrue(usages.contains(
+                "/pet admin release reconcile <player_name> <transaction-uuid> <decision>"));
+        assertTrue(usages.stream().noneMatch(usage -> usage.contains("<definition-id>")));
     }
 
     @Test

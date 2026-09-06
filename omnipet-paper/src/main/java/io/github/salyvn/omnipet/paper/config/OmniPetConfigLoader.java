@@ -16,6 +16,7 @@ import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
 import io.github.salyvn.omnipet.core.studio.input.CompiledFormula;
 import io.github.salyvn.omnipet.core.studio.input.StudioFormulaValidator;
 import io.github.salyvn.omnipet.paper.render.PaperHeadRendererSettings;
+import io.github.salyvn.omnipet.paper.runtime.IdlePlaySettings;
 import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeSettings;
 
 /** Aggregate loader that preserves the strict Phase 4 storage contract. */
@@ -29,7 +30,7 @@ public final class OmniPetConfigLoader {
      * {@code docs/integrations.md}.
      */
     private static final Set<String> ROOT_KEYS =
-            Set.of("storage", "runtime", "render", "progression", "items", "integrations", "gui");
+            Set.of("storage", "runtime", "render", "idle-play", "progression", "items", "integrations", "gui");
     private static final ItemAppearanceCodec APPEARANCES = new ItemAppearanceCodec();
 
     public LoadResult load(Path file) throws IOException {
@@ -60,12 +61,13 @@ public final class OmniPetConfigLoader {
                         "storage", requiredMap(root.get("storage"), "storage"))));
         PaperRuntimeSettings runtime = runtime(optionalMap(root.get("runtime"), "runtime"));
         PaperHeadRendererSettings render = render(optionalMap(root.get("render"), "render"));
+        IdlePlaySettings idlePlay = idlePlay(optionalMap(root.get("idle-play"), "idle-play"), warnings);
         Map<String, Object> progressionValues = optionalMap(root.get("progression"), "progression");
         ProgressionConfig progression = progression(progressionValues);
         Map<String, Object> itemValues = optionalMap(root.get("items"), "items");
         OmniPetConfig.CultivationItems items = items(itemValues);
         GuiConfig gui = new GuiConfigLoader().parse(root.get("gui"), warnings);
-        return new LoadResult(new OmniPetConfig(storage.config(), runtime, render, progression,
+        return new LoadResult(new OmniPetConfig(storage.config(), runtime, render, idlePlay, progression,
                 experienceFormulaSource(progressionValues),
                 killExperience(optionalMap(
                         progressionValues.get("killExperience"), "progression.killExperience")),
@@ -91,6 +93,13 @@ public final class OmniPetConfigLoader {
         render.put("interpolationTicks", config.render().interpolationTicks());
         render.put("maximumLeanDegrees", config.render().maximumLeanDegrees());
         render.put("nameplates", config.render().nameplates());
+        // Written back like every other tuned section, so a legacy migration does not reset a pet's play.
+        LinkedHashMap<String, Object> idlePlay = new LinkedHashMap<>();
+        idlePlay.put("enabled", config.idlePlay().enabled());
+        idlePlay.put("particle", config.idlePlay().particle().name());
+        idlePlay.put("particleCount", config.idlePlay().particleCount());
+        idlePlay.put("particleSpread", config.idlePlay().particleSpread());
+        idlePlay.put("particleEveryTicks", config.idlePlay().particleEveryTicks());
         LinkedHashMap<String, Object> progression = new LinkedHashMap<>();
         progression.put("maxLevel", config.progression().maxLevel());
         progression.put("maxStamina", config.progression().maxStamina());
@@ -122,6 +131,7 @@ public final class OmniPetConfigLoader {
         root.put("storage", storageRoot.get("storage"));
         root.put("runtime", runtime);
         root.put("render", render);
+        root.put("idle-play", idlePlay);
         root.put("progression", progression);
         root.put("items", items);
         // Serialised, not omitted: encode() is what a legacy migration writes back, so leaving gui out
@@ -190,6 +200,49 @@ public final class OmniPetConfigLoader {
                 truthy(values.getOrDefault("nameplates", defaults.nameplates()), "render.nameplates"),
                 truthy(values.getOrDefault("nameplateStatus", defaults.nameplateStatus()),
                         "render.nameplateStatus"));
+    }
+
+    /**
+     * How idle pets play around a still owner, and the vanity particle they trail.
+     *
+     * <p>The numeric bounds are strict like {@code runtime:} — a spread or cadence out of range steers
+     * every pet and an operator should hear about it. The fail-soft key is the particle name: a name
+     * this server version does not have, or one whose bursts need extra data OmniPet does not send,
+     * falls back to the default and warns, rather than refusing to start the plugin over one cosmetic
+     * key.
+     */
+    private static IdlePlaySettings idlePlay(Map<String, Object> values, Consumer<String> warnings) {
+        rejectUnknown(values, Set.of(
+                "enabled", "particle", "particleCount", "particleSpread", "particleEveryTicks"), "idle-play");
+        IdlePlaySettings defaults = IdlePlaySettings.defaults();
+        org.bukkit.Particle particle = defaults.particle();
+        Object rawParticle = values.get("particle");
+        if (rawParticle != null) {
+            try {
+                org.bukkit.Particle named = org.bukkit.Particle.valueOf(
+                        text(rawParticle, "idle-play.particle").trim().toUpperCase(java.util.Locale.ROOT));
+                if (named.getDataType() == Void.class) {
+                    particle = named;
+                } else {
+                    // The sink calls the no-data spawnParticle overload, so DUST, BLOCK, ITEM and their
+                    // kin would throw per burst and fill the log. Warn like an unknown name instead.
+                    warnings.accept("particle '" + rawParticle + "' for idle-play.particle needs particle"
+                            + " data OmniPet does not send; playing pets will trail the default instead");
+                }
+            } catch (IllegalArgumentException unknown) {
+                warnings.accept("unknown particle '" + rawParticle
+                        + "' for idle-play.particle; playing pets will trail the default instead");
+            }
+        }
+        return new IdlePlaySettings(
+                truthy(values.getOrDefault("enabled", defaults.enabled()), "idle-play.enabled"),
+                particle,
+                integer(values.getOrDefault("particleCount", defaults.particleCount()),
+                        "idle-play.particleCount"),
+                number(values.getOrDefault("particleSpread", defaults.particleSpread()),
+                        "idle-play.particleSpread"),
+                integer(values.getOrDefault("particleEveryTicks", defaults.particleEveryTicks()),
+                        "idle-play.particleEveryTicks"));
     }
 
     private static PaperRuntimeSettings runtime(Map<String, Object> values) {

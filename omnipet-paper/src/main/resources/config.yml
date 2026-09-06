@@ -150,6 +150,29 @@ render:
 
 
 # ----------------------------------------------------------------------------------------------
+#  IDLE PLAY - what a pet does when its owner stands still
+# ----------------------------------------------------------------------------------------------
+#  RESTART ONLY, like render: the runtime is wired with these values when it is built, and a
+#  reload keeps the running wiring. When the owner stops moving, the pet plays around them: it
+#  circles, darts in and out, and hops, and trails a small vanity particle so nearby players see
+#  it too. Set enabled to false for the older, calmer pet that simply holds its follow spot and
+#  watches its owner.
+# ----------------------------------------------------------------------------------------------
+idle-play:
+  enabled: true
+  # Any org.bukkit.Particle name. An unknown name, or one that needs extra data (DUST, BLOCK, ITEM,
+  # ...), falls back to the default and warns rather than failing startup. HEART and HAPPY_VILLAGER
+  # read as a contented pet.
+  particle: HEART
+  # 1..16 particles per burst. Kept small because the burst is drawn for everyone nearby.
+  particleCount: 1
+  # How far the burst scatters, in blocks (0..2).
+  particleSpread: 0.3
+  # Ticks between bursts while playing (5..200). 20 ticks is one second.
+  particleEveryTicks: 10
+
+
+# ----------------------------------------------------------------------------------------------
 #  PROGRESSION - levelling, stamina, and the default EXP curve
 # ----------------------------------------------------------------------------------------------
 #  Server-wide fallback. Any pet definition may override the formula for itself.

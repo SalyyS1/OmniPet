@@ -176,23 +176,44 @@ final class StudioDraftInputParsers {
         if (isNone(input)) return List.of();
         List<SkillReference> result = new ArrayList<>();
         for (String entry : required(input).split(";", -1)) {
-            String[] fields = entry.trim().split("\\|", -1);
-            if (fields.length != 6) throw new IllegalArgumentException("skill format: <provider:id>|<trigger>|<cooldown>|<chance>|<stamina>|<target>");
-            int separator = fields[0].indexOf(':');
-            if (separator <= 0 || separator == fields[0].length() - 1) throw new IllegalArgumentException("skill requires provider:id");
-            Duration cooldown = fields[2].equalsIgnoreCase("none") ? null
-                    : StudioInputParsers.parsePositiveDuration(fields[2]);
-            result.add(new SkillReference(
-                    fields[0].substring(0, separator),
-                    fields[0].substring(separator + 1),
-                    nullable(fields[1]),
-                    cooldown,
-                    StudioInputParsers.parseChance(fields[3]),
-                    nonNegative(fields[4], "stamina"),
-                    nullable(fields[5]),
-                    Map.of()));
+            String value = required(entry);
+            result.add(value.contains("|") ? advancedSkill(value) : simpleSkill(value));
         }
         return List.copyOf(result);
+    }
+
+    /** A bare ID is the common MythicMobs case; an optional provider prefix remains available. */
+    private static SkillReference simpleSkill(String value) {
+        if (value.chars().anyMatch(Character::isWhitespace)) {
+            throw new IllegalArgumentException("skill shorthand: <id> or <provider:id>");
+        }
+        int separator = value.indexOf(':');
+        if (separator < 0) return new SkillReference("MYTHICMOBS", value);
+        if (separator == 0 || separator == value.length() - 1) {
+            throw new IllegalArgumentException("skill shorthand: <id> or <provider:id>");
+        }
+        return new SkillReference(value.substring(0, separator), value.substring(separator + 1));
+    }
+
+    private static SkillReference advancedSkill(String value) {
+        String[] fields = value.split("\\|", -1);
+        if (fields.length != 6) throw new IllegalArgumentException(
+                "skill format: <provider:id>|<trigger>|<cooldown>|<chance>|<stamina>|<target>");
+        int separator = fields[0].indexOf(':');
+        if (separator <= 0 || separator == fields[0].length() - 1) {
+            throw new IllegalArgumentException("skill requires provider:id");
+        }
+        Duration cooldown = fields[2].equalsIgnoreCase("none") ? null
+                : StudioInputParsers.parsePositiveDuration(fields[2]);
+        return new SkillReference(
+                fields[0].substring(0, separator),
+                fields[0].substring(separator + 1),
+                nullable(fields[1]),
+                cooldown,
+                StudioInputParsers.parseChance(fields[3]),
+                nonNegative(fields[4], "stamina"),
+                nullable(fields[5]),
+                Map.of());
     }
 
     static Map<String, Object> behavior(String input) {

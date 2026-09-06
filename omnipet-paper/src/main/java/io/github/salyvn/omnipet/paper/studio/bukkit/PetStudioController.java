@@ -415,7 +415,7 @@ public final class PetStudioController {
             var result = eggs.createCompanionEgg(definition);
             switch (result.outcome()) {
                 case CREATED -> player.sendMessage("OmniPet: created egg " + result.eggId()
-                        + "; give it with /pet admin egg give <player> " + result.eggId() + ".");
+                        + "; give it with /pet admin egg give <player_name> " + result.eggId() + ".");
                 case TIER_MISMATCH -> player.sendMessage("OmniPet: egg " + result.eggId()
                         + " is still on the previous tier and will not hatch this pet. Re-create it with "
                         + "/pet admin egg create " + result.eggId() + " " + definition.id() + ".");

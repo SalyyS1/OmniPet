@@ -69,6 +69,46 @@ class MovementControllerTest {
                 defaults.dashSpeedMultiplier(), defaults.safetySnapDistance(), defaults.maxDeltaSeconds()));
     }
 
+    @Test
+    void stepTowardAnArbitraryTargetUsesTheSameBoundedMotion() {
+        MovementProfile profile = MovementProfile.defaults();
+        MovementInput in = input(new RuntimeVector(0, 1, 0), 0.05, 0);
+        RuntimeVector target = new RuntimeVector(1.5, 2, 0.5);
+
+        MovementStep step = movement.stepToward(profile, in, target);
+
+        assertFalse(step.safetySnap());
+        assertEquals(target, step.target());
+        assertTrue(step.velocity().length() <= profile.maxSpeed());
+        assertTrue(Double.isFinite(step.position().length()));
+    }
+
+    @Test
+    void stepIsStepTowardItsOwnPatternTarget() {
+        // step() must stay exactly stepToward(baseTarget), or idle play would move on different physics
+        // from following.
+        MovementProfile profile = MovementProfile.defaults();
+        MovementInput in = input(new RuntimeVector(0, 1, 0), 0.05, 1.3);
+
+        MovementStep viaStep = movement.step(profile, in);
+        MovementStep viaToward = movement.stepToward(profile, in, viaStep.target());
+
+        assertEquals(viaStep, viaToward);
+    }
+
+    @Test
+    void aDistantTargetSnapsWithoutVelocityWhicheverEntryPoint() {
+        MovementProfile profile = MovementProfile.defaults();
+        MovementInput in = input(RuntimeVector.ZERO, 0.05, 0);
+        RuntimeVector distant = new RuntimeVector(100, 100, 100);
+
+        MovementStep step = movement.stepToward(profile, in, distant);
+
+        assertTrue(step.safetySnap());
+        assertEquals(distant, step.position());
+        assertEquals(RuntimeVector.ZERO, step.velocity());
+    }
+
     private static MovementInput input(RuntimeVector current, double delta, double phase) {
         return new MovementInput(
                 RuntimeVector.ZERO,

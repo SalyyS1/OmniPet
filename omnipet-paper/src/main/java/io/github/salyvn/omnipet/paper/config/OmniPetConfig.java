@@ -4,12 +4,14 @@ import java.util.Objects;
 
 import io.github.salyvn.omnipet.core.progression.ProgressionConfig;
 import io.github.salyvn.omnipet.paper.render.PaperHeadRendererSettings;
+import io.github.salyvn.omnipet.paper.runtime.IdlePlaySettings;
 import io.github.salyvn.omnipet.paper.runtime.PaperRuntimeSettings;
 
 public record OmniPetConfig(
         Phase4PaperConfig storage,
         PaperRuntimeSettings runtime,
         PaperHeadRendererSettings render,
+        IdlePlaySettings idlePlay,
         ProgressionConfig progression,
         String experienceFormulaSource,
         io.github.salyvn.omnipet.core.progression.KillExperienceRules killExperience,
@@ -23,6 +25,8 @@ public record OmniPetConfig(
         storage = Objects.requireNonNull(storage, "storage config");
         runtime = Objects.requireNonNull(runtime, "runtime config");
         render = render == null ? PaperHeadRendererSettings.defaults() : render;
+        // Absent means the built-in playful default, which is what this feature ships on.
+        idlePlay = idlePlay == null ? IdlePlaySettings.defaults() : idlePlay;
         progression = Objects.requireNonNull(progression, "progression config");
         // Absent means off, so an existing config keeps behaving as it did until an operator opts in.
         killExperience = killExperience == null

@@ -12,6 +12,7 @@ public record PaperRuntimeFailure(UUID ownerId, UUID petInstanceId, Stage stage,
         SNAPSHOT,
         OWNER_POSE,
         MOVEMENT,
+        PARTICLE,
         RECONCILIATION,
         CLEANUP,
         COORDINATOR

@@ -20,9 +20,13 @@ class PaperRuntimeProductionWiringTest {
                 "src/main/java/io/github/salyvn/omnipet/paper/OmniPetPlugin.java"));
 
         // The renderer settings travel with the runtime settings, so both renderers are tuned from the
-        // same config rather than one of them silently keeping its built-in numbers.
-        assertTrue(source.contains(
-                "petRuntime = PaperRuntimeBootstrap.create(this, activeConfig.runtime(), activeConfig.render())"));
+        // same config rather than one of them silently keeping its built-in numbers, and idle play travels
+        // beside them so the whole runtime is configured from one place. Whitespace-collapsed so a
+        // line-wrap of the call does not read as a wiring change.
+        String collapsed = source.replaceAll("\\s+", " ");
+        assertTrue(collapsed.contains(
+                "petRuntime = PaperRuntimeBootstrap.create( this, activeConfig.runtime(), "
+                        + "activeConfig.render(), activeConfig.idlePlay())"), collapsed);
         assertTrue(source.contains("new PaperRuntimeSnapshotPublisher(petRuntime, registry)"));
         assertTrue(source.contains("new PlayerStorageLifecycleListener("));
         assertTrue(source.contains("managementServices::onJoin"));

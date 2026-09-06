@@ -60,6 +60,9 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
      * @param interactions the same index handed to {@code activation}, so {@link #petFor(UUID)} can
      *     answer entity lookups. Null when the caller does not need reverse lookup, in which case
      *     {@code petFor} is always empty rather than throwing.
+     *
+     * <p>Idle play defaults to enabled with a no-op particle sink, so playing pets leave no trail;
+     * use the longer overload to wire a real one.
      */
     public PaperPetRuntimeCoordinator(
             PaperRuntimeScheduler scheduler,
@@ -71,6 +74,26 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
             LongSupplier nanoTime,
             PaperRuntimeFailureSink failures,
             InteractionIndex interactions) {
+        this(scheduler, settings, activation, movement, renderers, poses, nanoTime, failures, interactions,
+                IdlePlaySettings.defaults(), PetVanityParticleSink.NONE);
+    }
+
+    /**
+     * @param idlePlay how pets behave around a still owner, and the vanity particle they trail
+     * @param particles where those particles are drawn; {@link PetVanityParticleSink#NONE} for none
+     */
+    public PaperPetRuntimeCoordinator(
+            PaperRuntimeScheduler scheduler,
+            PaperRuntimeSettings settings,
+            PetActivationService activation,
+            MovementController movement,
+            ActivationRendererResolver renderers,
+            PaperRuntimeOwnerPoseSource poses,
+            LongSupplier nanoTime,
+            PaperRuntimeFailureSink failures,
+            InteractionIndex interactions,
+            IdlePlaySettings idlePlay,
+            PetVanityParticleSink particles) {
         this.scheduler = Objects.requireNonNull(scheduler, "runtime scheduler");
         this.settings = Objects.requireNonNull(settings, "runtime settings");
         this.failures = Objects.requireNonNull(failures, "runtime failure sink");
@@ -78,6 +101,7 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
         // Retained as well as handed to the engine: the engine uses it as a movement clock, the tick
         // loop uses it to stop before it has spent more of the tick than the operator allowed.
         this.nanoTime = Objects.requireNonNull(nanoTime, "runtime monotonic clock");
+        Objects.requireNonNull(idlePlay, "idle-play settings");
         this.engine = new PaperRuntimeOwnerEngine(
                 Objects.requireNonNull(activation, "pet activation service"),
                 Objects.requireNonNull(movement, "movement controller"),
@@ -85,7 +109,10 @@ public final class PaperPetRuntimeCoordinator implements AutoCloseable {
                 Objects.requireNonNull(poses, "owner pose source"),
                 nanoTime,
                 failures,
-                settings.maximumPetsPerOwner());
+                settings.maximumPetsPerOwner(),
+                idlePlay.enabled(),
+                idlePlay.effectiveParticleEveryTicks(),
+                idlePlay.enabled() ? particles : PetVanityParticleSink.NONE);
     }
 
     public synchronized void start() {

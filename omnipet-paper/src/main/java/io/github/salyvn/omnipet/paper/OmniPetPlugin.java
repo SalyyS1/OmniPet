@@ -170,7 +170,8 @@ public final class OmniPetPlugin extends JavaPlugin {
             PurchaseTransactionCoordinator purchaseTransactions = new PurchaseTransactionCoordinator();
             registry = new InMemoryRegistrySnapshotRepository();
             var snapshot = new FoundationRegistryLoader().load(definitions, registry);
-            petRuntime = PaperRuntimeBootstrap.create(this, activeConfig.runtime(), activeConfig.render());
+            petRuntime = PaperRuntimeBootstrap.create(
+                    this, activeConfig.runtime(), activeConfig.render(), activeConfig.idlePlay());
             ownerBuffs = new PaperOwnerBuffCoordinator(this);
             ownerBuffs.refreshProvider();
             skillProviders = new PaperMythicMobsSkillContext(this);
@@ -443,6 +444,9 @@ public final class OmniPetPlugin extends JavaPlugin {
             managementServices.updateConfig(staged);
             if (!activeConfig.runtime().equals(staged.runtime())) {
                 getLogger().warning("Runtime scheduler settings changed; restart the server to activate them safely.");
+            }
+            if (!activeConfig.idlePlay().equals(staged.idlePlay())) {
+                getLogger().warning("Idle-play settings changed; restart the server to activate them safely.");
             }
             activeConfig = staged;
             GuiSettings.bind(staged.gui());

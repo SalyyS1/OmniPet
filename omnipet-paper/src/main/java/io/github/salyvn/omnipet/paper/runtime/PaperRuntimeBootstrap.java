@@ -25,9 +25,19 @@ public final class PaperRuntimeBootstrap {
     /** Both renderers share {@code render}, so retuning movement cannot apply to only one of them. */
     public static PaperPetRuntimeCoordinator create(
             JavaPlugin plugin, PaperRuntimeSettings settings, PaperHeadRendererSettings render) {
+        return create(plugin, settings, render, IdlePlaySettings.defaults());
+    }
+
+    /** Idle play and its vanity particles are wired here so a disabled feature installs a no-op sink. */
+    public static PaperPetRuntimeCoordinator create(
+            JavaPlugin plugin,
+            PaperRuntimeSettings settings,
+            PaperHeadRendererSettings render,
+            IdlePlaySettings idlePlay) {
         Objects.requireNonNull(plugin, "runtime plugin");
         Objects.requireNonNull(settings, "runtime settings");
         Objects.requireNonNull(render, "renderer settings");
+        Objects.requireNonNull(idlePlay, "idle-play settings");
         PaperHeadRenderer head = new PaperHeadRenderer(render);
         HeadFallbackRendererResolver renderers = new HeadFallbackRendererResolver(
                 new PaperModelEngineRendererResolver(plugin, render),
@@ -38,6 +48,9 @@ public final class PaperRuntimeBootstrap {
         // Retained rather than discarded: this index is already populated on spawn and purged on
         // remove, so exposing it is all that stood between a rendered pet and a right-click.
         InteractionIndex interactions = new InteractionIndex();
+        PetVanityParticleSink particles = idlePlay.enabled()
+                ? new BukkitPetVanityParticleSink(idlePlay)
+                : PetVanityParticleSink.NONE;
         return new PaperPetRuntimeCoordinator(
                 new BukkitPaperRuntimeScheduler(plugin),
                 settings,
@@ -47,7 +60,9 @@ public final class PaperRuntimeBootstrap {
                 new BukkitPaperRuntimeOwnerPoseSource(),
                 System::nanoTime,
                 failure -> plugin.getLogger().warning(format(failure)),
-                interactions);
+                interactions,
+                idlePlay,
+                particles);
     }
 
     private static String format(PaperRuntimeFailure failure) {

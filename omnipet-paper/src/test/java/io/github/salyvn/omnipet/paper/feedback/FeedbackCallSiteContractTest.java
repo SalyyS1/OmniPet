@@ -36,24 +36,33 @@ class FeedbackCallSiteContractTest {
     }
 
     @Test
-    void particlesFunnelThroughTheSameOutputAndNeverToAWorld() throws IOException {
-        // World.spawnParticle shows the burst to everyone nearby, so it carries exactly the griefing
-        // risk the sound rule exists to prevent. Player.spawnParticle shows it to the acting player.
+    void particlesFunnelThroughTwoAuditedSinksAndOnlyTheThrottledOneBroadcasts() throws IOException {
+        // World.spawnParticle shows the burst to everyone nearby, so it carries exactly the griefing risk
+        // the sound rule exists to prevent. There are exactly two audited call sites: click feedback, which
+        // stays player-scoped, and the idle vanity trail, which a pet playing for its owner alone would be
+        // invisible in — so it broadcasts, but only a handful of particles throttled per pet per several
+        // ticks, which cannot be turned into a sprayer.
         List<Path> withParticles = sources()
                 .filter(path -> Pattern.compile("^(?!\\s*\\*).*\\.spawnParticle\\(", Pattern.MULTILINE)
                         .matcher(read(path)).find())
                 .toList();
 
-        assertEquals(1, withParticles.size(),
-                "particles must funnel through BukkitFeedbackOutput so the rate limit cannot be bypassed: "
+        assertEquals(2, withParticles.size(),
+                "particles must funnel through the two audited sinks so the throttle cannot be bypassed: "
                         + withParticles);
-        assertTrue(withParticles.getFirst().endsWith("BukkitFeedbackOutput.java"), withParticles.toString());
+        assertTrue(withParticles.stream().anyMatch(path -> path.endsWith("BukkitFeedbackOutput.java")),
+                withParticles.toString());
+        assertTrue(withParticles.stream().anyMatch(path -> path.endsWith("BukkitPetVanityParticleSink.java")),
+                withParticles.toString());
 
+        // The only broadcast is the rate-limited idle trail. Click feedback must stay player-scoped.
         List<String> broadcast = sources()
                 .filter(path -> read(path).contains("getWorld().spawnParticle"))
                 .map(Path::toString)
                 .toList();
-        assertTrue(broadcast.isEmpty(), "a burst must be visible to the acting player only: " + broadcast);
+        assertEquals(1, broadcast.size(),
+                "the only world-visible burst is the throttled idle trail: " + broadcast);
+        assertTrue(broadcast.getFirst().endsWith("BukkitPetVanityParticleSink.java"), broadcast.toString());
     }
 
     @Test

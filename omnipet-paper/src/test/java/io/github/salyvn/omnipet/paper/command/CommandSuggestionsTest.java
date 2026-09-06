@@ -79,10 +79,9 @@ class CommandSuggestionsTest {
     }
 
     @Test
-    void anArgumentPositionSuggestsNothingRatherThanGuessingAUuid() {
+    void anIdArgumentSuggestsNothingRatherThanGuessing() {
         assertEquals(List.of(), suggest(EVERYTHING, true, "skill", ""));
-        assertEquals(List.of(), suggest(EVERYTHING, true, "admin", "hatch", "inspect", ""));
-        // `reconcile` takes a transaction UUID first, so it has nothing safe to enumerate.
+        // Slot reconciliation takes a transaction UUID first, so it has nothing safe to enumerate.
         assertEquals(List.of(), suggest(EVERYTHING, true, "admin", "reconcile", ""));
     }
 
@@ -114,19 +113,22 @@ class CommandSuggestionsTest {
         return CommandSuggestions.suggest(OmniPetCommandTree.root(), hasPermission, isPlayer, args);
     }
     @Test
-    void aPlayerArgumentSuggestsOnlineNames() {
-        // The one argument position worth completing. Reading the online roster is an in-memory lookup,
-        // unlike resolving a UUID, which is why only names are offered.
+    void requiredAndOptionalPlayerArgumentsSuggestOnlineNames() {
+        // Reading the online roster is an in-memory lookup, unlike resolving an offline profile or UUID.
         java.util.function.Supplier<List<String>> roster = () -> List.of("Steve", "Alex", "Stephanie");
 
         assertEquals(List.of("Steve", "Alex", "Stephanie"),
                 suggestWithRoster(roster, "admin", "hatch", "inspect", ""));
         assertEquals(List.of("Steve", "Stephanie"),
-                suggestWithRoster(roster, "admin", "hatch", "inspect", "Ste"));
+                suggestWithRoster(roster, "admin", "egg", "give", "Ste"));
+        assertEquals(List.of("Steve", "Alex", "Stephanie"),
+                suggestWithRoster(roster, "admin", "stats", ""));
+        assertEquals(List.of("Steve", "Alex", "Stephanie"),
+                suggestWithRoster(roster, "admin", "release", "reconcile", ""));
     }
 
     @Test
-    void anIdArgumentSuggestsNothingRatherThanGuessing() {
+    void aLaterIdArgumentSuggestsNothingRatherThanGuessing() {
         java.util.function.Supplier<List<String>> roster = () -> List.of("Steve");
 
         // Position 2 of `hatch reduce` is an incubation UUID: there is nothing safe to enumerate.

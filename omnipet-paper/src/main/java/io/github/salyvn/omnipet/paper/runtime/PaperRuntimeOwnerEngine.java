@@ -26,6 +26,9 @@ final class PaperRuntimeOwnerEngine {
     private final LongSupplier nanoTime;
     private final PaperRuntimeFailureSink failures;
     private final int maximumPetsPerOwner;
+    private final boolean idlePlayEnabled;
+    private final int particleEveryTicks;
+    private final PetVanityParticleSink particles;
     private final Map<UUID, LinkedHashMap<UUID, PaperRuntimePetState>> states = new LinkedHashMap<>();
     private final Map<UUID, SnapshotKey> reportedInvalidSnapshots = new LinkedHashMap<>();
     /**
@@ -48,6 +51,21 @@ final class PaperRuntimeOwnerEngine {
             LongSupplier nanoTime,
             PaperRuntimeFailureSink failures,
             int maximumPetsPerOwner) {
+        this(activation, movement, renderers, poses, nanoTime, failures, maximumPetsPerOwner,
+                false, 0, PetVanityParticleSink.NONE);
+    }
+
+    PaperRuntimeOwnerEngine(
+            PetActivationService activation,
+            MovementController movement,
+            ActivationRendererResolver renderers,
+            PaperRuntimeOwnerPoseSource poses,
+            LongSupplier nanoTime,
+            PaperRuntimeFailureSink failures,
+            int maximumPetsPerOwner,
+            boolean idlePlayEnabled,
+            int particleEveryTicks,
+            PetVanityParticleSink particles) {
         this.activation = activation;
         this.movement = movement;
         this.renderers = renderers;
@@ -55,6 +73,9 @@ final class PaperRuntimeOwnerEngine {
         this.nanoTime = nanoTime;
         this.failures = failures;
         this.maximumPetsPerOwner = maximumPetsPerOwner;
+        this.idlePlayEnabled = idlePlayEnabled;
+        this.particleEveryTicks = particleEveryTicks;
+        this.particles = particles == null ? PetVanityParticleSink.NONE : particles;
     }
 
     boolean process(PaperRuntimeOwnerSnapshot snapshot) {
@@ -93,10 +114,13 @@ final class PaperRuntimeOwnerEngine {
                             pet, owner, nowNanos, nextRendererGeneration(), movement);
                     ownerStates.put(petId, state);
                 } else {
-                    state.advance(pet, owner, nowNanos, movement);
+                    state.advance(pet, owner, nowNanos, movement, idlePlayEnabled, particleEveryTicks);
                 }
                 requests.add(state.request(ownerId, pet, owner));
                 retained.add(petId);
+                // A playing pet trails particles for the whole world to see; a following one does not. The
+                // burst is best-effort and isolated so a particle backend fault cannot fail the tick.
+                if (state.particleDue()) emitParticle(ownerId, petId, state.position());
             } catch (RuntimeException failure) {
                 ownerStates.remove(petId);
                 report(ownerId, petId, PaperRuntimeFailure.Stage.MOVEMENT, failure);
@@ -152,6 +176,14 @@ final class PaperRuntimeOwnerEngine {
             throw new IllegalStateException("renderer generation space is exhausted");
         }
         return nextRendererGeneration++;
+    }
+
+    private void emitParticle(UUID ownerId, UUID petId, io.github.salyvn.omnipet.core.runtime.RuntimeVector position) {
+        try {
+            particles.emit(ownerId, position);
+        } catch (RuntimeException | LinkageError failure) {
+            report(ownerId, petId, PaperRuntimeFailure.Stage.PARTICLE, failure);
+        }
     }
 
     private void report(UUID ownerId, UUID petId, PaperRuntimeFailure.Stage stage, Throwable failure) {
