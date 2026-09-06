@@ -48,7 +48,7 @@ Serial effort is ~19d. If the three tracks are staffed in parallel the critical 
 
 | # | Phase | Status |
 |---|-------|--------|
-| 1 | [Baseline and settle in-progress work](./phase-01-start.md) | Pending |
+| 1 | [Baseline and settle in-progress work](./phase-01-start.md) | Done |
 | 2 | [Core persistence and concurrency hardening](./phase-02-core-persistence-and-concurrency-hardening.md) | Pending |
 | 3 | [Saga timing and main-thread safety](./phase-03-saga-timing-and-main-thread-safety.md) | Pending |
 | 4 | [Runtime, render, skill integration fixes](./phase-04-runtime-render-skill-integration-fixes.md) | Pending |
@@ -95,6 +95,10 @@ Second-day pass with a working shell (yesterday's session had none). Nothing in 
 - **No bStats service ID exists anywhere in the repo.** Phase 6 ships the vendored class with the ID as a blank config value (no-op) unless the operator supplies one.
 - Baseline re-verified: `gradlew clean build` green — core 75 suites / 369 tests, paper 135 suites / 747 tests, 0 failures / errors / skips; `build/release/OmniPet-3.0.0-SNAPSHOT.jar` 2,014,223 bytes, SHA-256 `4ffa336a4a02eb74c6977c3156459e695fd834ccb895ac5c6ef0be1545d4d2e7`, 1161 entries, 1062 classes. README still quotes the 2026-08-03 checkpoint (1,727,430 bytes / 959 classes) — on Phase 8's stale-claim list.
 - Working tree today: 55 dirty paths (the 49 idle-play files plus this plan's own directory, reports, and journal). `.claude-terminal` stays out of every commit.
+
+## Execution log
+
+- **2026-09-06 (cook, Phase 1).** Code-reviewer gate: verdict yes-with-edits, no P1; its two P2s and the cheap P3s were applied before committing (`getDataType()` particle guard in `OmniPetConfigLoader` + loader test, cultivation usage-string rename, idle-play reload warning in `OmniPetPlugin`, `PARTICLE` failure stage, roadmap hint, CHANGELOG wording). Five commits pushed: `048838d` feat(runtime), `91376a4` fix(skills) hotfix, `5b54ea6` docs, `faa3f04` docs(plans), `3eb78d2` chore(gitignore). CI run 34026139909: gradle + all five compatibility matrix points green — first full-matrix green since 2026-08-06. Pages run 34026139915 deployed; live `wiki-stats.json` serves the committed file. Baseline JAR now 2,014,399 bytes / SHA-256 `02cc67fd…c537`. Phase 4 inherits a green matrix. Leftovers for Phase 8: `docs/wiki-content.js` still carries pre-rename `/petadmin` hints.
 
 ## Cross-Plan Dependencies
 

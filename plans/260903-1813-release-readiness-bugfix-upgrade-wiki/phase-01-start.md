@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Baseline and settle in-progress work"
-status: in-progress
+status: done
 priority: P1
 effort: "3h"
 dependencies: []
@@ -44,23 +44,23 @@ Commit the uncommitted idle-play feature (49 modified/new files, builds green) s
 
 ## Todo
 
-- [x] Reconfirm green build on current tree (2026-09-04 06:10, with the hotfix applied: 210 suites / 1116 tests, 0 failures; `compileCompatibilityJava` green against `1.21.11-R0.1-SNAPSHOT` and the `1.21-R0.1` floor)
-- [ ] Commit idle-play feature + docs (conventional commits, no AI references)
-- [ ] Max-health hotfix committed; `compatibility` green on all five matrix points in CI
-- [x] Record baseline: 210 suites / 1116 tests (core 75 / 369, paper 135 / 747), `build/release/OmniPet-3.0.0-SNAPSHOT.jar` 2,014,223 bytes, SHA-256 `4ffa336a…d2e7`, 1062 classes (2026-09-04)
+- [x] Reconfirm green build on current tree (2026-09-04 06:10, with the hotfix applied: 210 suites / 1116 tests, 0 failures; `compileCompatibilityJava` green against `1.21.11-R0.1-SNAPSHOT` and the `1.21-R0.1` floor; re-verified 2026-09-06 after the Phase 1 review fixes: same counts, both compat targets green, wiki verify green)
+- [x] Commit idle-play feature + docs (conventional commits, no AI references) — 2026-09-06: `048838d` feat(runtime), `91376a4` fix(skills) hotfix, `5b54ea6` docs, `faa3f04` docs(plans), `3eb78d2` chore(gitignore); review gate passed (two P2s + cheap P3s applied first, see `plans/reports/from-code-reviewer-to-cook-phase-01-idle-play-and-max-health-hotfix-review.md`)
+- [x] Max-health hotfix committed; `compatibility` green on all five matrix points in CI (hotfix is `91376a4`; run 34026139909 on 2026-09-06: gradle job and all five matrix points green — first full-matrix green since 2026-08-06)
+- [x] Record baseline: 210 suites / 1116 tests (core 75 / 369, paper 135 / 747), `build/release/OmniPet-3.0.0-SNAPSHOT.jar` 2,014,399 bytes, SHA-256 `02cc67fd7819b46b1e05090dd4fc591785dfc0c0f6f33c34bf74a4cd50cac537` (2026-09-06 build with review fixes; supersedes the 2026-09-04 2,014,223-byte / `4ffa336a…d2e7` artifact)
 - [x] Record `compatibility` job status: red since 2026-08-06 — `1.21-R0.1` green; `1.21.11`, `26.1.1`, `26.1.2`, `26.2` fail on `GENERIC_MAX_HEALTH`
 - [x] Record the compile-range vs certified-range answer: keep the full matrix; "compiles against 1.21 → 26.2", certified range = Phase 9 evidence (operator, 2026-09-04)
 - [x] Record the dependency-locking decision: lockfiles tracked, locking active, keep
-- [ ] Pages deploy for the docs commit succeeded; live stats file updated
-- [ ] Clean `git status`
+- [x] Pages deploy for the docs commit succeeded; live stats file updated (run 34026139915 success; live `wiki-stats.json` now serves the committed 1087 tests / 207 suites instead of the stale 1016 / 199)
+- [x] Clean `git status` (2026-09-06: every source path committed; only the tracked `.claude-terminal` tool-state file and the unapproved `plans/260806-2047-license-and-ip-control/` plan remain out, both by design)
 
 ## Success Criteria
 
-- [ ] `git status` shows no uncommitted source changes
-- [ ] Baseline recorded and reproducible with `gradlew clean build`
-- [ ] `compatibility` job green on every matrix point, so Phase 4 starts from a green baseline
+- [x] `git status` shows no uncommitted source changes (2026-09-06: only tool-state and the unapproved license plan remain out, by design)
+- [x] Baseline recorded and reproducible with `gradlew clean build` (three green builds on 2026-09-06, 210 / 1116)
+- [x] `compatibility` job green on every matrix point, so Phase 4 starts from a green baseline (run 34026139909)
 - [x] Compile range and certified range recorded as two separate facts, so Phase 8 documents Paper support without guessing
-- [ ] Live docs site serves the committed docs
+- [x] Live docs site serves the committed docs (Pages run 34026139915)
 
 ## Risk Assessment
 
