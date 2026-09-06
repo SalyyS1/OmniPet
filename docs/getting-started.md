@@ -71,15 +71,15 @@ The canonical egg catalog is `plugins/OmniPet/eggs/*.yml`, one schema 1 file per
 
 ```
 /pet admin browse                          # create the pet; its egg is written alongside
-/pet admin egg give <player> <id>_egg      # hand out the egg
+/pet admin egg give <player_name> <id>_egg # hand out the egg
 /pet hatch main                            # start incubating
 /pet hatch claim                           # once ready, the pet lands in the vault
 /pet vault                                 # left-click to activate it
 ```
 
 An existing catalog entry is never overwritten, and `gui.studio.autoCreateEgg: false` turns the
-behaviour off. `/pet admin egg create <egg-id> <definition-id> [duration]` defines an egg by hand, and
-`/pet admin pet give <player> <definition-id>` skips incubation entirely for testing.
+behaviour off. `/pet admin egg create <egg-id> <ID> [duration]` defines an egg by hand, and
+`/pet admin pet give <player_name> <ID>` skips incubation entirely for testing.
 
 Hatch start reads the catalog from disk on each use, so a newly written or edited egg is usable
 without a restart. What *is* fixed at startup is the egg count reported in the enable log and the

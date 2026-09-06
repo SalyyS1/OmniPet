@@ -104,7 +104,7 @@ Saving a definition creates the pet's *blueprint*, not a pet in anyone's vault. 
 
 - If `<definitionId>_egg` is unknown, the Studio's auto-create was off or the write failed. Check the
   enable log for `could not create a companion egg`, then run
-  `/pet admin egg create <egg-id> <definition-id> [duration]`.
+  `/pet admin egg create <egg-id> <ID> [duration]`.
 - For a quick test, `/pet admin pet give <you> <definitionId>` skips incubation entirely.
 - An egg without the OmniPet PDC identity is refused by `/pet hatch`. A vanilla turtle egg, or one
   copied with a plugin that drops persistent data, will not work — mint it with `egg give`.

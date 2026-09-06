@@ -164,6 +164,13 @@ render:
   maximumLeanDegrees: 12.0
   nameplates: true
 
+idle-play:
+  enabled: true
+  particle: HEART
+  particleCount: 1
+  particleSpread: 0.3
+  particleEveryTicks: 10
+
 progression:
   maxLevel: 100
   maxStamina: 100.0
@@ -196,6 +203,7 @@ gui:
 ```
 
   `<name>`, `<level>`, and `<status>` are the parts, and anything else on the line is your own text. Leaving a placeholder out simply omits it, so a plate of nothing but the name is `nameplate: "<name>"`. Two keys rather than one because the separator dividing the name from the status belongs to the status, and blanking a placeholder in a single template would leave that separator behind as trailing space. Square brackets mark text that vanishes along with the level when a pet's level cannot be read — keep them around whatever belongs to the level, or a pet with a malformed progression node shows a bare `Lv.` The whole line is parsed as MiniMessage once at the end, so a colour opened in the template closes around the name and the status alike. Both renderers use these templates, so a model pet and a head pet are labelled identically.
+- `idle-play` is what a pet does when its owner stands still. Restart only, like `render`: the runtime is wired with these values when it is built and `/pet admin reload` keeps the running wiring. With `enabled: true` the pet circles its owner, darts in and out, and hops, using the same orbit, bob, and spring numbers as its per-definition `behavior` block, and trails a vanity particle that nearby players see too. `enabled: false` restores the older, calmer pet that holds its follow spot and watches its owner — add it to the list if the server runs every cosmetic off. `particle` is any `org.bukkit.Particle` name; an unknown name, or one whose bursts need extra data OmniPet does not send, warns and falls back to the default rather than refusing to start. The numbers are strict like `runtime:`, because they steer every pet: `particleCount` 1–16 per burst, `particleSpread` 0–2 blocks, `particleEveryTicks` 5–200 ticks between bursts (20 ticks is one second). The section is written back by legacy migration like every other tuned section, so an old file keeps the defaults rather than losing the block.
 - `progression.defaultExperienceFormula` is compiled and evaluated against `formulaSamples` before activation. A non-finite or non-positive sample rejects the config. A pet definition may override the formula; an invalid override falls back to this validated global one. The formula text is retained beside the compiled result, so a legacy migration rewrites your formula rather than resetting it to the default.
 - `overflowPolicy` is `CARRY` or `DISCARD` and decides what happens to experience granted at `maxLevel`.
 - `progression.killExperience` grants a pet experience when its owner kills something. Absent means off, so an upgraded config behaves exactly as it did. `default` is what an unlisted mob is worth; `perMob` overrides it, taking vanilla entity types and MythicMobs internal names in the same map with no prefix and no regard to case. A MythicMobs mob is matched by its own name first, so a custom boss built on a zombie is not paid as a zombie, and `0` excludes a mob without deleting the feature. `share` is `EACH` (every active pet earns the full amount) or `SPLIT` (the amount is divided between them) — `EACH` by default, because splitting means a second pet halves the first one's growth and makes an unlocked slot feel like a downgrade. Only pets actually rendered earn: one that failed to render was not there for the kill. Kills are banked in memory and written every five seconds, so a grinder costs one disk write rather than hundreds, and a crash loses at most those five seconds.
@@ -317,6 +325,8 @@ Optional `display.name` is the floating name above an active pet — the Studio'
 `display.provider` accepts `HEAD` or `MODELENGINE`; `MODELENGINE` requires a non-blank `display.model`.
 
 Admin Pet Studio can also persist bounded `stats`, `rarity.bands`, `progression`, `skills`, `behavior`, and `release` metadata. The editor validates these fields and preserves unknown raw nodes.
+
+For the common MythicMobs case, type only skill IDs: `Fireball; Heal`. Each bare ID uses provider `MYTHICMOBS` plus runtime defaults (`ACTIVE`, no cooldown, full chance, no stamina cost, `LOOK_THEN_NEAREST`). An explicit provider may be written as `mythicmobs:omnipet:dash`. The advanced form remains available when overrides are needed: `mythicmobs:Fireball|ACTIVE|30s|1.0|10|SELF`. Type `none` to clear the list.
 
 A stat's ID is stored as the Studio's logical form — the picker writes `mythiclib:attack_damage` and keeps the provider's own name alongside it. The namespace is stripped again before the stat reaches MythicLib, so both the namespaced form and a bare `ATTACK_DAMAGE` you type yourself work.
 
