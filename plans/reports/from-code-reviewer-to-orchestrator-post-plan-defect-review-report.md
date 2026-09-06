@@ -1,5 +1,7 @@
 # Post-Plan Defect Review — OmniPet (HEAD~6..HEAD, weighted on `061a2a7`)
 
+> **CLOSED — 2026-09-03. Do not re-open.** All five findings are fixed in current code, re-verified during the release-readiness plan's red-team pass: the CRITICAL unhatchable companion egg by `PetIncubationProfileReader.java:24-48` (`IMPLICIT_BAND`, with Javadoc describing that exact failure); main-thread grant I/O and the escaping `StaleRevisionException` by `EggAdminController`'s `PerPlayerTaskQueue` + `mainDispatcher` wiring (`:116-127`, `:210`, `:220`, `:315-321`, `:354-359`); the tier-letter `rarityId` at `:375-378`; egg re-tiering at `:231-259`. Kept as an audit trail only. See `plans/reports/from-red-team-to-planner-release-plan-red-team-report.md`.
+
 Scope: `061a2a7` (egg mint/grant), `9b5fd4c` (SoundResolver), `dca50e5`/`3c4e0c7` (vault tests) plus
 immediate collaborators. Advisory only; no code changed. Config-surface issues already fixed in
 `d57c37c`/`476e9a7` are excluded.

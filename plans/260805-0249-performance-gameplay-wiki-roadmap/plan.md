@@ -2,6 +2,8 @@
 
 **Trạng thái:** Phần A xong (Phase 1-3) · Phần B xong (Phase 4-5) · còn 10 phase · 874 test / 0 fail
 
+> **Liên kết plan:** Phase 13-14 (wiki UX, part-g) và Phase 15 (certification, part-h) đã được hấp thụ vào `260903-1813-release-readiness-bugfix-upgrade-wiki` (Phase 8-9 bên đó) — không làm lại ở đây. Các phase gameplay còn lại (6-12) là việc sau release, độc lập với plan đó.
+
 ## Bối cảnh
 
 Bảy phase trước đã dọn structure, sửa motion, thêm animation ModelEngine, thống nhất GUI, onboarding, particle, và i18n. Plan này là bước tiếp: **làm plugin chạy nhẹ hơn và chơi sâu hơn**.
