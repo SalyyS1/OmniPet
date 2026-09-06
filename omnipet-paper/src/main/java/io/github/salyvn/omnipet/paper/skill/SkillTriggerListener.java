@@ -188,14 +188,19 @@ public final class SkillTriggerListener implements Listener {
      * @param delta the health about to be lost, negative when healing, since both events report the change
      *     before it is applied to the entity
      */
+    @SuppressWarnings("deprecation")
     private void checkLowHealth(Player player, double delta) {
         Double threshold = lowHealthThreshold.apply(player.getUniqueId());
         if (threshold == null) {
             belowThreshold.remove(player.getUniqueId());
             return;
         }
-        var attribute = player.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH);
-        double maximum = attribute == null ? 20 : attribute.getValue();
+        // Read through Damageable rather than the max-health Attribute constant: that constant was
+        // renamed in Paper 1.21.3 (GENERIC_MAX_HEALTH -> MAX_HEALTH), so either spelling fails to link on
+        // one end of the supported 1.21 range, and a Registry lookup by key returns null on the other
+        // end, which would silently read every player as 20 max HP. The deprecated accessor is the one
+        // path present on every build, and it cannot fall back to a wrong number.
+        double maximum = player.getMaxHealth();
         if (maximum <= 0) return;
         double after = Math.max(0, Math.min(maximum, player.getHealth() - delta));
         boolean low = after / maximum <= threshold;
