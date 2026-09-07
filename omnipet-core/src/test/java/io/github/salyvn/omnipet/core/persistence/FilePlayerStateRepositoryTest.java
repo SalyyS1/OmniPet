@@ -147,6 +147,33 @@ class FilePlayerStateRepositoryTest {
     }
 
     @Test
+    void anOversizeFileFailsCleanlyAndIsNeverQuarantined() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        Path root = temporary.resolve("players");
+        Files.createDirectories(root);
+        Path file = root.resolve(playerId + ".yml");
+        // Just past the repository's 4 MiB read bound. The point is not the size but the kind of
+        // failure: reading it fails before the codec ever sees bytes, and a failure that is not a
+        // verdict about the content must leave the player's file exactly where it is.
+        Files.writeString(file, "#" + "x".repeat(4 * 1024 * 1024));
+
+        FilePlayerStateRepository repository = new FilePlayerStateRepository(root);
+
+        java.io.IOException failure =
+                assertThrows(java.io.IOException.class, () -> repository.snapshot(playerId));
+        assertTrue(failure.getMessage().contains("too large"),
+                "error should name the problem, got: " + failure.getMessage());
+        assertTrue(Files.exists(file), "an unreadable file must not be moved aside");
+        assertFalse(Files.exists(root.resolve("quarantine")),
+                "a read failure is not a decode failure and must not quarantine");
+
+        // And the player recovers by itself once the file is sane again — no operator recovery step,
+        // which is what quarantining would have forced.
+        Files.writeString(file, "uuid: " + playerId + "\npets: []\n");
+        assertEquals(playerId, repository.snapshot(playerId).playerId());
+    }
+
+    @Test
     void newProfilesUseSafeSchemaFourDefaults() throws Exception {
         UUID playerId = UUID.randomUUID();
         PlayerStateRepository repository = new FilePlayerStateRepository(temporary.resolve("players"));

@@ -1,7 +1,6 @@
 package io.github.salyvn.omnipet.core.persistence;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -19,6 +18,15 @@ import io.github.salyvn.omnipet.core.domain.PlayerState;
 import io.github.salyvn.omnipet.core.domain.PlayerStateEnvelope;
 
 public final class FilePlayerStateRepository implements PlayerStateRepository {
+    /**
+     * The largest player file this repository will read into memory.
+     *
+     * <p>A constant rather than a constructor parameter: there are dozens of construction sites, and a
+     * bound that every caller may set differently is a bound nobody can reason about. Four mebibytes is
+     * orders of magnitude above a real player file and far below a heap problem.
+     */
+    private static final int MAX_PLAYER_STATE_BYTES = 4 * 1024 * 1024;
+
     private final SafeRepositoryPaths paths;
     private final PlayerStateYamlCodec codec;
     private final AtomicFileStore fileStore;
@@ -124,7 +132,7 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
             }
             return PlayerState.empty(playerId);
         }
-        String yaml = Files.readString(path, StandardCharsets.UTF_8);
+        String yaml = BoundedFiles.readString(path, MAX_PLAYER_STATE_BYTES);
         PlayerMigrationResult result;
         try {
             result = codec.decodeWithReport(yaml);
@@ -133,6 +141,12 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
                 throw new IllegalArgumentException("embedded UUID does not match repository target");
             }
         } catch (RuntimeException failure) {
+            // Quarantine is for a file whose bytes are not a valid player document. Every other fault —
+            // a disk hiccup, an interrupted read, a bug in this code — is transient or ours, and moving a
+            // player's data aside for one of those turns a momentary failure into a permanent lockout:
+            // the next load finds the quarantine file and refuses to start the player at all. So anything
+            // the codec did not classify as bad content is rethrown untouched.
+            if (!isDecodeFailure(failure)) throw failure;
             String quarantineName = playerId + "-" + UUID.randomUUID() + ".yml";
             Path quarantine = paths.resolveQuarantine(quarantineName);
             fileStore.quarantine(path, quarantine.getParent(), quarantine.getFileName().toString());
@@ -143,6 +157,25 @@ public final class FilePlayerStateRepository implements PlayerStateRepository {
             fileStore.write(path, codec.encodeBytes(result.envelope()));
         }
         return state;
+    }
+
+    /**
+     * Whether this failure says the file's content is wrong, rather than that reading it went wrong.
+     *
+     * <p>Malformed YAML arrives as {@code YAMLException}; a document that parses but does not describe a
+     * player arrives as {@link IllegalArgumentException}, including the embedded-UUID mismatch above. Both
+     * mean the bytes on disk cannot become a player and will not become one on a retry, which is exactly
+     * when setting the file aside is the kind thing to do. Anything else — including a bare
+     * {@code NullPointerException} or {@code ClassCastException} out of the codec, which is a defect in
+     * this code rather than a verdict about the file — is left to propagate.
+     */
+    private static boolean isDecodeFailure(RuntimeException failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.yaml.snakeyaml.error.YAMLException) return true;
+            if (cause instanceof IllegalArgumentException) return true;
+            if (cause.getCause() == cause) break;
+        }
+        return false;
     }
 
     private boolean hasQuarantinedState(UUID playerId) throws IOException {

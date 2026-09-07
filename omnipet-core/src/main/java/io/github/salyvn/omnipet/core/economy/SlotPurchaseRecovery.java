@@ -20,7 +20,7 @@ final class SlotPurchaseRecovery {
         Optional<SlotPurchaseTransaction> found = support.find(transactionId);
         if (found.isEmpty()) return result(SlotPurchaseResult.Status.TRANSACTION_NOT_FOUND, null, "transaction was not found");
         SlotPurchaseTransaction transaction = found.get();
-        SlotPurchaseResult completed = completeIfEntitled(transaction);
+        SlotPurchaseResult completed = completeIfEntitled(transaction, playerStates.snapshot(transaction.playerId()));
         if (completed != null) return completed;
         return switch (transaction.state()) {
             case PREPARED -> preparedPurchase.purchase(
@@ -39,7 +39,16 @@ final class SlotPurchaseRecovery {
     }
 
     SlotPurchaseResult resolveKnown(SlotPurchaseTransaction transaction) throws IOException {
-        SlotPurchaseResult completed = completeIfEntitled(transaction);
+        return resolveKnown(transaction, playerStates.snapshot(transaction.playerId()));
+    }
+
+    /**
+     * Resolves a journaled transaction against a caller-supplied player state. Callers already
+     * holding the player lock must use this overload: re-reading through the repository under the
+     * same lock would acquire it twice, which the lock registry refuses.
+     */
+    SlotPurchaseResult resolveKnown(SlotPurchaseTransaction transaction, PlayerState currentState) throws IOException {
+        SlotPurchaseResult completed = completeIfEntitled(transaction, currentState);
         if (completed != null) return completed;
         if (transaction.state() == SlotPurchaseSagaState.PREPARED) return null;
         if (transaction.state() == SlotPurchaseSagaState.ENTITLEMENT_PERSISTED
@@ -65,7 +74,7 @@ final class SlotPurchaseRecovery {
     SlotPurchaseResult refundAfterPersistenceFailure(SlotPurchaseTransaction transaction, String detail) throws IOException {
         if (transaction == null) throw new IOException(detail + " before the transaction was journaled");
         try {
-            SlotPurchaseResult completed = completeIfEntitled(transaction);
+            SlotPurchaseResult completed = completeIfEntitled(transaction, playerStates.snapshot(transaction.playerId()));
             if (completed != null) return completed;
         } catch (IOException verificationFailure) {
             return markUnknown(transaction, "persistence result could not be verified; refund not safe");
@@ -136,8 +145,7 @@ final class SlotPurchaseRecovery {
         return result(SlotPurchaseResult.Status.REFUND_FAILED_REQUIRES_RECOVERY, updated, updated.detail());
     }
 
-    private SlotPurchaseResult completeIfEntitled(SlotPurchaseTransaction transaction) throws IOException {
-        PlayerState state = playerStates.snapshot(transaction.playerId());
+    private SlotPurchaseResult completeIfEntitled(SlotPurchaseTransaction transaction, PlayerState state) throws IOException {
         if (!SlotPurchaseSagaSupport.hasTransactionEntitlement(state, transaction.transactionId())) return null;
         if (transaction.state() == SlotPurchaseSagaState.ENTITLEMENT_SYNC_PENDING
                 || transaction.state() == SlotPurchaseSagaState.COMPLETED) {

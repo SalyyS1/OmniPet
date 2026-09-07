@@ -8,13 +8,21 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.ReentrantLock;
 
-/** Combines classloader-local coordination with a process-wide player file lock. */
+/**
+ * Combines classloader-local coordination with a process-wide player file lock.
+ *
+ * <p>The local lock is deliberately NOT reentrant: a same-thread nested acquire used to sail through
+ * the JVM lock and then spin forever on the file lock, because a JVM file lock cannot be re-acquired
+ * by a second channel in the same process. Nesting now fails fast, which turns the latent deadlock
+ * into a bug that says its own name.
+ */
 final class SharedRepositoryLockRegistry {
     private static final ConcurrentHashMap<Path, Entry> ENTRIES = new ConcurrentHashMap<>();
     private static final long RETRY_NANOS = 1_000_000L;
+    private static final long FILE_LOCK_WAIT_NANOS = 30_000_000_000L;
 
     private SharedRepositoryLockRegistry() {}
 
@@ -26,7 +34,13 @@ final class SharedRepositoryLockRegistry {
             selected.references++;
             return selected;
         });
+        if (entry.lock.isHeldByCurrentThread()) {
+            dereference(key, entry);
+            throw new IllegalStateException(
+                    "player lock already held by this thread; nested acquire is not supported: " + key);
+        }
         entry.lock.lock();
+        entry.owner = Thread.currentThread();
         FileChannel channel = null;
         try {
             channel = FileChannel.open(
@@ -49,7 +63,20 @@ final class SharedRepositoryLockRegistry {
         }
     }
 
+    /** Whether any thread in this classloader currently holds the local half of the lock. */
+    static boolean isLocallyHeld(Path lockFile) {
+        Entry entry = ENTRIES.get(lockFile.toAbsolutePath().normalize());
+        return entry != null && entry.owner != null;
+    }
+
+    /** The thread holding the local half of the lock, or null. Tests assert "nobody holds this". */
+    static Thread ownerThread(Path lockFile) {
+        Entry entry = ENTRIES.get(lockFile.toAbsolutePath().normalize());
+        return entry == null ? null : entry.owner;
+    }
+
     private static FileLock acquireFileLock(FileChannel channel, Path lockFile) throws IOException {
+        long started = System.nanoTime();
         while (true) {
             try {
                 FileLock lock = channel.tryLock();
@@ -59,6 +86,9 @@ final class SharedRepositoryLockRegistry {
             }
             if (Thread.currentThread().isInterrupted()) {
                 throw new IOException("interrupted while waiting for player lock: " + lockFile);
+            }
+            if (System.nanoTime() - started > FILE_LOCK_WAIT_NANOS) {
+                throw new IOException("timed out waiting for player lock: " + lockFile);
             }
             LockSupport.parkNanos(RETRY_NANOS);
         }
@@ -101,7 +131,12 @@ final class SharedRepositoryLockRegistry {
     }
 
     private static void releaseLocal(Path key, Entry entry) {
+        entry.owner = null;
         entry.lock.unlock();
+        dereference(key, entry);
+    }
+
+    private static void dereference(Path key, Entry entry) {
         ENTRIES.computeIfPresent(key, (ignored, current) -> {
             if (current != entry) return current;
             current.references--;
@@ -111,6 +146,7 @@ final class SharedRepositoryLockRegistry {
 
     private static final class Entry {
         private final ReentrantLock lock = new ReentrantLock();
+        private volatile Thread owner;
         private int references;
     }
 }

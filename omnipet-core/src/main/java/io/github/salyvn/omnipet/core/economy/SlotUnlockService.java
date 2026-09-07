@@ -242,7 +242,9 @@ public final class SlotUnlockService {
         if (prepared.state() != SlotPurchaseSagaState.PREPARED) {
             SlotPurchaseResult resolved;
             try {
-                resolved = recovery.resolveKnown(prepared);
+                // Under the player lock, so the already-loaded state goes in rather than a re-read:
+                // the repository refuses a nested acquire of the same player lock.
+                resolved = recovery.resolveKnown(prepared, current);
             } catch (IOException failure) {
                 throw new SlotPurchaseSagaSupport.JournalAccessException(failure);
             }

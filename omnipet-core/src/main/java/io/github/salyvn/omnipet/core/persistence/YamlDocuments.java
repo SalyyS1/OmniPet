@@ -11,13 +11,16 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 import io.github.salyvn.omnipet.core.domain.RawNodeValues;
 
 public final class YamlDocuments {
-    private static final Yaml READER = reader();
-    private static final Yaml WRITER = writer();
+    // SnakeYAML's Yaml instances are documented as not thread-safe, and the plugin loads player and
+    // definition files from async tasks while the main thread loads too. One instance per thread keeps
+    // the construction cost where it belongs — once per thread — instead of locking every read.
+    private static final ThreadLocal<Yaml> READER = ThreadLocal.withInitial(YamlDocuments::reader);
+    private static final ThreadLocal<Yaml> WRITER = ThreadLocal.withInitial(YamlDocuments::writer);
 
     private YamlDocuments() {}
 
     public static Map<String, Object> readMap(String yaml) {
-        Object value = READER.load(yaml == null ? "" : yaml);
+        Object value = READER.get().load(yaml == null ? "" : yaml);
         if (value == null) return new LinkedHashMap<>();
         if (!(value instanceof Map<?, ?> map)) throw new IllegalArgumentException("YAML document must be a map");
         LinkedHashMap<String, Object> result = new LinkedHashMap<>();
@@ -27,7 +30,7 @@ public final class YamlDocuments {
     }
 
     public static String writeMap(Map<String, Object> value) {
-        return WRITER.dump(RawNodeValues.mutableCopy(value));
+        return WRITER.get().dump(RawNodeValues.mutableCopy(value));
     }
 
     private static Yaml reader() {
