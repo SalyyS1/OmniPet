@@ -2,6 +2,7 @@ package io.github.salyvn.omnipet.core.release;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -120,6 +121,72 @@ class ReleaseServiceTest {
 
         assertEquals(ReleaseResult.Status.INVALID_CONFIRMATION, result.status());
         assertEquals(1, repository.snapshot(playerId).pets().size());
+    }
+
+    @Test
+    void aPreviewSurvivesStaminaRegeneratingUnderneathIt() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        UUID petId = UUID.randomUUID();
+        Map<String, Object> before = Map.of("progression", new java.util.LinkedHashMap<>(Map.of(
+                "level", 3,
+                "experience", 40.0,
+                "evolution", 1,
+                "stamina", 12.0,
+                "lastStaminaEpochMillis", 1_000L)));
+        FilePlayerStateRepository repository = seeded(playerId, List.of(pet(petId, before)), Map.of());
+        ReleaseService service = new ReleaseService(repository, ignored -> rewards());
+        ReleasePreview preview = service.preview(UUID.randomUUID(), playerId, petId).preview();
+
+        // Stamina refills on its own while the player is deciding. That is not a change to which pet
+        // this is, so the preview they were shown must still be good when they confirm it.
+        Map<String, Object> after = Map.of("progression", new java.util.LinkedHashMap<>(Map.of(
+                "level", 3,
+                "experience", 40.0,
+                "evolution", 1,
+                "stamina", 20.0,
+                "lastStaminaEpochMillis", 9_000L)));
+        repository.withLocked(playerId, repository.snapshot(playerId).revision(), state -> new PlayerState(
+                playerId, state.revision(), List.of(pet(petId, after)), state.vaultCapacity(),
+                state.activeSlotCount(), state.desiredActivePetIds(), state.slotEntitlements(),
+                state.legacyCurrentEgg(), state.extensions()));
+
+        ReleasePreview reissued = service.preview(
+                preview.transactionId(), playerId, petId).preview();
+
+        assertEquals(preview.petFingerprint(), reissued.petFingerprint(),
+                "stamina regeneration must not change what the pet is");
+    }
+
+    @Test
+    void aRealChangeToThePetStillChangesItsFingerprint() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        UUID petId = UUID.randomUUID();
+        Map<String, Object> before = Map.of("progression", new java.util.LinkedHashMap<>(Map.of(
+                "level", 3,
+                "experience", 40.0,
+                "evolution", 1,
+                "stamina", 12.0,
+                "lastStaminaEpochMillis", 1_000L)));
+        FilePlayerStateRepository repository = seeded(playerId, List.of(pet(petId, before)), Map.of());
+        ReleaseService service = new ReleaseService(repository, ignored -> rewards());
+        ReleasePreview preview = service.preview(UUID.randomUUID(), playerId, petId).preview();
+
+        Map<String, Object> levelled = Map.of("progression", new java.util.LinkedHashMap<>(Map.of(
+                "level", 4,
+                "experience", 0.0,
+                "evolution", 1,
+                "stamina", 12.0,
+                "lastStaminaEpochMillis", 1_000L)));
+        repository.withLocked(playerId, repository.snapshot(playerId).revision(), state -> new PlayerState(
+                playerId, state.revision(), List.of(pet(petId, levelled)), state.vaultCapacity(),
+                state.activeSlotCount(), state.desiredActivePetIds(), state.slotEntitlements(),
+                state.legacyCurrentEgg(), state.extensions()));
+
+        ReleasePreview reissued = service.preview(
+                preview.transactionId(), playerId, petId).preview();
+
+        assertNotEquals(preview.petFingerprint(), reissued.petFingerprint(),
+                "levelling up is a real change and must still be caught");
     }
 
     @Test

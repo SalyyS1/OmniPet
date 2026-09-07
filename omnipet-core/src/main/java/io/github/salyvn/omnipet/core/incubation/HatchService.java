@@ -76,7 +76,7 @@ public final class HatchService {
         HatchResult guard = requireIncubating(state, incubationId);
         if (guard != null) return guard;
         IncubationState current = state.incubation();
-        HatchResult duplicate = duplicate(state, current, actionToken);
+        HatchResult duplicate = duplicate(state, current, actionToken, false);
         if (duplicate != null) return duplicate;
         return remaining(HatchResult.Status.REDUCED, state, current,
                 IncubationStateChanges.saturatingSubtract(current.remainingActiveMillis(), reductionMillis), actionToken);
@@ -89,7 +89,8 @@ public final class HatchService {
         if (remainingMillis < 0 || remainingMillis > current.outcome().totalActiveMillis()) {
             throw new IllegalArgumentException("remaining active time is outside the resolved duration");
         }
-        HatchResult duplicate = duplicate(state, current, actionToken);
+        // Setting the remaining time to zero ends the incubation, so it is terminal like complete.
+        HatchResult duplicate = duplicate(state, current, actionToken, remainingMillis == 0);
         if (duplicate != null) return duplicate;
         return remaining(HatchResult.Status.REMAINING_SET, state, current, remainingMillis, actionToken);
     }
@@ -98,7 +99,8 @@ public final class HatchService {
         HatchResult guard = requireIncubating(state, incubationId);
         if (guard != null) return guard;
         IncubationState current = state.incubation();
-        HatchResult duplicate = duplicate(state, current, actionToken);
+        // Terminal, so exempt from the token cap: see duplicate(..., terminal).
+        HatchResult duplicate = duplicate(state, current, actionToken, true);
         if (duplicate != null) return duplicate;
         return remaining(HatchResult.Status.COMPLETED, state, current, 0, actionToken);
     }
@@ -108,7 +110,7 @@ public final class HatchService {
         IncubationState current = state.incubation();
         HatchResult mismatch = requireMatch(state, current, incubationId);
         if (mismatch != null) return mismatch;
-        HatchResult duplicate = duplicate(state, current, actionToken);
+        HatchResult duplicate = duplicate(state, current, actionToken, true);
         if (duplicate != null) return duplicate;
         if (current.status() != IncubationStatus.INCUBATING && current.status() != IncubationStatus.READY) {
             return result(HatchResult.Status.INVALID_STATE, state);
@@ -165,10 +167,16 @@ public final class HatchService {
         return current.id().equals(incubationId) ? null : result(HatchResult.Status.INCUBATION_ID_MISMATCH, state);
     }
 
-    private static HatchResult duplicate(PlayerState state, IncubationState current, UUID actionToken) {
+    /**
+     * @param terminal whether this action ends the incubation. A terminal action is allowed through a
+     *     full token list: its retry is caught by the resulting status instead, and refusing it would
+     *     leave an egg at 128 tokens with no action left that could ever finish it.
+     */
+    private static HatchResult duplicate(
+            PlayerState state, IncubationState current, UUID actionToken, boolean terminal) {
         Objects.requireNonNull(actionToken, "action token");
         if (current.hasApplied(actionToken)) return result(HatchResult.Status.ALREADY_APPLIED, state);
-        return current.appliedActionTokens().size() == IncubationState.MAX_ACTION_TOKENS
+        return !terminal && current.appliedActionTokens().size() >= IncubationState.MAX_ACTION_TOKENS
                 ? result(HatchResult.Status.ACTION_TOKEN_CAPACITY_REACHED, state)
                 : null;
     }

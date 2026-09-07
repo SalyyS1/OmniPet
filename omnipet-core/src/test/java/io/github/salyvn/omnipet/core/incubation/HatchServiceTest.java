@@ -123,6 +123,30 @@ class HatchServiceTest {
     }
 
     @Test
+    void aFullTokenListStillAcceptsTheActionsThatEndTheIncubation() {
+        UUID incubationId = UUID.randomUUID();
+        PlayerState started = start(incubationId);
+        IncubationState current = started.incubation();
+        List<UUID> tokens = IntStream.range(0, IncubationState.MAX_ACTION_TOKENS)
+                .mapToObj(ignored -> UUID.randomUUID())
+                .toList();
+        PlayerState full = started.withIncubation(new IncubationState(
+                current.id(), current.eggId(), current.outcome(), current.remainingActiveMillis(),
+                current.status(), tokens, current.extensions()));
+
+        // Cancel and complete are the only two actions that can end an incubation. If the cap refused
+        // them as well, an egg that reached 128 tokens could never be finished or abandoned by anyone.
+        HatchResult cancelled = hatches.cancel(full, incubationId, UUID.randomUUID());
+        assertEquals(HatchResult.Status.CANCELLED, cancelled.status());
+        assertEquals(tokens, cancelled.incubation().appliedActionTokens(),
+                "a terminal action past the cap must not grow the list");
+
+        HatchResult completed = hatches.complete(full, incubationId, UUID.randomUUID());
+        assertEquals(HatchResult.Status.COMPLETED, completed.status());
+        assertEquals(0, completed.incubation().remainingActiveMillis());
+    }
+
+    @Test
     void repeatedCancellationTokenIsIdempotentAndTerminalIdCannotBeReused() {
         UUID incubationId = UUID.randomUUID();
         UUID token = UUID.randomUUID();

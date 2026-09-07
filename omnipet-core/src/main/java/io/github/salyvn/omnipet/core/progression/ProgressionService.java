@@ -81,17 +81,28 @@ public final class ProgressionService {
                 0, "breakthrough applied");
     }
 
+    /**
+     * Brings stamina up to date, or returns the state untouched when there is nothing to add.
+     *
+     * <p>A pet sitting at full stamina used to produce a new state on every call anyway, because the
+     * timestamp moved even though the number did not. Every one of those is a write, and an idle pet
+     * generates them forever, so a full vault of idle pets was a steady stream of disk traffic that
+     * changed nothing. Leaving the state alone is also safe for the next call: the older timestamp only
+     * means a larger elapsed time, and the result is still clamped to the maximum.
+     */
     public ProgressionState regenerateStamina(
             ProgressionState state,
             long nowEpochMillis,
             ProgressionConfig config) {
         Objects.requireNonNull(state, "progression state");
         Objects.requireNonNull(config, "progression config");
-        if (nowEpochMillis < state.lastStaminaEpochMillis()) {
-            return state;
-        }
+        // A clock corrected backwards must not invent a debt, and a pet already at the cap has nothing
+        // to gain from being rewritten.
+        if (nowEpochMillis < state.lastStaminaEpochMillis()) return state;
+        if (state.stamina() >= config.maxStamina()) return state;
         double seconds = (nowEpochMillis - state.lastStaminaEpochMillis()) / 1000.0;
         double next = Math.min(config.maxStamina(), state.stamina() + seconds * config.staminaRegenPerSecond());
+        if (next == state.stamina() && nowEpochMillis == state.lastStaminaEpochMillis()) return state;
         return state.withValues(state.level(), state.experience(), state.evolution(), next, nowEpochMillis);
     }
 

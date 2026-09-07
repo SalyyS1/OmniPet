@@ -11,6 +11,10 @@ import io.github.salyvn.omnipet.core.domain.PetInstance;
 import io.github.salyvn.omnipet.core.domain.RawNodeValues;
 
 final class ReleaseIdentity {
+    private static final String PROGRESSION_KEY = "progression";
+    private static final String STAMINA_KEY = "stamina";
+    private static final String STAMINA_TIME_KEY = "lastStaminaEpochMillis";
+
     private ReleaseIdentity() {}
 
     static String petFingerprint(PetInstance pet) {
@@ -18,9 +22,34 @@ final class ReleaseIdentity {
         identity.put("id", pet.id().toString());
         identity.put("definitionId", pet.definitionId());
         identity.put("definitionRevision", pet.definitionRevision());
-        identity.put("components", pet.rawComponents());
+        identity.put("components", withoutRegeneratingFields(pet.rawComponents()));
         identity.put("extensions", pet.extensions());
         return sha256(RawNodeValues.semanticBytes(identity));
+    }
+
+    /**
+     * The pet's components without the two that change on their own.
+     *
+     * <p>A fingerprint answers "is this still the pet the player was shown?", and stamina refilling by
+     * itself does not make it a different pet. Including it meant a preview could expire between being
+     * offered and being confirmed for no reason the player could see or avoid — walk away for a moment,
+     * come back, and the release is refused. Level, experience and evolution stay in: those change only
+     * because something happened to the pet, and a player confirming a release should be looking at
+     * current numbers.
+     */
+    private static Map<String, Object> withoutRegeneratingFields(Map<String, Object> components) {
+        Object progression = components.get(PROGRESSION_KEY);
+        if (!(progression instanceof Map<?, ?> values)) return components;
+        LinkedHashMap<String, Object> trimmedProgression = new LinkedHashMap<>();
+        values.forEach((key, value) -> {
+            String name = String.valueOf(key);
+            if (!STAMINA_KEY.equals(name) && !STAMINA_TIME_KEY.equals(name)) {
+                trimmedProgression.put(name, value);
+            }
+        });
+        LinkedHashMap<String, Object> trimmed = new LinkedHashMap<>(components);
+        trimmed.put(PROGRESSION_KEY, trimmedProgression);
+        return trimmed;
     }
 
     static String confirmationToken(
