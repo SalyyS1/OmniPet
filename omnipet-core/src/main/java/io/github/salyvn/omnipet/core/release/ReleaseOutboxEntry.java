@@ -41,7 +41,11 @@ public record ReleaseOutboxEntry(
                 rewards, internalState, state, evidence, extensions);
     }
 
-    public enum InternalState { PENDING, ACKNOWLEDGED }
+    /**
+     * @see ReleaseOutboxDeliveryService#recoverInternal for why ATTEMPTING is written before the port is
+     *     called rather than after it answers
+     */
+    public enum InternalState { PENDING, ATTEMPTING, ACKNOWLEDGED }
 
     public enum ExternalState {
         NOT_REQUIRED,

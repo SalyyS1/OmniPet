@@ -56,9 +56,28 @@ final class ReleaseOutboxStore {
         return List.copyOf(entries);
     }
 
+    /**
+     * Whether the whole outbox can be read, not merely whether its container is the right shape.
+     *
+     * <p>This used to check only that the root was a map, so a single malformed entry inside passed the
+     * check and then threw out of {@code list} or {@code find} — the caller asked "is this usable?",
+     * was told yes, and got an exception anyway. Callers use this to answer with an OUTBOX_INVALID
+     * status instead of failing, and that only works if the answer covers the entries too.
+     */
     boolean isUsable(PlayerState state) {
         Object root = state.extensions().get(EXTENSION_KEY);
-        return root == null || root instanceof Map<?, ?>;
+        if (root == null) return true;
+        if (!(root instanceof Map<?, ?> map)) return false;
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (!(entry.getValue() instanceof Map<?, ?> encoded)) return false;
+            try {
+                ReleaseOutboxEntry decoded = decode(encoded);
+                if (!decoded.transactionId().toString().equals(String.valueOf(entry.getKey()))) return false;
+            } catch (RuntimeException malformed) {
+                return false;
+            }
+        }
+        return true;
     }
 
     PlayerState release(PlayerState state, UUID petId, ReleaseOutboxEntry entry) {
@@ -181,9 +200,24 @@ final class ReleaseOutboxStore {
         return UUID.fromString(text(map, key));
     }
 
+    /**
+     * Reads a whole-number field, refusing a value that would not survive the trip.
+     *
+     * <p>{@code Number.longValue()} silently truncates: a reward amount stored as a double, or an epoch
+     * in a field too wide for it, came back as a different number than was written with nothing to say
+     * so. A value that cannot be represented exactly is treated as a malformed entry, which the caller
+     * reports as an invalid outbox rather than acting on a mangled amount.
+     */
     private static long longValue(Map<String, Object> map, String key) {
         Object value = map.get(key);
-        if (value instanceof Number number) return number.longValue();
+        if (value instanceof Number number) {
+            double decimal = number.doubleValue();
+            long exact = number.longValue();
+            if (!Double.isFinite(decimal) || decimal != exact) {
+                throw new IllegalArgumentException("release outbox " + key + " is not an exact whole number");
+            }
+            return exact;
+        }
         return Long.parseLong(text(map, key));
     }
 }

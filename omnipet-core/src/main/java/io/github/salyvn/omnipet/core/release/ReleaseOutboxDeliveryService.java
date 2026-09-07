@@ -8,6 +8,9 @@ import java.util.UUID;
 import io.github.salyvn.omnipet.core.persistence.PlayerStateRepository;
 
 public final class ReleaseOutboxDeliveryService {
+    /** How many times recovery re-reads an entry another thread transitioned out from under it. */
+    private static final int MAX_RECOVERY_PASSES = 4;
+
     private final PlayerStateRepository players;
     private final ReleaseOutboxStore outbox = new ReleaseOutboxStore();
     private final ReleaseOutboxStateUpdater updater;
@@ -29,19 +32,69 @@ public final class ReleaseOutboxDeliveryService {
         if (entry.internalState() == ReleaseOutboxEntry.InternalState.ACKNOWLEDGED) {
             return internal(InternalOutboxResult.Status.ACKNOWLEDGED, entry, "internal rewards already acknowledged");
         }
+        // An interrupted attempt is not a failed one. The items may already be in the player's inventory
+        // with nothing on disk saying so, and delivering again would pay them twice, so this stops and
+        // asks rather than guessing. The external path has always worked this way; the internal one used
+        // to call the port with no persisted intent at all, which is only safe if servers never crash.
+        if (entry.internalState() == ReleaseOutboxEntry.InternalState.ATTEMPTING) {
+            return internal(InternalOutboxResult.Status.PENDING_FAILURE, entry,
+                    "internal delivery was interrupted; rewards may already have been given, so they were"
+                            + " not delivered again");
+        }
+
+        ReleaseOutboxEntry attempting;
+        try {
+            attempting = updater.transitionInternal(
+                    playerId, entry,
+                    ReleaseOutboxEntry.InternalState.PENDING,
+                    ReleaseOutboxEntry.InternalState.ATTEMPTING);
+        } catch (IOException intentFailure) {
+            // The intent could not be written, so nothing was delivered and the entry is untouched.
+            // Reporting that is better than delivering anyway: a retry later costs nothing, and this
+            // is the one ordering that cannot pay a player twice.
+            return internal(InternalOutboxResult.Status.PENDING_FAILURE, entry,
+                    "internal delivery intent could not be persisted; rewards were not delivered");
+        }
+        if (attempting == null) {
+            return internal(InternalOutboxResult.Status.PENDING_FAILURE, entry,
+                    "internal state changed before delivery; rewards were not delivered");
+        }
 
         InternalRewardDeliveryPort.Outcome outcome;
         try {
-            outcome = delivery.deliver(playerId, transactionId, entry.rewards().internalRewards());
+            outcome = delivery.deliver(playerId, transactionId, attempting.rewards().internalRewards());
             if (outcome == null) outcome = InternalRewardDeliveryPort.Outcome.failed("delivery port returned no outcome");
         } catch (RuntimeException failure) {
             outcome = InternalRewardDeliveryPort.Outcome.failed(shortDetail(failure));
         }
         return switch (outcome.status()) {
-            case CAPACITY_FULL -> internal(InternalOutboxResult.Status.PENDING_CAPACITY, entry, outcome.detail());
-            case FAILED -> internal(InternalOutboxResult.Status.PENDING_FAILURE, entry, outcome.detail());
-            case DELIVERED -> updater.acknowledgeInternal(playerId, transactionId, entry, outcome.detail());
+            // Nothing was handed over, so the intent is rolled back and a later retry is free to try again.
+            case CAPACITY_FULL -> internal(InternalOutboxResult.Status.PENDING_CAPACITY,
+                    revertAttempt(playerId, attempting), outcome.detail());
+            case FAILED -> internal(InternalOutboxResult.Status.PENDING_FAILURE,
+                    revertAttempt(playerId, attempting), outcome.detail());
+            case DELIVERED -> updater.acknowledgeInternal(playerId, transactionId, attempting, outcome.detail());
         };
+    }
+
+    /**
+     * Puts a failed attempt back to PENDING so it can be retried.
+     *
+     * <p>Only for outcomes that prove nothing was delivered: a full inventory, or a port that reported
+     * failure. An outcome that could not be read at all leaves the entry ATTEMPTING on purpose. If the
+     * revert itself cannot be written the entry stays ATTEMPTING too, which is the safe direction —
+     * a retry that is refused costs an operator a command, a double payment costs them trust.
+     */
+    private ReleaseOutboxEntry revertAttempt(UUID playerId, ReleaseOutboxEntry attempting) {
+        try {
+            ReleaseOutboxEntry reverted = updater.transitionInternal(
+                    playerId, attempting,
+                    ReleaseOutboxEntry.InternalState.ATTEMPTING,
+                    ReleaseOutboxEntry.InternalState.PENDING);
+            return reverted == null ? attempting : reverted;
+        } catch (IOException persistenceFailure) {
+            return attempting;
+        }
     }
 
     public ExternalReleaseResult attemptExternal(
@@ -94,22 +147,32 @@ public final class ReleaseOutboxDeliveryService {
         }
     }
 
+    /**
+     * Moves an interrupted external attempt to "needs reconciliation", or reports the current state.
+     *
+     * <p>Written as a loop rather than by calling itself: another thread finishing the same transition
+     * first sends this back to the beginning, and unbounded recursion on a contended entry is a stack
+     * overflow waiting for a busy server. The bound is small because each pass either transitions the
+     * entry or observes that someone else already did.
+     */
     public ExternalReleaseResult recoverExternal(UUID playerId, UUID transactionId) throws IOException {
-        Lookup lookup = lookup(playerId, transactionId);
-        if (lookup.status() != null) return external(lookup, null);
-        ReleaseOutboxEntry entry = lookup.entry();
-        ExternalReleaseResult terminal = terminalExternal(entry);
-        if (terminal != null) return terminal;
-        if (entry.externalState() == ReleaseOutboxEntry.ExternalState.ATTEMPTING) {
-            entry = updater.transitionExternal(
+        for (int attempt = 0; attempt < MAX_RECOVERY_PASSES; attempt++) {
+            Lookup lookup = lookup(playerId, transactionId);
+            if (lookup.status() != null) return external(lookup, null);
+            ReleaseOutboxEntry entry = lookup.entry();
+            ExternalReleaseResult terminal = terminalExternal(entry);
+            if (terminal != null) return terminal;
+            if (entry.externalState() != ReleaseOutboxEntry.ExternalState.ATTEMPTING) {
+                return external(ExternalReleaseResult.Status.FAILED, entry,
+                        "external reward is pending and requires an explicit delivery command");
+            }
+            ReleaseOutboxEntry recovered = updater.transitionExternal(
                     playerId, entry, ReleaseOutboxEntry.ExternalState.ATTEMPTING,
                     ReleaseOutboxEntry.ExternalState.UNKNOWN_REQUIRES_RECONCILIATION,
                     "external attempt was interrupted; provider commit is unknown");
-            if (entry == null) return recoverExternal(playerId, transactionId);
-            return terminalExternal(entry);
+            if (recovered != null) return terminalExternal(recovered);
         }
-        return external(ExternalReleaseResult.Status.FAILED, entry,
-                "external reward is pending and requires an explicit delivery command");
+        throw new IOException("external release recovery remained contended");
     }
 
     public ExternalReleaseResult reconcileExternal(
@@ -132,6 +195,8 @@ public final class ReleaseOutboxDeliveryService {
         if (limit < 1 || limit > ReleaseOutboxStore.MAX_ENTRIES) {
             throw new IllegalArgumentException("release pending limit must be 1.." + ReleaseOutboxStore.MAX_ENTRIES);
         }
+        // ATTEMPTING counts as unfinished on both sides: an interrupted attempt is exactly the thing an
+        // operator needs to see, and it is the one state nothing resolves on its own.
         return outbox.list(players.snapshot(playerId), ReleaseOutboxStore.MAX_ENTRIES).stream()
                 .filter(entry -> entry.internalState() != ReleaseOutboxEntry.InternalState.ACKNOWLEDGED
                         || entry.externalState() == ReleaseOutboxEntry.ExternalState.PENDING

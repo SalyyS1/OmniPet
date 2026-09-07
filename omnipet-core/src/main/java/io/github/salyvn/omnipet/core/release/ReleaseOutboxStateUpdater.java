@@ -65,6 +65,34 @@ final class ReleaseOutboxStateUpdater {
                 "internal acknowledgement remained contended");
     }
 
+    /**
+     * Writes the intent to deliver internal rewards before the delivery is attempted.
+     *
+     * <p>Returns null when the entry is no longer in {@code requiredState}, which means someone else got
+     * there first and this caller must not deliver.
+     */
+    ReleaseOutboxEntry transitionInternal(
+            UUID playerId,
+            ReleaseOutboxEntry expected,
+            ReleaseOutboxEntry.InternalState requiredState,
+            ReleaseOutboxEntry.InternalState nextState) throws IOException {
+        for (int attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
+            PlayerState current = players.snapshot(playerId);
+            ReleaseOutboxEntry entry = outbox.find(current, expected.transactionId())
+                    .orElseThrow(() -> new IOException("release outbox entry disappeared"));
+            if (!sameIdentity(entry, expected)) throw new IOException("release outbox identity changed");
+            if (entry.internalState() != requiredState) return null;
+            ReleaseOutboxEntry updated = entry.withInternalState(nextState);
+            try {
+                players.withLocked(playerId, current.revision(), locked -> outbox.update(locked, updated));
+                return updated;
+            } catch (StaleRevisionException retry) {
+                // Retry the local state transition only, never the delivery.
+            }
+        }
+        throw new IOException("internal release state remained contended");
+    }
+
     ReleaseOutboxEntry transitionExternal(
             UUID playerId,
             ReleaseOutboxEntry expected,

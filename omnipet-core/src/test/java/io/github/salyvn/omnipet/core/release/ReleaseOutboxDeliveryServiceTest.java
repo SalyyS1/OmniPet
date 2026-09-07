@@ -35,6 +35,8 @@ class ReleaseOutboxDeliveryServiceTest {
                 (player, transaction, rewards) -> InternalRewardDeliveryPort.Outcome.capacityFull("inventory full"));
 
         assertEquals(InternalOutboxResult.Status.PENDING_CAPACITY, result.status());
+        // A full inventory proves nothing was handed over, so the attempt is rolled back and the entry
+        // is an ordinary pending one again rather than needing an operator to look at it.
         assertEquals(ReleaseOutboxEntry.InternalState.PENDING, read(fixture).internalState());
     }
 
@@ -56,20 +58,61 @@ class ReleaseOutboxDeliveryServiceTest {
     }
 
     @Test
-    void lostAcknowledgementRetriesWithSameTokenWithoutDuplicatePhysicalDelivery() throws Exception {
+    void anIntentThatCannotBePersistedDeliversNothingAndRetriesCleanly() throws Exception {
         Released fixture = released(false);
         IdempotentInternalPort port = new IdempotentInternalPort();
-        PlayerStateRepository failAck = new FailBeforeWriteRepository(fixture.repository());
-        ReleaseOutboxDeliveryService firstProcess = new ReleaseOutboxDeliveryService(failAck);
+        PlayerStateRepository failIntent = new FailBeforeWriteRepository(fixture.repository());
 
-        InternalOutboxResult first = firstProcess.recoverInternal(fixture.playerId(), fixture.transactionId(), port);
+        InternalOutboxResult first = new ReleaseOutboxDeliveryService(failIntent)
+                .recoverInternal(fixture.playerId(), fixture.transactionId(), port);
         InternalOutboxResult recovered = new ReleaseOutboxDeliveryService(fixture.repository())
                 .recoverInternal(fixture.playerId(), fixture.transactionId(), port);
 
-        assertEquals(InternalOutboxResult.Status.ACK_PERSIST_FAILED, first.status());
+        // The intent write is what fails here, before the port is ever called, so there is nothing to be
+        // unsure about: the entry is untouched and the next attempt is an ordinary first attempt.
+        assertEquals(InternalOutboxResult.Status.PENDING_FAILURE, first.status());
         assertEquals(InternalOutboxResult.Status.ACKNOWLEDGED, recovered.status());
-        assertEquals(2, port.invocations.get());
+        assertEquals(1, port.invocations.get());
         assertEquals(1, port.physicalDeliveries.get());
+    }
+
+    @Test
+    void aLostAcknowledgementLeavesTheAttemptRecordedAndIsNeverBlindRetried() throws Exception {
+        Released fixture = released(false);
+        IdempotentInternalPort port = new IdempotentInternalPort();
+        // Write 1 is the delivery intent, write 2 is the acknowledgement: the crash lands between the
+        // rewards reaching the player and the record saying so.
+        ReleaseOutboxDeliveryService crashing = new ReleaseOutboxDeliveryService(
+                new FailOnSecondWriteRepository(fixture.repository()));
+
+        InternalOutboxResult first = crashing.recoverInternal(fixture.playerId(), fixture.transactionId(), port);
+        assertEquals(InternalOutboxResult.Status.ACK_PERSIST_FAILED, first.status());
+        assertEquals(ReleaseOutboxEntry.InternalState.ATTEMPTING, read(fixture).internalState(),
+                "the attempt must be on disk, or recovery cannot tell it happened");
+
+        InternalOutboxResult recovered = new ReleaseOutboxDeliveryService(fixture.repository())
+                .recoverInternal(fixture.playerId(), fixture.transactionId(), port);
+
+        // The items may already be in the player's inventory. Handing them over again would pay twice,
+        // so recovery stops and says so rather than guessing.
+        assertEquals(InternalOutboxResult.Status.PENDING_FAILURE, recovered.status());
+        assertEquals(1, port.invocations.get(), "an interrupted delivery must not be replayed");
+        assertEquals(1, port.physicalDeliveries.get());
+    }
+
+    @Test
+    void anInterruptedInternalAttemptStaysVisibleToAnOperator() throws Exception {
+        Released fixture = released(false);
+        IdempotentInternalPort port = new IdempotentInternalPort();
+        new ReleaseOutboxDeliveryService(new FailOnSecondWriteRepository(fixture.repository()))
+                .recoverInternal(fixture.playerId(), fixture.transactionId(), port);
+
+        List<ReleaseOutboxEntry> pending = new ReleaseOutboxDeliveryService(fixture.repository())
+                .pending(fixture.playerId(), 10);
+
+        assertEquals(List.of(fixture.transactionId()),
+                pending.stream().map(ReleaseOutboxEntry::transactionId).toList(),
+                "an interrupted attempt is exactly what an operator needs to find");
     }
 
     @Test
