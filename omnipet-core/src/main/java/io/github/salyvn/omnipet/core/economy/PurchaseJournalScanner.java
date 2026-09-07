@@ -61,6 +61,16 @@ final class PurchaseJournalScanner {
         }
 
         ArrayList<Path> entries = bucket.entries();
+        // The directory glob is not the same filter as the cursor's parser: glob matching is
+        // case-insensitive on Windows, so an upper-case hex filename reaches this list and yields a null
+        // sort key, which would fail the whole scan on a comparator NPE. Such a name is not a canonical
+        // transaction ID, so it is reported and dropped rather than allowed to break the page.
+        entries.removeIf(path -> {
+            String name = path.getFileName().toString();
+            if (PurchaseJournalScanCursor.compactId(name) != null) return false;
+            issues.add(name, "journal filename is not a canonical transaction UUID");
+            return true;
+        });
         entries.sort(Comparator.comparing(path -> PurchaseJournalScanCursor.compactId(
                 path.getFileName().toString())));
         ArrayList<SlotPurchaseTransaction> transactions = new ArrayList<>();

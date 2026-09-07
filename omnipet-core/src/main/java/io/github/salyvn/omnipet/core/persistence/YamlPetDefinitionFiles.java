@@ -10,15 +10,23 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import io.github.salyvn.omnipet.core.domain.StableId;
 
 final class YamlPetDefinitionFiles {
     private final SafeRepositoryPaths paths;
+    private final Consumer<String> problems;
 
     YamlPetDefinitionFiles(SafeRepositoryPaths paths) {
+        this(paths, problem -> {});
+    }
+
+    YamlPetDefinitionFiles(SafeRepositoryPaths paths, Consumer<String> problems) {
         this.paths = paths;
+        this.problems = Objects.requireNonNull(problems, "definition problem sink");
     }
 
     Optional<DefinitionFile> find(String id) throws IOException {
@@ -54,6 +62,15 @@ final class YamlPetDefinitionFiles {
         return paths.resolveId(id, ".yml");
     }
 
+    /**
+     * Every readable definition file, with unusable filenames skipped rather than fatal.
+     *
+     * <p>One stray file used to end the scan: a `my pet.yml` left in the definitions directory made
+     * {@code StableId.requireValid} throw, and since every lookup and every listing goes through here,
+     * that one file made the entire pet registry unreadable. A definition nobody can name is a
+     * definition nobody can load, so it is reported and passed over, and the rest of the server's pets
+     * keep working.
+     */
     private List<DefinitionFile> scan() throws IOException {
         if (!Files.isDirectory(paths.root(), LinkOption.NOFOLLOW_LINKS)) return List.of();
         List<DefinitionFile> files = new ArrayList<>();
@@ -70,7 +87,14 @@ final class YamlPetDefinitionFiles {
                 } else {
                     continue;
                 }
-                String id = StableId.requireValid(fileName.substring(0, fileName.length() - extensionLength));
+                String id;
+                try {
+                    id = StableId.requireValid(fileName.substring(0, fileName.length() - extensionLength));
+                } catch (IllegalArgumentException invalidName) {
+                    problems.accept("skipping pet definition file with an unusable name: " + fileName
+                            + " (" + invalidName.getMessage() + ")");
+                    continue;
+                }
                 files.add(new DefinitionFile(id, paths.requireSafe(path)));
             }
         }

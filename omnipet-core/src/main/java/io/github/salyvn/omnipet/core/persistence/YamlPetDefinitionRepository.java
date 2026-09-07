@@ -11,8 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import io.github.salyvn.omnipet.core.domain.PetDefinition;
 import io.github.salyvn.omnipet.core.domain.PetDefinitionEnvelope;
@@ -20,19 +19,33 @@ import io.github.salyvn.omnipet.core.domain.StableId;
 import io.github.salyvn.omnipet.core.migration.legacy.LegacyPetDefinitionReader;
 
 public final class YamlPetDefinitionRepository implements PetDefinitionRepository {
+    /**
+     * The largest definition file this repository will read into memory. Generous next to a real
+     * definition, which is a few kilobytes of YAML, and far below a heap problem.
+     */
+    private static final int MAX_DEFINITION_BYTES = 1024 * 1024;
+
     private final SafeRepositoryPaths paths;
     private final PetDefinitionYamlCodec codec;
     private final AtomicFileStore fileStore;
     private final LegacyPetDefinitionReader legacyReader;
     private final YamlPetDefinitionFiles definitionFiles;
-    private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
+    private final KeyedLockRegistry<String> locks = new KeyedLockRegistry<>();
 
     public YamlPetDefinitionRepository(Path root) {
+        this(root, problem -> {});
+    }
+
+    /**
+     * @param problems where unusable definition filenames are reported. A stray file is skipped rather
+     *     than fatal, so without a sink the skip is silent and an operator wonders where their pet went.
+     */
+    public YamlPetDefinitionRepository(Path root, Consumer<String> problems) {
         this.paths = new SafeRepositoryPaths(root);
         this.codec = new PetDefinitionYamlCodec();
         this.fileStore = new AtomicFileStore();
         this.legacyReader = new LegacyPetDefinitionReader();
-        this.definitionFiles = new YamlPetDefinitionFiles(paths);
+        this.definitionFiles = new YamlPetDefinitionFiles(paths, problems);
     }
 
     @Override
@@ -200,7 +213,7 @@ public final class YamlPetDefinitionRepository implements PetDefinitionRepositor
         Optional<YamlPetDefinitionFiles.DefinitionFile> existing = definitionFiles.find(id);
         if (existing.isEmpty()) return Optional.empty();
         Path path = existing.orElseThrow().path();
-        String yaml = Files.readString(path, StandardCharsets.UTF_8);
+        String yaml = BoundedFiles.readString(path, MAX_DEFINITION_BYTES);
         Map<String, Object> raw = YamlDocuments.readMap(yaml);
         int schemaVersion = schemaVersion(raw.getOrDefault("schemaVersion", 1));
         if (schemaVersion < 1 || schemaVersion > PetDefinitionEnvelope.CURRENT_SCHEMA_VERSION) {
@@ -217,13 +230,7 @@ public final class YamlPetDefinitionRepository implements PetDefinitionRepositor
     }
 
     private <T> T withIdLock(String id, IoSupplier<T> operation) throws IOException {
-        ReentrantLock lock = locks.computeIfAbsent(StableId.folded(id), ignored -> new ReentrantLock());
-        lock.lock();
-        try {
-            return operation.get();
-        } finally {
-            lock.unlock();
-        }
+        return locks.withLock(StableId.folded(id), operation::get);
     }
 
     private static int schemaVersion(Object value) {
