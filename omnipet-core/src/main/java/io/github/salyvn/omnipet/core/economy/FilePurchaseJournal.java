@@ -7,17 +7,16 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 
 import io.github.salyvn.omnipet.core.persistence.AtomicFileStore;
+import io.github.salyvn.omnipet.core.persistence.KeyedLockRegistry;
 
 /** File-per-transaction journal with atomic replacement and restart-safe records. */
 public final class FilePurchaseJournal implements PurchaseJournal {
     private final Path root;
     private final PurchaseJournalYamlCodec codec;
     private final AtomicFileStore fileStore;
-    private final ConcurrentHashMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
+    private final KeyedLockRegistry<UUID> locks = new KeyedLockRegistry<>();
 
     public FilePurchaseJournal(Path root) {
         this(root, new PurchaseJournalYamlCodec(), new AtomicFileStore());
@@ -32,43 +31,38 @@ public final class FilePurchaseJournal implements PurchaseJournal {
 
     @Override
     public Optional<SlotPurchaseTransaction> find(UUID transactionId) throws IOException {
-        ReentrantLock lock = lock(transactionId);
-        lock.lock();
-        try {
-            return load(transactionId);
-        } finally {
-            lock.unlock();
-        }
+        requireTransactionId(transactionId);
+        return locks.withLock(transactionId, () -> load(transactionId));
     }
 
     @Override
     public SlotPurchaseTransaction create(SlotPurchaseTransaction transaction) throws IOException {
         if (transaction == null) throw new IllegalArgumentException("purchase transaction is required");
-        ReentrantLock lock = lock(transaction.transactionId());
-        lock.lock();
-        try {
+        requireTransactionId(transaction.transactionId());
+        return locks.withLock(transaction.transactionId(), () -> {
             Optional<SlotPurchaseTransaction> existing = load(transaction.transactionId());
-            if (existing.isPresent()) return existing.get();
+            // An existing record wins, but only if it is the same purchase: returning a different
+            // transaction that happens to share an ID would hand the caller someone else's purchase.
+            if (existing.isPresent()) {
+                requireSameIdentity(existing.get(), transaction);
+                return existing.get();
+            }
             write(transaction);
             return transaction;
-        } finally {
-            lock.unlock();
-        }
+        });
     }
 
     @Override
     public void save(SlotPurchaseTransaction transaction) throws IOException {
         if (transaction == null) throw new IllegalArgumentException("purchase transaction is required");
-        ReentrantLock lock = lock(transaction.transactionId());
-        lock.lock();
-        try {
+        requireTransactionId(transaction.transactionId());
+        locks.withLock(transaction.transactionId(), () -> {
             SlotPurchaseTransaction existing = load(transaction.transactionId())
                     .orElseThrow(() -> new IOException("purchase transaction does not exist: " + transaction.transactionId()));
             requireSameIdentity(existing, transaction);
             write(transaction);
-        } finally {
-            lock.unlock();
-        }
+            return null;
+        });
     }
 
     @Override
@@ -116,9 +110,13 @@ public final class FilePurchaseJournal implements PurchaseJournal {
         return path;
     }
 
-    private ReentrantLock lock(UUID transactionId) {
+    private static void requireTransactionId(UUID transactionId) {
         if (transactionId == null) throw new IllegalArgumentException("transaction id is required");
-        return locks.computeIfAbsent(transactionId, ignored -> new ReentrantLock());
+    }
+
+    /** How many transaction locks are currently tracked. Zero once every operation has finished. */
+    int trackedLocks() {
+        return locks.trackedKeys();
     }
 
     private static void requireSameIdentity(

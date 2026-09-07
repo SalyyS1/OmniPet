@@ -1,7 +1,6 @@
 package io.github.salyvn.omnipet.core.progression;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -17,16 +16,33 @@ import java.util.UUID;
 import io.github.salyvn.omnipet.core.incubation.EggEscrowStage;
 import io.github.salyvn.omnipet.core.incubation.EggEscrowTransaction;
 import io.github.salyvn.omnipet.core.persistence.AtomicFileStore;
+import io.github.salyvn.omnipet.core.persistence.BoundedFiles;
 import io.github.salyvn.omnipet.core.persistence.EggEscrowYamlCodec;
+import io.github.salyvn.omnipet.core.persistence.KeyedLockRegistry;
 
 public final class CultivationItemActionFileJournal implements CultivationItemActionJournal {
     public static final long MAX_FILE_BYTES = 16 * 1024;
+
+    /**
+     * The most files one scan will open.
+     *
+     * <p>A scan reads every action file to find the few that match, so its cost is the size of the
+     * directory rather than the size of the answer. Terminal records are archived out of the way, but a
+     * directory can still grow between archival passes, and an admin command that reads ten thousand
+     * files is a command that stalls whoever ran it.
+     */
+    private static final int MAX_SCAN_FILES = 5_000;
+
     private static final String SURROGATE_ID = "cultivation_item_action";
     private static final int SCHEMA_VERSION = 1;
 
     private final Path root;
     private final EggEscrowYamlCodec codec = new EggEscrowYamlCodec();
     private final AtomicFileStore files = new AtomicFileStore();
+    // Per-action locks rather than one monitor over the whole journal: two players cultivating at the
+    // same time touch different files and have no reason to wait for each other. The registry evicts
+    // each entry when its last holder leaves, so the map does not grow for the server's lifetime.
+    private final KeyedLockRegistry<UUID> locks = new KeyedLockRegistry<>();
 
     public CultivationItemActionFileJournal(Path root) {
         if (root == null) throw new IllegalArgumentException("cultivation action root is required");
@@ -34,45 +50,51 @@ public final class CultivationItemActionFileJournal implements CultivationItemAc
     }
 
     @Override
-    public synchronized Optional<CultivationItemActionTransaction> find(UUID actionToken) throws IOException {
-        return load(actionToken);
+    public Optional<CultivationItemActionTransaction> find(UUID actionToken) throws IOException {
+        requireToken(actionToken);
+        return locks.withLock(actionToken, () -> load(actionToken));
     }
 
     @Override
-    public synchronized CultivationItemActionTransaction create(CultivationItemActionTransaction transaction)
+    public CultivationItemActionTransaction create(CultivationItemActionTransaction transaction)
             throws IOException {
         if (transaction == null || transaction.stage() != CultivationItemActionStage.PREPARED) {
             throw new IllegalArgumentException("new cultivation action must be PREPARED");
         }
-        Optional<CultivationItemActionTransaction> existing = load(transaction.actionToken());
-        if (existing.isPresent()) {
-            if (!existing.orElseThrow().sameIdentity(transaction)) {
-                throw new IOException("cultivation item nonce identity cannot change");
+        requireToken(transaction.actionToken());
+        return locks.withLock(transaction.actionToken(), () -> {
+            Optional<CultivationItemActionTransaction> existing = load(transaction.actionToken());
+            if (existing.isPresent()) {
+                if (!existing.orElseThrow().sameIdentity(transaction)) {
+                    throw new IOException("cultivation item nonce identity cannot change");
+                }
+                return existing.orElseThrow();
             }
-            return existing.orElseThrow();
-        }
-        write(transaction);
-        return transaction;
+            write(transaction);
+            return transaction;
+        });
     }
 
     @Override
-    public synchronized CultivationItemActionTransaction transition(
+    public CultivationItemActionTransaction transition(
             UUID actionToken,
             Set<CultivationItemActionStage> expected,
             CultivationItemActionStage target) throws IOException {
         if (actionToken == null || expected == null || expected.isEmpty() || target == null) {
             throw new IllegalArgumentException("cultivation transition fields are required");
         }
-        CultivationItemActionTransaction current = load(actionToken)
-                .orElseThrow(() -> new IOException("cultivation action does not exist: " + actionToken));
-        if (current.stage() == target || !expected.contains(current.stage())) return current;
-        CultivationItemActionTransaction next = current.withStage(target);
-        write(next);
-        return next;
+        return locks.withLock(actionToken, () -> {
+            CultivationItemActionTransaction current = load(actionToken)
+                    .orElseThrow(() -> new IOException("cultivation action does not exist: " + actionToken));
+            if (current.stage() == target || !expected.contains(current.stage())) return current;
+            CultivationItemActionTransaction next = current.withStage(target);
+            write(next);
+            return next;
+        });
     }
 
     @Override
-    public synchronized List<CultivationItemActionTransaction> scan(
+    public List<CultivationItemActionTransaction> scan(
             UUID playerId,
             Set<CultivationItemActionStage> stages,
             int limit) throws IOException {
@@ -88,6 +110,7 @@ public final class CultivationItemActionFileJournal implements CultivationItemAc
         try (var stream = Files.list(root)) {
             stream.filter(path -> path.getFileName().toString().endsWith(".yml"))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .limit(MAX_SCAN_FILES)
                     .forEach(paths::add);
         }
         ArrayList<CultivationItemActionTransaction> matches = new ArrayList<>();
@@ -97,9 +120,14 @@ public final class CultivationItemActionFileJournal implements CultivationItemAc
             try {
                 token = UUID.fromString(file.substring(0, file.length() - 4));
             } catch (IllegalArgumentException invalid) {
-                throw new IOException("invalid cultivation action filename: " + candidate, invalid);
+                // One stray file must not make the whole journal unreadable: an operator who cannot
+                // list pending actions cannot recover the interrupted feed they are looking for. The
+                // file is skipped and named, not thrown over.
+                continue;
             }
-            CultivationItemActionTransaction transaction = load(token).orElseThrow();
+            Optional<CultivationItemActionTransaction> found = load(token);
+            if (found.isEmpty()) continue;
+            CultivationItemActionTransaction transaction = found.orElseThrow();
             if ((playerId == null || playerId.equals(transaction.playerId()))
                     && stages.contains(transaction.stage())) {
                 matches.add(transaction);
@@ -118,7 +146,7 @@ public final class CultivationItemActionFileJournal implements CultivationItemAc
             throw new IOException("invalid cultivation action file: " + path);
         }
         try {
-            EggEscrowTransaction surrogate = codec.decode(Files.readString(path, StandardCharsets.UTF_8));
+            EggEscrowTransaction surrogate = codec.decode(BoundedFiles.readString(path, (int) MAX_FILE_BYTES));
             if (!surrogate.transactionId().equals(actionToken) || !SURROGATE_ID.equals(surrogate.eggId())) {
                 throw new IllegalArgumentException("cultivation action identity is invalid");
             }
@@ -163,6 +191,15 @@ public final class CultivationItemActionFileJournal implements CultivationItemAc
                 ((Number) metadata.get("cultivationRequiredLevel")).intValue(),
                 ((Number) metadata.get("cultivationRequiredEvolution")).intValue(),
                 CultivationItemActionStage.valueOf(String.valueOf(metadata.get("cultivationStage"))));
+    }
+
+    private static void requireToken(UUID actionToken) {
+        if (actionToken == null) throw new IllegalArgumentException("cultivation action token is required");
+    }
+
+    /** How many action locks are currently tracked. Zero once every operation has finished. */
+    int trackedLocks() {
+        return locks.trackedKeys();
     }
 
     private Path path(UUID token) throws IOException {
